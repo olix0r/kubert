@@ -3,7 +3,7 @@
 
 pub use k8s_openapi as api;
 
-pub use kube::*;
+pub use kube;
 
 #[cfg(feature = "client")]
 mod client;
