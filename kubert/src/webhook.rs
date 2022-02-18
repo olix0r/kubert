@@ -1,4 +1,5 @@
 use std::{net::SocketAddr, path::PathBuf};
+use thiserror::Error;
 use tokio_rustls::{rustls, TlsAcceptor};
 use tower_service::Service;
 use tracing::{debug, error, info, info_span, Instrument};
@@ -11,17 +12,26 @@ pub struct WebhookArgs {
     #[cfg_attr(feature = "clap", clap(long, default_value = "0.0.0.0:443"))]
     pub webhook_addr: SocketAddr,
 
-    #[cfg_attr(
-        feature = "clap",
-        clap(long, default_value = "/var/run/linkerd/tls/tls.crt")
-    )]
-    pub webhook_tls_key: PathBuf,
+    #[cfg_attr(feature = "clap", clap(long))]
+    pub webhook_tls_key: Option<PathBuf>,
 
-    #[cfg_attr(
-        feature = "clap",
-        clap(long, default_value = "/var/run/linkerd/tls/tls.key")
-    )]
-    pub webhook_tls_certs: PathBuf,
+    #[cfg_attr(feature = "clap", clap(long))]
+    pub webhook_tls_certs: Option<PathBuf>,
+}
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("--webhook-tls-key must be set")]
+    NoTlsKey,
+
+    #[error("--webhook-tls-certs must be set")]
+    NoTlsCerts,
+
+    #[error("failed to bind {0:?}: {1}")]
+    Bind(SocketAddr, #[source] std::io::Error),
+
+    #[error("failed to get bound local address: {0}")]
+    LocalAddr(#[source] std::io::Error),
 }
 
 impl WebhookArgs {
@@ -30,10 +40,13 @@ impl WebhookArgs {
     pub async fn serve<S, B>(
         self,
         service: S,
-    ) -> std::io::Result<(
-        SocketAddr,
-        impl std::future::Future<Output = ()> + Send + 'static,
-    )>
+    ) -> Result<
+        (
+            SocketAddr,
+            impl std::future::Future<Output = ()> + Send + 'static,
+        ),
+        Error,
+    >
     where
         S: Clone
             + Send
@@ -45,8 +58,13 @@ impl WebhookArgs {
         B::Data: Send,
         B::Error: std::error::Error + Send + Sync,
     {
-        let tcp = tokio::net::TcpListener::bind(&self.webhook_addr).await?;
-        let listen_addr = tcp.local_addr()?;
+        let tcp = tokio::net::TcpListener::bind(&self.webhook_addr)
+            .await
+            .map_err(|e| Error::Bind(self.webhook_addr, e))?;
+        let listen_addr = tcp.local_addr().map_err(Error::LocalAddr)?;
+
+        let webhook_tls_key = self.webhook_tls_key.ok_or_else(|| Error::NoTlsKey)?;
+        let webhook_tls_certs = self.webhook_tls_certs.ok_or_else(|| Error::NoTlsCerts)?;
 
         let accept_loop = async move {
             loop {
@@ -67,8 +85,8 @@ impl WebhookArgs {
                 };
 
                 let service = service.clone();
-                let pk = self.webhook_tls_key.clone();
-                let crts = self.webhook_tls_certs.clone();
+                let pk = webhook_tls_key.clone();
+                let crts = webhook_tls_certs.clone();
                 tokio::spawn(
                     async move {
                         let socket = match accept_tls(&pk, &crts, socket).await {
