@@ -1,4 +1,3 @@
-use clap::Parser;
 use std::{net::SocketAddr, path::PathBuf};
 use tokio_rustls::{rustls, TlsAcceptor};
 use tower_service::Service;
@@ -6,15 +5,22 @@ use tracing::{debug, error, info, info_span, Instrument};
 
 pub use kube::core::admission::{AdmissionRequest, AdmissionResponse, AdmissionReview};
 
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct WebhookArgs {
-    #[clap(long, default_value = "0.0.0.0/443")]
+    #[cfg_attr(feature = "clap", clap(long, default_value = "0.0.0.0/443"))]
     pub webhook_addr: SocketAddr,
 
-    #[clap(long, default_value = "/var/run/linkerd/tls/tls.crt")]
+    #[cfg_attr(
+        feature = "clap",
+        clap(long, default_value = "/var/run/linkerd/tls/tls.crt")
+    )]
     pub webhook_tls_key: PathBuf,
 
-    #[clap(long, default_value = "/var/run/linkerd/tls/tls.key")]
+    #[cfg_attr(
+        feature = "clap",
+        clap(long, default_value = "/var/run/linkerd/tls/tls.key")
+    )]
     pub webhook_tls_certs: PathBuf,
 }
 

@@ -1,15 +1,14 @@
 pub use kube::Client;
 
 // TODO configure a --kubeconfig
-#[cfg(feature = "cli")]
-#[derive(Clone, Debug, clap::Parser)]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct ClientArgs {
     // Kubernetes context.
-    #[clap(long)]
+    #[cfg_attr(feature = "clap", clap(long))]
     pub context: Option<String>,
 }
 
-#[cfg(feature = "cli")]
 impl ClientArgs {
     pub async fn try_client(
         self,

@@ -9,10 +9,7 @@ pub use kube;
 mod client;
 
 #[cfg(all(feature = "client"))]
-pub use self::client::Client;
-
-#[cfg(all(feature = "client", feature = "cli"))]
-pub use self::client::ClientArgs;
+pub use self::client::{Client, ClientArgs};
 
 #[cfg(feature = "log")]
 pub mod log;
