@@ -1,4 +1,5 @@
 pub use kube::Client;
+use thiserror::Error;
 
 // TODO configure a --kubeconfig
 #[derive(Clone, Debug)]
@@ -9,10 +10,16 @@ pub struct ClientArgs {
     pub context: Option<String>,
 }
 
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error(transparent)]
+    Kubeconfig(#[from] kube::config::KubeconfigError),
+    #[error(transparent)]
+    Client(#[from] kube::Error),
+}
+
 impl ClientArgs {
-    pub async fn try_client(
-        self,
-    ) -> Result<Client, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    pub async fn try_client(self) -> Result<Client, Error> {
         let c = kube::config::KubeConfigOptions {
             context: self.context,
             ..Default::default()
@@ -20,6 +27,6 @@ impl ClientArgs {
         kube::Config::from_kubeconfig(&c)
             .await?
             .try_into()
-            .map_err(Into::into)
+            .map_err(Error::from)
     }
 }
