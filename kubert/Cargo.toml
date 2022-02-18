@@ -9,10 +9,6 @@ repository = "https://github.com/olix0r/kubert"
 [features]
 default = []
 client = ["kube/client"]
-client-native-tls = ["kube/native-tls"]
-client-rustls-tls = ["kube/rustls-tls"]
-kube-derive = ["kube/derive"]
-kube-runtime = ["kube/runtime"]
 # TODO controller = ["client", "kube/runtime"]
 log = ["tracing-subscriber"]
 # TODO runtime = ["clap", "drain", "log", "tokio/signal"]
@@ -22,21 +18,21 @@ webhook = [
     "hyper/http2",
     "hyper/runtime",
     "hyper/server",
-    "kube/admission",
     "rustls-pemfile",
     "tokio/fs",
     "tokio-rustls",
     "tower-service",
 ]
-v1_20 = ["k8s-openapi/v1_20"]
-v1_21 = ["k8s-openapi/v1_21"]
-v1_22 = ["k8s-openapi/v1_22"]
-v1_23 = ["k8s-openapi/v1_23"]
+
+[package.metadata.docs.rs]
+features = [
+    "client",
+    "k8s-openapi/v1_22",
+]
 
 [dependencies]
 #drain = { version = "0.1.0", optional = true, default-features = false }
 hyper = { version = "0.14.0", optional = true, default-features = false }
-k8s-openapi = { version = "0.14", default-features = false }
 kube = { version = "0.69.1", default-features = false }
 rustls = { version = "0.20", optional = true, default-features = false }
 rustls-pemfile = { version = "0.3", optional = true }
@@ -63,3 +59,6 @@ features = [
     "smallvec",
     "tracing-log",
 ]
+
+[dev-dependencies]
+k8s-openapi = { version = "0.14", default-features = false, features = ["v1_23"] }
