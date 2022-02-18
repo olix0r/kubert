@@ -1,6 +1,6 @@
 [package]
 name = "kubert"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "Kubernetes runtime helpers. Based on kube-rs."
@@ -16,11 +16,13 @@ client-rustls-tls = ["kube/rustls-tls"]
 log = ["tracing-subscriber"]
 # TODO runtime = ["cli", "drain", "log", "tokio/signal"]
 webhook = [
+    "cli",
     "hyper",
     "hyper/http1",
     "hyper/http2",
     "hyper/runtime",
     "hyper/server",
+    "kube/admission",
     "rustls-pemfile",
     "tokio/fs",
     "tokio-rustls",

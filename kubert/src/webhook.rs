@@ -4,6 +4,8 @@ use tokio_rustls::{rustls, TlsAcceptor};
 use tower_service::Service;
 use tracing::{debug, error, info, info_span, Instrument};
 
+pub use kube::core::admission::{AdmissionRequest, AdmissionResponse, AdmissionReview};
+
 #[derive(Clone, Debug, Parser)]
 pub struct WebhookArgs {
     #[clap(long, default_value = "0.0.0.0/443")]
