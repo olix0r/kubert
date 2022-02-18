@@ -8,7 +8,7 @@ pub use kube::core::admission::{AdmissionRequest, AdmissionResponse, AdmissionRe
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct WebhookArgs {
-    #[cfg_attr(feature = "clap", clap(long, default_value = "0.0.0.0/443"))]
+    #[cfg_attr(feature = "clap", clap(long, default_value = "0.0.0.0:443"))]
     pub webhook_addr: SocketAddr,
 
     #[cfg_attr(
