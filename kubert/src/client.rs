@@ -11,7 +11,9 @@ pub struct ClientArgs {
 
 #[cfg(feature = "cli")]
 impl ClientArgs {
-    pub async fn try_client(self) -> Result<Client, Box<dyn std::error::Error + 'static>> {
+    pub async fn try_client(
+        self,
+    ) -> Result<Client, Box<dyn std::error::Error + Send + Sync + 'static>> {
         let c = kube::config::KubeConfigOptions {
             context: self.context,
             ..Default::default()
