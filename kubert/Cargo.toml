@@ -20,6 +20,8 @@ webhook = [
     "hyper/server",
     "rustls-pemfile",
     "tokio/fs",
+    "tokio/net",
+    "tokio/rt",
     "tokio-rustls",
     "tower-service",
 ]
@@ -37,7 +39,7 @@ kube = { version = "0.69.1", default-features = false }
 rustls = { version = "0.20", optional = true, default-features = false }
 rustls-pemfile = { version = "0.3", optional = true }
 thiserror = "1.0.0"
-tokio = "1.6"
+tokio = { version = "1.6", default-features = false }
 tokio-rustls = { version = "0.23", optional = true, default-features = false }
 tower-service = { version = "0.3", optional = true }
 tracing = "0.1"
