@@ -1,4 +1,4 @@
-pub use kube::{Client, Config};
+pub use kube::Client;
 
 // TODO configure a --kubeconfig
 #[cfg(feature = "cli")]
@@ -16,7 +16,7 @@ impl ClientArgs {
             context: self.context,
             ..Default::default()
         };
-        Config::from_kubeconfig(&c)
+        kube::Config::from_kubeconfig(&c)
             .await?
             .try_into()
             .map_err(Into::into)

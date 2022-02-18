@@ -8,6 +8,9 @@ pub use kube;
 #[cfg(feature = "client")]
 mod client;
 
+#[cfg(all(feature = "client"))]
+pub use self::client::Client;
+
 #[cfg(all(feature = "client", feature = "cli"))]
 pub use self::client::ClientArgs;
 
