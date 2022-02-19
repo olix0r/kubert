@@ -1,14 +1,22 @@
+//! Configures the global default tracing subscriber
+
 use thiserror::Error;
 use tracing_subscriber::util::TryInitError;
 
 pub use tracing_subscriber::EnvFilter;
 
+/// Configures whether logs should be emitted in plaintext (the default) or as JSON-encoded
+/// messages
 #[derive(Clone, Debug)]
 pub enum LogFormat {
-    Json,
+    /// The default plaintext format
     Plain,
+
+    /// The JSON-encoded format
+    Json,
 }
 
+/// Indicates that an invalid log format was specified
 #[derive(Debug, Error)]
 #[error("invalid log level: {0} must be 'plain' or 'json'")]
 pub struct InvalidLogFormat(String);
@@ -34,6 +42,11 @@ impl std::str::FromStr for LogFormat {
 }
 
 impl LogFormat {
+    /// Attempts to configure the global default tracing subscriber in the current scope, returning
+    /// an error if one is already set
+    ///
+    /// This method returns an error if a global default subscriber has already been set, or if a
+    /// `log` logger has already been set.
     pub fn try_init(self, filter: EnvFilter) -> Result<(), TryInitError> {
         use tracing_subscriber::prelude::*;
 

@@ -1,24 +1,26 @@
+//! Drives graceful shutdown when the process receives a signal.
+
 use tokio::signal::unix::{signal, SignalKind};
 use tracing::debug;
 
 pub use drain::Watch;
 
-/// Drives shutdown by watching signals.
+/// Drives shutdown by watching signals
 #[derive(Debug)]
 #[must_use = "call `Shutdown::on_signal` to await a signal"]
 pub struct Shutdown(drain::Signal);
 
-/// Indicates whether shutdown completed gracefully or was forced by a second signal.
+/// Indicates whether shutdown completed gracefully or was forced by a second signal
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Completion {
-    /// Indicates that shutdown completed gracefully.
+    /// Indicates that shutdown completed gracefully
     Graceful,
 
-    /// Indicates that shutdown did not complete gracefully.
+    /// Indicates that shutdown did not complete gracefully
     Aborted,
 }
 
-/// Creates a shutdown channel.
+/// Creates a shutdown channel
 ///
 /// [`Shutdown`] watches for `SIGINT` and `SIGTERM` signals. When a signal is received, [`Watch`]
 /// instances are notifed and, when all watches are dropped, the shutdown is completed. If a second
@@ -31,11 +33,12 @@ pub fn channel() -> (Shutdown, Watch) {
 }
 
 impl Shutdown {
-    /// Watches for signals and drives shutdown.
+    /// Watches for signals and drives shutdown
     ///
-    /// I
+    /// When a `SIGINT` or `SIGTERM` signal is received, the shutdown is initiated, notifying all
+    /// [`Watch`] instances. When all watches are dropped, the shutdown is completed.
     ///
-    /// If a second signal is received while waiting for the process to terminate, this future
+    /// If a second signal is received while waiting for watches to be dropped, this future
     /// completes immediately and [`Completion::Aborted`] is returned.
     ///
     /// An error is returned when signal registration fails.
@@ -73,10 +76,12 @@ impl Shutdown {
 }
 
 impl Completion {
+    /// Returns `true` if the shutdown completed gracefully
     pub fn is_graceful(&self) -> bool {
         matches!(self, Completion::Graceful)
     }
 
+    /// Returns `true` if the shutdown was aborted
     pub fn is_aborted(&self) -> bool {
         matches!(self, Completion::Aborted)
     }
