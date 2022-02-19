@@ -1,0 +1,35 @@
+name: deny
+
+on:
+  pull_request:
+    paths:
+      - Cargo.toml
+      - "**/Cargo.toml"
+      - deny.toml
+      - .github/workflows/deny.yml
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUST_BACKTRACE: short
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  check:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        checks:
+          - advisories
+          - bans licenses sources
+    # Prevent sudden announcement of a new advisory from failing Ci.
+    continue-on-error: ${{ matrix.checks == 'advisories' }}
+    steps:
+    - uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+    - uses: EmbarkStudios/cargo-deny-action@8acbae97b5d01b0481ae14cee8fcd8f5aa9e374d
+      with:
+        command: check ${{ matrix.checks }}
