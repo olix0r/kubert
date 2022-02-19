@@ -1,7 +1,6 @@
 use thiserror::Error;
 use tracing_subscriber::util::TryInitError;
 
-pub use tracing::{debug, debug_span, error, info, info_span, trace, warn, Instrument};
 pub use tracing_subscriber::EnvFilter;
 
 #[derive(Clone, Debug)]
