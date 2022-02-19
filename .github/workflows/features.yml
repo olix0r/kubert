@@ -30,4 +30,5 @@ env:
         with:
           tool: cargo-hack
       - uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
+      - run: cargo fetch
       - run: cargo hack --feature-powerset --workspace check --all-targets --message-format=json | cargo-action-fmt
