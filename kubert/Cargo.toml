@@ -30,6 +30,9 @@ webhook = [
 [package.metadata.docs.rs]
 features = [
     "client",
+    "log",
+    "shutdown",
+    "webhook",
     "k8s-openapi/v1_22",
 ]
 
