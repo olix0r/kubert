@@ -13,5 +13,5 @@ pub mod log;
 #[cfg(feature = "shutdown")]
 pub mod shutdown;
 
-#[cfg(feature = "webhook")]
-pub mod webhook;
+#[cfg(feature = "server")]
+pub mod server;
