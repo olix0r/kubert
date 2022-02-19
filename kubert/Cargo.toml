@@ -8,7 +8,6 @@ repository = "https://github.com/olix0r/kubert"
 rust-version = "1.56.1"
 
 [features]
-default = []
 client = ["kube/client"]
 # TODO controller = ["client", "kube/runtime"]
 log = ["tracing-subscriber"]
@@ -34,7 +33,7 @@ features = [
     "log",
     "shutdown",
     "webhook",
-    "k8s-openapi/v1_22",
+    "k8s-openapi/v1_23",
 ]
 
 [dependencies]
