@@ -1,5 +1,8 @@
 //! Helpers for configuring and running an HTTPS server, especially for admission controllers and
-//! API extensions.
+//! API extensions
+//!
+//! Unlike a normal `hyper` server, this server reloads its TLS credentials for each connection to
+//! support certificate rotation.
 
 use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use thiserror::Error;
@@ -8,62 +11,80 @@ use tokio_rustls::{rustls, TlsAcceptor};
 use tower_service::Service;
 use tracing::{debug, error, info, info_span, Instrument};
 
-/// Command-line arguments used to configure a server.
+/// Command-line arguments used to configure a server
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct ServerArgs {
+    /// The server's address
     #[cfg_attr(feature = "clap", clap(long, default_value = "0.0.0.0:443"))]
     pub server_addr: SocketAddr,
 
+    /// The path to the server's TLS key
     #[cfg_attr(feature = "clap", clap(long))]
     pub server_tls_key: Option<TlsKeyPath>,
 
+    /// The path to the server's TLS certificate
     #[cfg_attr(feature = "clap", clap(long))]
     pub server_tls_certs: Option<TlsCertPath>,
 }
 
-/// A running server.
+/// A running server
 pub struct SpawnedServer {
     local_addr: SocketAddr,
     task: tokio::task::JoinHandle<()>,
 }
 
-/// The path to the server's TLS private key.
+/// The path to the server's TLS private key
 #[derive(Clone, Debug)]
 pub struct TlsKeyPath(PathBuf);
 
-/// The path to the server's TLS certificate bundle.
+/// The path to the server's TLS certificate bundle
 #[derive(Clone, Debug)]
 pub struct TlsCertPath(PathBuf);
 
+/// Describes an error that occurred while initializing a server
 #[derive(Debug, Error)]
 pub enum Error {
+    /// No TLS key path was configured
     #[error("--server-tls-key must be set")]
     NoTlsKey,
 
+    /// No TLS certificate path was configured
     #[error("--server-tls-certs must be set")]
     NoTlsCerts,
 
+    /// The configured TLS certificate path could not be read
     #[error("failed to read TLS certificates: {0}")]
     TlsCertsReadError(#[source] std::io::Error),
 
+    /// The configured TLS key path could not be read
     #[error("failed to read TLS key: {0}")]
     TlsKeyReadError(#[source] std::io::Error),
 
-    #[error("failed to load tls credentials: {0}")]
+    /// The configured TLS credentials were invalid
+    #[error("failed to load TLS credentials: {0}")]
     InvalidTlsCredentials(#[source] rustls::Error),
 
+    /// An error occurred while binding a server
     #[error("failed to bind {0:?}: {1}")]
     Bind(SocketAddr, #[source] std::io::Error),
 
+    /// An error occurred while reading a bound server's local address
     #[error("failed to get bound local address: {0}")]
     LocalAddr(#[source] std::io::Error),
 }
 
+// === impl ServerArgs ===
+
 impl ServerArgs {
-    /// Bind an HTTPS server to the configured address with the provided service.
+    /// Bind an HTTPS server to the configured address with the provided service
     ///
     /// The server terminates gracefully when the provided `drain` handle is signaled.
+    ///
+    /// TLS credentials are read from the configured paths _for each connection_ to support
+    /// certificate rotation. As such, it is not recommended to expose this server to the open
+    /// internet or to clients that open many short-lived connections. It is primarily intended for
+    /// kubernetes admission controllers.
     pub async fn spawn<S, B>(self, service: S, drain: drain::Watch) -> Result<SpawnedServer, Error>
     where
         S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
@@ -100,72 +121,19 @@ impl ServerArgs {
 // === impl SpawnedServer ===
 
 impl SpawnedServer {
-    /// Returns the bound local address of the spawned server.
+    /// Returns the bound local address of the spawned server
     pub fn local_addr(&self) -> SocketAddr {
         self.local_addr
     }
 
-    /// Terminates the server task forcefully.
+    /// Terminates the server task forcefully
     pub fn abort(&self) {
         self.task.abort();
     }
 
-    /// Waits for the server task to complete.
+    /// Waits for the server task to complete
     pub async fn join(self) -> Result<(), tokio::task::JoinError> {
         self.task.await
-    }
-}
-
-// === impl TlsCertPath ===
-
-impl TlsCertPath {
-    // Load public certificate from file.
-    async fn load_certs(&self) -> std::io::Result<Vec<rustls::Certificate>> {
-        // Open certificate file.
-        let pem = tokio::fs::read(&self.0).await?;
-        let mut reader = std::io::BufReader::new(pem.as_slice());
-
-        // Load and return certificate.
-        let certs = rustls_pemfile::certs(&mut reader)?;
-        Ok(certs.into_iter().map(rustls::Certificate).collect())
-    }
-}
-
-impl FromStr for TlsCertPath {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self)
-    }
-}
-
-// === impl TlsKeyPath ===
-
-impl TlsKeyPath {
-    // Load private key from file.
-    async fn load_private_key(&self) -> std::io::Result<rustls::PrivateKey> {
-        // Open keyfile.
-        let pem = tokio::fs::read(&self.0).await?;
-        let mut reader = std::io::BufReader::new(pem.as_slice());
-
-        // Load and return a single private key.
-        let keys = rustls_pemfile::rsa_private_keys(&mut reader)?;
-        if keys.len() != 1 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "too many private keys",
-            ));
-        }
-
-        Ok(rustls::PrivateKey(keys[0].clone()))
-    }
-}
-
-impl FromStr for TlsKeyPath {
-    type Err = Infallible;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        s.parse().map(Self)
     }
 }
 
@@ -271,7 +239,6 @@ async fn serve_conn<S, B>(
     }
 }
 
-/// Load TLS credentials from the provided paths and return a configured TLS acceptor.
 async fn load_tls(pk: &TlsKeyPath, crts: &TlsCertPath) -> Result<TlsAcceptor, Error> {
     let key = pk
         .load_private_key()
@@ -288,4 +255,56 @@ async fn load_tls(pk: &TlsKeyPath, crts: &TlsCertPath) -> Result<TlsAcceptor, Er
     cfg.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
 
     Ok(TlsAcceptor::from(Arc::new(cfg)))
+}
+
+// === impl TlsCertPath ===
+
+impl TlsCertPath {
+    // Load public certificate from file
+    async fn load_certs(&self) -> std::io::Result<Vec<rustls::Certificate>> {
+        // Open certificate file.
+        let pem = tokio::fs::read(&self.0).await?;
+        let mut reader = std::io::BufReader::new(pem.as_slice());
+
+        // Load and return certificate.
+        let certs = rustls_pemfile::certs(&mut reader)?;
+        Ok(certs.into_iter().map(rustls::Certificate).collect())
+    }
+}
+
+impl FromStr for TlsCertPath {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
+
+// === impl TlsKeyPath ===
+
+impl TlsKeyPath {
+    async fn load_private_key(&self) -> std::io::Result<rustls::PrivateKey> {
+        // Open keyfile.
+        let pem = tokio::fs::read(&self.0).await?;
+        let mut reader = std::io::BufReader::new(pem.as_slice());
+
+        // Load and return a single private key.
+        let keys = rustls_pemfile::rsa_private_keys(&mut reader)?;
+        if keys.len() != 1 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "too many private keys",
+            ));
+        }
+
+        Ok(rustls::PrivateKey(keys[0].clone()))
+    }
+}
+
+impl FromStr for TlsKeyPath {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
 }
