@@ -1,14 +1,14 @@
 name: features
 
 on:
-   pull_request:
-     paths:
-       - '**/Cargo.toml'
-       - '**/*.rs'
-       - .github/workflows/features.yml
+  pull_request:
+    paths:
+      - '**/Cargo.toml'
+      - '**/*.rs'
+      - .github/workflows/features.yml
 
 permissions:
-   contents: read
+  contents: read
 
 env:
   CARGO_ACTION_FMT_VERSION: v0.1.3
@@ -17,6 +17,7 @@ env:
   RUST_BACKTRACE: short
   RUSTUP_MAX_RETRIES: 10
 
+jobs:
   features:
     timeout-minutes: 5
     runs-on: ubuntu-latest

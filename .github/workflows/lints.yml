@@ -1,13 +1,13 @@
 name: lints
 
 on:
-   pull_request:
-     paths:
-       - '**/*.rs'
-       - .github/workflows/lints.yml
+  pull_request:
+    paths:
+      - '**/*.rs'
+      - .github/workflows/lints.yml
 
 permissions:
-   contents: read
+  contents: read
 
 env:
   CARGO_ACTION_FMT_VERSION: v0.1.3
