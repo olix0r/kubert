@@ -5,6 +5,7 @@ edition = "2021"
 license = "Apache-2.0"
 description = "Kubernetes runtime helpers. Based on kube-rs."
 repository = "https://github.com/olix0r/kubert"
+rust-version = "1.56.1"
 
 [features]
 default = []
