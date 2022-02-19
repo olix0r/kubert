@@ -1,5 +1,5 @@
 use tokio::signal::unix::{signal, SignalKind};
-use tracing::{debug, info};
+use tracing::debug;
 
 pub use drain::Watch;
 

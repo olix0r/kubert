@@ -1,4 +1,7 @@
-use std::{net::SocketAddr, path::PathBuf};
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 use thiserror::Error;
 use tokio_rustls::{rustls, TlsAcceptor};
 use tower_service::Service;
@@ -61,8 +64,8 @@ impl WebhookArgs {
             .map_err(|e| Error::Bind(self.webhook_addr, e))?;
         let listen_addr = tcp.local_addr().map_err(Error::LocalAddr)?;
 
-        let webhook_tls_key = self.webhook_tls_key.ok_or_else(|| Error::NoTlsKey)?;
-        let webhook_tls_certs = self.webhook_tls_certs.ok_or_else(|| Error::NoTlsCerts)?;
+        let webhook_tls_key = self.webhook_tls_key.ok_or(Error::NoTlsKey)?;
+        let webhook_tls_certs = self.webhook_tls_certs.ok_or(Error::NoTlsCerts)?;
 
         let accept_loop = async move {
             loop {
@@ -115,16 +118,16 @@ impl WebhookArgs {
 /// Serve an HTTP server for the admission controller on the given TCP
 /// connection.
 async fn accept_tls(
-    pk: &PathBuf,
-    crts: &PathBuf,
+    pk: &Path,
+    crts: &Path,
     socket: tokio::net::TcpStream,
 ) -> Result<tokio_rustls::server::TlsStream<tokio::net::TcpStream>, String> {
     let tls = {
-        let key = load_private_key(&pk)
+        let key = load_private_key(pk)
             .await
             .map_err(|e| format!("failed to load private key: {}", e))?;
 
-        let certs = load_certs(&crts)
+        let certs = load_certs(crts)
             .await
             .map_err(|e| format!("failed to load certificates: {}", e))?;
 
@@ -144,7 +147,7 @@ async fn accept_tls(
 }
 
 // Load public certificate from file.
-async fn load_certs(filename: &PathBuf) -> Result<Vec<rustls::Certificate>, String> {
+async fn load_certs(filename: &Path) -> Result<Vec<rustls::Certificate>, String> {
     // Open certificate file.
     let pem = tokio::fs::read(filename).await.map_err(|e| e.to_string())?;
     let mut reader = std::io::BufReader::new(pem.as_slice());
@@ -155,7 +158,7 @@ async fn load_certs(filename: &PathBuf) -> Result<Vec<rustls::Certificate>, Stri
 }
 
 // Load private key from file.
-async fn load_private_key(filename: &PathBuf) -> Result<rustls::PrivateKey, String> {
+async fn load_private_key(filename: &Path) -> Result<rustls::PrivateKey, String> {
     // Open keyfile.
     let pem = tokio::fs::read(filename).await.map_err(|e| e.to_string())?;
     let mut reader = std::io::BufReader::new(pem.as_slice());
