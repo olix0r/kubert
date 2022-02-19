@@ -8,31 +8,34 @@ repository = "https://github.com/olix0r/kubert"
 rust-version = "1.56.1"
 
 [features]
-client = ["kube-client"]
+client = ["kube-client", "thiserror"]
 # TODO controller = ["client", "kube/runtime"]
-log = ["tracing-subscriber"]
+log = ["thiserror", "tracing-subscriber"]
 # TODO runtime = ["clap", "drain", "log", "tokio/signal"]
-shutdown = ["drain", "tokio/macros", "tokio/signal"]
-webhook = [
+server = [
+    "drain",
     "hyper",
     "hyper/http1",
     "hyper/http2",
     "hyper/runtime",
     "hyper/server",
     "rustls-pemfile",
+    "thiserror",
     "tokio/fs",
+    "tokio/macros",
     "tokio/net",
     "tokio/rt",
     "tokio-rustls",
     "tower-service",
 ]
+shutdown = ["drain", "tokio/macros", "tokio/signal"]
 
 [package.metadata.docs.rs]
 features = [
     "client",
     "log",
+    "server",
     "shutdown",
-    "webhook",
     "k8s-openapi/v1_23",
 ]
 
@@ -40,8 +43,8 @@ features = [
 drain = { version = "0.1.0", optional = true, default-features = false }
 hyper = { version = "0.14.17", optional = true, default-features = false }
 rustls-pemfile = { version = "0.3.0", optional = true }
-thiserror = "1.0.30"
-tokio = { version = "1.17.0", default-features = false }
+thiserror = { version = "1.0.30", optional = true }
+tokio = { version = "1.17.0", optional = false, default-features = false }
 tokio-rustls = { version = "0.23.2", optional = true, default-features = false }
 tower-service = { version = "0.3.1", optional = true }
 tracing = "0.1.31"
