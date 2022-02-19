@@ -12,7 +12,7 @@ pub struct Shutdown(drain::Signal);
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Completion {
     /// Indicates that shutdown completed gracefully.
-    Terminated,
+    Graceful,
 
     /// Indicates that shutdown did not complete gracefully.
     Aborted,
@@ -56,7 +56,7 @@ impl Shutdown {
         tokio::select! {
             _ = self.0.drain() => {
                 debug!("Drained");
-                Ok(Completion::Terminated)
+                Ok(Completion::Graceful)
             },
 
             _ = interrupt.recv() => {
@@ -69,5 +69,15 @@ impl Shutdown {
                 Ok(Completion::Aborted)
             }
         }
+    }
+}
+
+impl Completion {
+    pub fn is_graceful(&self) -> bool {
+        matches!(self, Completion::Graceful)
+    }
+
+    pub fn is_aborted(&self) -> bool {
+        matches!(self, Completion::Aborted)
     }
 }
