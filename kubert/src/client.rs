@@ -14,6 +14,7 @@ pub struct ClientArgs {
 pub enum Error {
     #[error(transparent)]
     Kubeconfig(#[from] kube::config::KubeconfigError),
+
     #[error(transparent)]
     Client(#[from] kube::Error),
 }

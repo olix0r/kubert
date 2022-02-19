@@ -12,6 +12,7 @@ client = ["kube/client"]
 # TODO controller = ["client", "kube/runtime"]
 log = ["tracing-subscriber"]
 # TODO runtime = ["clap", "drain", "log", "tokio/signal"]
+shutdown = ["drain", "tokio/macros", "tokio/signal"]
 webhook = [
     "hyper",
     "hyper/http1",
@@ -33,7 +34,7 @@ features = [
 ]
 
 [dependencies]
-#drain = { version = "0.1.0", optional = true, default-features = false }
+drain = { version = "0.1.0", optional = true, default-features = false }
 hyper = { version = "0.14.0", optional = true, default-features = false }
 kube = { version = "0.69.1", default-features = false }
 rustls = { version = "0.20", optional = true, default-features = false }

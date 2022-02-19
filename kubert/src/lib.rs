@@ -10,5 +10,8 @@ pub use self::client::ClientArgs;
 #[cfg(feature = "log")]
 pub mod log;
 
+#[cfg(feature = "shutdown")]
+pub mod shutdown;
+
 #[cfg(feature = "webhook")]
 pub mod webhook;
