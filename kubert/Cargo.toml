@@ -13,7 +13,7 @@ keywords = ["kubernetes", "client", "runtime", "server"]
 client = ["kube-client", "thiserror"]
 # TODO controller = ["client", "kube/runtime"]
 log = ["thiserror", "tracing-subscriber"]
-requeue = ["futures", "kube-core", "kube-runtime", "tokio-util/time"]
+requeue = ["futures", "kube-core", "kube-runtime", "tokio/macros", "tokio/sync", "tokio-util/time"]
 # TODO runtime = ["clap", "drain", "log", "tokio/signal"]
 server = [
     "drain",
