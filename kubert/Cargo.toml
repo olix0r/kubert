@@ -13,6 +13,7 @@ keywords = ["kubernetes", "client", "runtime", "server"]
 client = ["kube-client", "thiserror"]
 # TODO controller = ["client", "kube/runtime"]
 log = ["thiserror", "tracing-subscriber"]
+requeue = ["futures", "kube-core", "kube-runtime", "tokio-util/time"]
 # TODO runtime = ["clap", "drain", "log", "tokio/signal"]
 server = [
     "drain",
@@ -44,10 +45,12 @@ features = [
 
 [dependencies]
 drain = { version = "0.1.0", optional = true, default-features = false }
+futures = { version = "0.3", optional = true, default-features = false }
 hyper = { version = "0.14.17", optional = true, default-features = false }
 rustls-pemfile = { version = "0.3.0", optional = true }
 thiserror = { version = "1.0.30", optional = true }
 tokio = { version = "1.17.0", optional = false, default-features = false }
+tokio-util = { version = "0.7", optional = true, default-features = false }
 tokio-rustls = { version = "0.23.2", optional = true, default-features = false }
 tower-service = { version = "0.3.1", optional = true }
 tracing = "0.1.31"
@@ -63,6 +66,16 @@ version = "0.69.1"
 optional = true
 default-features = false
 features = ["client", "config"]
+
+[dependencies.kube-core]
+version = "0.69.1"
+optional = true
+default-features = false
+
+[dependencies.kube-runtime]
+version = "0.69.1"
+optional = true
+default-features = false
 
 [dependencies.tracing-subscriber]
 version = "0.3.9"
