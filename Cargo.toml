@@ -1,2 +1,3 @@
 [workspace]
+default-members = ["kubert"]
 members = ["kubert"]
