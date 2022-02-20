@@ -102,3 +102,11 @@ impl<T: Resource> Sender<T> {
         self.tx.send((key, time)).await
     }
 }
+
+impl<T: Resource> Clone for Sender<T> {
+    fn clone(&self) -> Self {
+        Self {
+            tx: self.tx.clone(),
+        }
+    }
+}
