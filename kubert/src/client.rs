@@ -28,6 +28,10 @@ pub enum ConfigError {
     #[error(transparent)]
     Kubeconfig(#[from] config::KubeconfigError),
 
+    /// Indicates that the in-cluster configuration could not be read
+    #[error(transparent)]
+    InCluster(#[from] config::InClusterError),
+
     /// Indicates that the client could not be initialized
     #[error(transparent)]
     Client(#[from] Error),
@@ -38,15 +42,24 @@ impl ClientArgs {
     ///
     /// This will respect the `$KUBECONFIG` environment variable, but otherwise default to
     /// `~/.kube/config`. The _current-context_ is used unless `context` is set.
+    ///
+    /// This is basically equivalent to using `kube_client::Client::try_default`, except that it
+    /// supports kubeconfig configuration from the command-line.
     pub async fn try_client(self) -> Result<Client, ConfigError> {
         let c = kube_client::config::KubeConfigOptions {
             context: self.context,
             cluster: self.cluster,
             user: self.user,
         };
-        kube_client::Config::from_kubeconfig(&c)
-            .await?
-            .try_into()
-            .map_err(Into::into)
+
+        let client = match kube_client::Config::from_kubeconfig(&c).await {
+            Ok(client) => client,
+            Err(e) if c.context.is_some() || c.cluster.is_some() || c.user.is_some() => {
+                return Err(e.into())
+            }
+            Err(_) => kube_client::Config::from_cluster_env()?,
+        };
+
+        client.try_into().map_err(Into::into)
     }
 }
