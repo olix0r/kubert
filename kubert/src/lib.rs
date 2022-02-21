@@ -22,6 +22,10 @@ pub mod log;
 #[cfg_attr(docsrs, doc(cfg(any(feature = "shutdown"))))]
 pub mod shutdown;
 
+#[cfg(feature = "requeue")]
+#[cfg_attr(docsrs, doc(cfg(any(feature = "requeue"))))]
+pub mod requeue;
+
 #[cfg(feature = "server")]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "shutdown"))))]
 pub mod server;
