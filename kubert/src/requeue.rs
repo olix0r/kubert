@@ -1,4 +1,5 @@
-#![allow(missing_docs)]
+//! A bounded, delayed, multi-producer, single-consumer queue for deferring work in response to
+//! scheduler updates.
 
 use futures::prelude::*;
 use kube_core::Resource;
@@ -13,10 +14,16 @@ use tokio::{
 };
 use tokio_util::time::{delay_queue, DelayQueue};
 
+/// Sends delayed values to the associated `Receiver`.
+///
+/// Instances are created by the [`channel`] function.
 pub struct Sender<T: Resource> {
     tx: mpsc::Sender<(ObjectRef<T>, Instant)>,
 }
 
+/// Receives values from associated `Sender`s.
+///
+/// Instances are created by the [`channel`] function.
 pub struct Receiver<T>
 where
     T: Resource,
@@ -28,27 +35,30 @@ where
     pending: HashMap<ObjectRef<T>, delay_queue::Key>,
 }
 
+/// Creates a bounded, delayed mpsc channel for requeuing controller updates.
 pub fn channel<T>(capacity: usize) -> (Sender<T>, Receiver<T>)
 where
     T: Resource,
     T::DynamicType: PartialEq + Eq + Hash + Clone,
 {
     let (tx, rx) = mpsc::channel(capacity);
-    let tx = Sender { tx };
     let rx = Receiver {
         rx,
         rx_closed: false,
         q: DelayQueue::new(),
         pending: HashMap::new(),
     };
-    (tx, rx)
+    (Sender { tx }, rx)
 }
+
+// === impl Receiver ===
 
 impl<T> Receiver<T>
 where
     T: Resource,
     T::DynamicType: PartialEq + Eq + Hash + Clone,
 {
+    /// Processes requeued updates, returning the next available update.
     pub async fn recv(&mut self) -> Option<ObjectRef<T>> {
         while !(self.rx_closed && self.pending.is_empty()) {
             tracing::trace!(rx.closed = self.rx_closed, pending = self.pending.len());
@@ -61,8 +71,8 @@ where
                         }
                         hash_map::Entry::Vacant(slot) => {
                             tracing::trace!(name = %slot.key().name, "inserting");
-                            let key = self.q.insert_at(slot.key().clone(), at);
-                            slot.insert(key);
+                            let k = self.q.insert_at(slot.key().clone(), at);
+                            slot.insert(k);
                         }
                     },
                     None => {
@@ -73,10 +83,10 @@ where
 
                 exp = self.q.next(), if !self.pending.is_empty() => {
                     if let Some(exp) = exp {
-                        let key = exp.into_inner();
-                        tracing::trace!(name = %key.name, "dequeued");
-                        self.pending.remove(&key);
-                        return Some(key);
+                        let obj = exp.into_inner();
+                        tracing::trace!(name = %obj.name, "dequeued");
+                        self.pending.remove(&obj);
+                        return Some(obj);
                     }
                 }
             }
@@ -87,25 +97,30 @@ where
     }
 }
 
+// === impl Receiver ===
+
 impl<T: Resource> Sender<T> {
+    /// Waits for all receivers to be dropped.
     pub async fn closed(&self) {
         self.tx.closed().await
     }
 
-    pub async fn requeue(
-        &self,
-        key: ObjectRef<T>,
-        wait: Duration,
-    ) -> Result<(), SendError<(ObjectRef<T>, Instant)>> {
-        self.requeue_at(key, Instant::now() + wait).await
-    }
-
+    /// Schedule the given object to be rescheduled at the given time.
     pub async fn requeue_at(
         &self,
-        key: ObjectRef<T>,
+        obj: ObjectRef<T>,
         time: Instant,
     ) -> Result<(), SendError<(ObjectRef<T>, Instant)>> {
-        self.tx.send((key, time)).await
+        self.tx.send((obj, time)).await
+    }
+
+    /// Schedule the given object to be rescheduled after the `defer` time has passed.
+    pub async fn requeue(
+        &self,
+        obj: ObjectRef<T>,
+        defer: Duration,
+    ) -> Result<(), SendError<(ObjectRef<T>, Instant)>> {
+        self.requeue_at(obj, Instant::now() + defer).await
     }
 }
 
@@ -125,6 +140,8 @@ mod tests {
     use tokio_stream::wrappers::ReceiverStream;
     use tokio_test::{assert_pending, assert_ready, task};
     use tracing::{info_span, Instrument};
+
+    // === utils ===
 
     fn spawn_channel(
         capacity: usize,
@@ -178,6 +195,8 @@ mod tests {
         time::sleep(d).await;
         tracing::trace!(duration = ?d, ?t0, now = ?time::Instant::now(), "slept")
     }
+
+    // === tests ===
 
     #[tokio::test(flavor = "current_thread")]
     async fn delays() {
