@@ -3,18 +3,18 @@
 use tokio::signal::unix::{signal, SignalKind};
 use tracing::debug;
 
-#[cfg_attr(docsrs, doc(cfg(any(feature = "shutdown"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 pub use drain::Watch;
 
 /// Drives shutdown by watching signals
 #[derive(Debug)]
 #[must_use = "call `Shutdown::on_signal` to await a signal"]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "shutdown"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 pub struct Shutdown(drain::Signal);
 
 /// Indicates whether shutdown completed gracefully or was forced by a second signal
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "shutdown"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 pub enum Completion {
     /// Indicates that shutdown completed gracefully
     Graceful,
@@ -30,7 +30,7 @@ pub enum Completion {
 /// signal is received while waiting for watches to be dropped, the shutdown is aborted.
 ///
 /// If a second signal is received while waiting for shutdown to complete, the process
-#[cfg_attr(docsrs, doc(cfg(any(feature = "shutdown"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 pub fn channel() -> (Shutdown, Watch) {
     let (drain_tx, drain_rx) = drain::channel();
     (Shutdown(drain_tx), drain_rx)
