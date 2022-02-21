@@ -51,6 +51,7 @@ where
 enum Op<T> {
     Requeue(T, Instant),
     Cancel(T),
+    Clear,
 }
 
 // === impl Receiver ===
@@ -71,10 +72,17 @@ where
             loop {
                 match self.rx.poll_recv(cx) {
                     Poll::Pending => break,
+
                     Poll::Ready(None) => {
                         self.rx_closed = true;
                         break;
                     }
+
+                    Poll::Ready(Some(Op::Clear)) => {
+                        self.pending.clear();
+                        self.q.clear();
+                    }
+
                     Poll::Ready(Some(Op::Cancel(obj))) => {
                         if let Some(key) = self.pending.remove(&obj) {
                             tracing::trace!(?key, "canceling");
@@ -132,6 +140,14 @@ impl<T> Sender<T> {
     /// Waits for all receivers to be dropped.
     pub async fn closed(&self) {
         self.tx.closed().await
+    }
+
+    /// Cancels all pending work.
+    pub async fn clear(&self) -> Result<(), SendError<()>> {
+        self.tx
+            .send(Op::Clear)
+            .await
+            .map_err(|SendError(_)| SendError(()))
     }
 
     /// Schedule the given object to be rescheduled at the given time.
@@ -297,6 +313,24 @@ mod tests {
 
         sleep(Duration::from_millis(10001)).await;
         tx.cancel(pod_a).await.expect("must send cancel");
+        assert_pending!(rx.poll_next());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn clears() {
+        let _tracing = init_tracing();
+        time::pause();
+        let (tx, mut rx) = spawn_channel(1);
+
+        // Requeue a pod
+        let pod_a = ObjectRef::new("pod-a").within("default");
+        tx.requeue(pod_a, Duration::from_secs(10))
+            .await
+            .expect("must send");
+        assert_pending!(rx.poll_next());
+
+        sleep(Duration::from_millis(10001)).await;
+        tx.clear().await.expect("must send cancel");
         assert_pending!(rx.poll_next());
     }
 }
