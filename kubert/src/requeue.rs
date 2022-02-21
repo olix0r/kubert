@@ -1,10 +1,11 @@
 //! A bounded, delayed, multi-producer, single-consumer queue for deferring work in response to
 //! scheduler updates.
 
-use futures::stream::StreamExt;
 use std::{
     collections::{hash_map, HashMap},
     hash::Hash,
+    pin::Pin,
+    task::{Context, Poll},
 };
 use tokio::{
     sync::mpsc::{self, error::SendError},
@@ -58,24 +59,30 @@ impl<T> Receiver<T>
 where
     T: Clone + PartialEq + Eq + Hash,
 {
-    /// Processes requeued updates, returning the next available update.
-    pub async fn recv(&mut self) -> Option<T> {
-        while !(self.rx_closed && self.pending.is_empty()) {
-            tracing::trace!(rx.closed = self.rx_closed, pending = self.pending.len());
-            tokio::select! {
-                // We process messages from the sender before looking at the delay queue so that
-                // updates have a chance to reset/cancel pending updates.
-                biased;
+    /// Attempts to process requeues, obtaining the next value from the delay queueand registering
+    /// current task for wakeup if the value is not yet available, and returning `None` if the
+    /// channel is exhausted.
+    pub fn poll_requeued(&mut self, cx: &mut Context<'_>) -> Poll<Option<T>> {
+        tracing::trace!(rx.closed = self.rx_closed, pending = self.pending.len());
 
-                item = self.rx.recv(), if !self.rx_closed => match item {
-                    Some(Op::Cancel(obj)) => {
+        // We process messages from the sender before looking at the delay queue so that
+        // updates have a chance to reset/cancel pending updates.
+        if !self.rx_closed {
+            loop {
+                match self.rx.poll_recv(cx) {
+                    Poll::Pending => break,
+                    Poll::Ready(None) => {
+                        self.rx_closed = true;
+                        break;
+                    }
+                    Poll::Ready(Some(Op::Cancel(obj))) => {
                         if let Some(key) = self.pending.remove(&obj) {
                             tracing::trace!(?key, "canceling");
                             self.q.remove(&key);
                         }
                     }
 
-                    Some(Op::Requeue(k, at)) => match self.pending.entry(k) {
+                    Poll::Ready(Some(Op::Requeue(k, at))) => match self.pending.entry(k) {
                         hash_map::Entry::Occupied(ent) => {
                             let key = ent.get();
                             tracing::trace!(?key, "resetting");
@@ -87,26 +94,35 @@ where
                             slot.insert(key);
                         }
                     },
-
-                    None => {
-                        tracing::trace!("receiver closed");
-                        self.rx_closed = true;
-                    }
-                },
-
-                exp = self.q.next(), if !self.pending.is_empty() => {
-                    if let Some(exp) = exp {
-                        tracing::trace!(key = ?exp.key(), "dequeued");
-                        let obj = exp.into_inner();
-                        self.pending.remove(&obj);
-                        return Some(obj);
-                    }
                 }
             }
         }
 
-        tracing::trace!("complete");
-        None
+        if !self.pending.is_empty() {
+            if let Poll::Ready(Some(exp)) = self.q.poll_expired(cx) {
+                tracing::trace!(key = ?exp.key(), "dequeued");
+                let obj = exp.into_inner();
+                self.pending.remove(&obj);
+                return Poll::Ready(Some(obj));
+            }
+        }
+
+        if self.rx_closed && self.pending.is_empty() {
+            Poll::Ready(None)
+        } else {
+            Poll::Pending
+        }
+    }
+}
+
+// We never put `T` in a `Pin`...
+impl<T: PartialEq + Eq + Hash> Unpin for Receiver<T> {}
+
+impl<T: Clone + PartialEq + Eq + Hash> futures_core::Stream for Receiver<T> {
+    type Item = T;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Receiver::poll_requeued(self.get_mut(), cx)
     }
 }
 
@@ -160,51 +176,20 @@ mod tests {
     use k8s_openapi::api::core::v1::Pod;
     use kube::runtime::reflector::ObjectRef;
     use tokio::time;
-    use tokio_stream::wrappers::ReceiverStream;
     use tokio_test::{assert_pending, assert_ready, task};
-    use tracing::{info_span, Instrument};
 
     // === utils ===
 
+    // Spawns a task that reads from the receiver and publishes updates on another mpsc. This is all
+    // done so that we can use `[task::Spawn`] on a stream type.
     fn spawn_channel(
         capacity: usize,
     ) -> (
         Sender<ObjectRef<Pod>>,
-        task::Spawn<ReceiverStream<ObjectRef<Pod>>>,
+        task::Spawn<Receiver<ObjectRef<Pod>>>,
     ) {
-        // Spawn a (mocked) task that reads from the receiver and updates a counter.
-        let (rqtx, mut rqrx) = channel::<ObjectRef<Pod>>(capacity);
-        let (tx, rx) = mpsc::channel(capacity);
-        let t0 = time::Instant::now();
-        tokio::spawn(
-            async move {
-                loop {
-                    tokio::select! {
-                        biased;
-                        _ = tx.closed() => {
-                            tracing::trace!("test sender closed");
-                            break;
-                        }
-                        p = rqrx.recv() => match p {
-                            None => {
-                                tracing::trace!("requeue receiver closed");
-                                break;
-                            }
-                            Some(pod) => {
-                                tracing::debug!(?pod, "dequeued");
-                                if tx.send(pod).await.is_err() {
-                                    break;
-                                }
-                                tracing::trace!("pod sent");
-                            }
-                        }
-                    }
-                }
-                tracing::debug!(uptime = ?time::Instant::now() - t0, "channel complete")
-            }
-            .instrument(info_span!("requeue worker")),
-        );
-        (rqtx, task::spawn(ReceiverStream::new(rx)))
+        let (tx, rx) = channel::<ObjectRef<Pod>>(capacity);
+        (tx, task::spawn(rx))
     }
 
     fn init_tracing() -> tracing::subscriber::DefaultGuard {
@@ -310,13 +295,8 @@ mod tests {
             .expect("must send");
         assert_pending!(rx.poll_next());
 
-        sleep(Duration::from_millis(9999)).await;
-        assert_pending!(rx.poll_next());
-
+        sleep(Duration::from_millis(10001)).await;
         tx.cancel(pod_a).await.expect("must send cancel");
-
-        // Wait until the first requeue would timeout and check that it has not been sent.
-        sleep(Duration::from_millis(2)).await;
         assert_pending!(rx.poll_next());
     }
 }

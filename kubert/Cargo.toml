@@ -13,7 +13,7 @@ keywords = ["kubernetes", "client", "runtime", "server"]
 client = ["kube-client", "thiserror"]
 # TODO controller = ["client", "kube/runtime"]
 log = ["thiserror", "tracing-subscriber"]
-requeue = ["futures", "tokio/macros", "tokio/sync", "tokio-util/time"]
+requeue = ["futures-core", "tokio/macros", "tokio/sync", "tokio-util/time"]
 # TODO runtime = ["clap", "drain", "log", "tokio/signal"]
 server = [
     "drain",
@@ -45,7 +45,7 @@ features = [
 
 [dependencies]
 drain = { version = "0.1.0", optional = true, default-features = false }
-futures = { version = "0.3", optional = true, default-features = false }
+futures-core = { version = "0.3", optional = true, default-features = false }
 hyper = { version = "0.14.17", optional = true, default-features = false }
 rustls-pemfile = { version = "0.3.0", optional = true }
 thiserror = { version = "1.0.30", optional = true }
@@ -93,7 +93,6 @@ features = [
 kube = { version = "0.69.1", default-features = false, features = ["runtime"] }
 k8s-openapi = { version = "0.14.0", default-features = false, features = ["v1_23"] }
 tracing-subscriber = { version = "0.3", features = ["ansi"] }
-tokio-stream = "0.1.8"
 tokio-test = "0.4"
 
 [dev-dependencies.tokio]
