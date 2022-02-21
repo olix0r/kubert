@@ -2,8 +2,6 @@
 //! scheduler updates.
 
 use futures::stream::StreamExt;
-use kube_core::Resource;
-use kube_runtime::reflector::ObjectRef;
 use std::{
     collections::{hash_map, HashMap},
     hash::Hash,
@@ -17,8 +15,8 @@ use tokio_util::time::{delay_queue, DelayQueue};
 /// Sends delayed values to the associated `Receiver`.
 ///
 /// Instances are created by the [`channel`] function.
-pub struct Sender<T: Resource> {
-    tx: mpsc::Sender<(ObjectRef<T>, Instant)>,
+pub struct Sender<T> {
+    tx: mpsc::Sender<Op<T>>,
 }
 
 /// Receives values from associated `Sender`s.
@@ -26,20 +24,18 @@ pub struct Sender<T: Resource> {
 /// Instances are created by the [`channel`] function.
 pub struct Receiver<T>
 where
-    T: Resource,
-    T::DynamicType: PartialEq + Eq + Hash + Clone,
+    T: PartialEq + Eq + Hash,
 {
-    rx: mpsc::Receiver<(ObjectRef<T>, Instant)>,
+    rx: mpsc::Receiver<Op<T>>,
     rx_closed: bool,
-    q: DelayQueue<ObjectRef<T>>,
-    pending: HashMap<ObjectRef<T>, delay_queue::Key>,
+    q: DelayQueue<T>,
+    pending: HashMap<T, delay_queue::Key>,
 }
 
 /// Creates a bounded, delayed mpsc channel for requeuing controller updates.
 pub fn channel<T>(capacity: usize) -> (Sender<T>, Receiver<T>)
 where
-    T: Resource,
-    T::DynamicType: PartialEq + Eq + Hash + Clone,
+    T: PartialEq + Eq + Hash,
 {
     let (tx, rx) = mpsc::channel(capacity);
     let rx = Receiver {
@@ -51,30 +47,47 @@ where
     (Sender { tx }, rx)
 }
 
+enum Op<T> {
+    Requeue(T, Instant),
+    Cancel(T),
+}
+
 // === impl Receiver ===
 
 impl<T> Receiver<T>
 where
-    T: Resource,
-    T::DynamicType: PartialEq + Eq + Hash + Clone,
+    T: Clone + PartialEq + Eq + Hash,
 {
     /// Processes requeued updates, returning the next available update.
-    pub async fn recv(&mut self) -> Option<ObjectRef<T>> {
+    pub async fn recv(&mut self) -> Option<T> {
         while !(self.rx_closed && self.pending.is_empty()) {
             tracing::trace!(rx.closed = self.rx_closed, pending = self.pending.len());
             tokio::select! {
+                // We process messages from the sender before looking at the delay queue so that
+                // updates have a chance to reset/cancel pending updates.
+                biased;
+
                 item = self.rx.recv(), if !self.rx_closed => match item {
-                    Some((k, at)) => match self.pending.entry(k) {
+                    Some(Op::Cancel(obj)) => {
+                        if let Some(key) = self.pending.remove(&obj) {
+                            tracing::trace!(?key, "canceling");
+                            self.q.remove(&key);
+                        }
+                    }
+
+                    Some(Op::Requeue(k, at)) => match self.pending.entry(k) {
                         hash_map::Entry::Occupied(ent) => {
-                            tracing::trace!(name = %ent.key().name, "resetting");
-                            self.q.reset_at(ent.get(), at);
+                            let key = ent.get();
+                            tracing::trace!(?key, "resetting");
+                            self.q.reset_at(key, at);
                         }
                         hash_map::Entry::Vacant(slot) => {
-                            tracing::trace!(name = %slot.key().name, "inserting");
-                            let k = self.q.insert_at(slot.key().clone(), at);
-                            slot.insert(k);
+                            let key = self.q.insert_at(slot.key().clone(), at);
+                            tracing::trace!(?key, "inserting");
+                            slot.insert(key);
                         }
                     },
+
                     None => {
                         tracing::trace!("receiver closed");
                         self.rx_closed = true;
@@ -83,8 +96,8 @@ where
 
                 exp = self.q.next(), if !self.pending.is_empty() => {
                     if let Some(exp) = exp {
+                        tracing::trace!(key = ?exp.key(), "dequeued");
                         let obj = exp.into_inner();
-                        tracing::trace!(name = %obj.name, "dequeued");
                         self.pending.remove(&obj);
                         return Some(obj);
                     }
@@ -99,32 +112,41 @@ where
 
 // === impl Receiver ===
 
-impl<T: Resource> Sender<T> {
+impl<T> Sender<T> {
     /// Waits for all receivers to be dropped.
     pub async fn closed(&self) {
         self.tx.closed().await
     }
 
     /// Schedule the given object to be rescheduled at the given time.
-    pub async fn requeue_at(
-        &self,
-        obj: ObjectRef<T>,
-        time: Instant,
-    ) -> Result<(), SendError<(ObjectRef<T>, Instant)>> {
-        self.tx.send((obj, time)).await
+    pub async fn requeue_at(&self, obj: T, time: Instant) -> Result<(), SendError<T>> {
+        self.tx
+            .send(Op::Requeue(obj, time))
+            .await
+            .map_err(|SendError(op)| match op {
+                Op::Requeue(obj, _) => SendError(obj),
+                _ => unreachable!(),
+            })
     }
 
     /// Schedule the given object to be rescheduled after the `defer` time has passed.
-    pub async fn requeue(
-        &self,
-        obj: ObjectRef<T>,
-        defer: Duration,
-    ) -> Result<(), SendError<(ObjectRef<T>, Instant)>> {
+    pub async fn requeue(&self, obj: T, defer: Duration) -> Result<(), SendError<T>> {
         self.requeue_at(obj, Instant::now() + defer).await
+    }
+
+    /// Cancels pending updates for the given object.
+    pub async fn cancel(&self, obj: T) -> Result<(), SendError<T>> {
+        self.tx
+            .send(Op::Cancel(obj))
+            .await
+            .map_err(|SendError(op)| match op {
+                Op::Cancel(obj) => SendError(obj),
+                _ => unreachable!(),
+            })
     }
 }
 
-impl<T: Resource> Clone for Sender<T> {
+impl<T> Clone for Sender<T> {
     fn clone(&self) -> Self {
         Self {
             tx: self.tx.clone(),
@@ -136,6 +158,7 @@ impl<T: Resource> Clone for Sender<T> {
 mod tests {
     pub use super::*;
     use k8s_openapi::api::core::v1::Pod;
+    use kube::runtime::reflector::ObjectRef;
     use tokio::time;
     use tokio_stream::wrappers::ReceiverStream;
     use tokio_test::{assert_pending, assert_ready, task};
@@ -145,9 +168,12 @@ mod tests {
 
     fn spawn_channel(
         capacity: usize,
-    ) -> (Sender<Pod>, task::Spawn<ReceiverStream<ObjectRef<Pod>>>) {
+    ) -> (
+        Sender<ObjectRef<Pod>>,
+        task::Spawn<ReceiverStream<ObjectRef<Pod>>>,
+    ) {
         // Spawn a (mocked) task that reads from the receiver and updates a counter.
-        let (rqtx, mut rqrx) = channel::<Pod>(capacity);
+        let (rqtx, mut rqrx) = channel::<ObjectRef<Pod>>(capacity);
         let (tx, rx) = mpsc::channel(capacity);
         let t0 = time::Instant::now();
         tokio::spawn(
@@ -268,6 +294,29 @@ mod tests {
             assert_ready!(rx.poll_next()).expect("stream must not end"),
             pod_a
         );
+        assert_pending!(rx.poll_next());
+    }
+
+    #[tokio::test(flavor = "current_thread")]
+    async fn cancels() {
+        let _tracing = init_tracing();
+        time::pause();
+        let (tx, mut rx) = spawn_channel(1);
+
+        // Requeue a pod
+        let pod_a = ObjectRef::new("pod-a").within("default");
+        tx.requeue(pod_a.clone(), Duration::from_secs(10))
+            .await
+            .expect("must send");
+        assert_pending!(rx.poll_next());
+
+        sleep(Duration::from_millis(9999)).await;
+        assert_pending!(rx.poll_next());
+
+        tx.cancel(pod_a).await.expect("must send cancel");
+
+        // Wait until the first requeue would timeout and check that it has not been sent.
+        sleep(Duration::from_millis(2)).await;
         assert_pending!(rx.poll_next());
     }
 }
