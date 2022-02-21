@@ -1,10 +1,10 @@
-name: lints
+name: lint
 
 on:
   pull_request:
     paths:
       - '**/*.rs'
-      - .github/workflows/lints.yml
+      - .github/workflows/lint.yml
 
 permissions:
   contents: read
