@@ -30,5 +30,7 @@ jobs:
           chmod 755 /usr/local/bin/cargo-action-fmt
       - uses: actions/checkout@ec3a7ce113134d7a93b817d10a8272cb61118579
       - run: cargo fetch
-      - run: cargo test --no-run --frozen --workspace --all-features --message-format=json | cargo-action-fmt
-      - run: cargo test          --frozen --workspace --all-features --message-format=json | cargo-action-fmt
+      - name: cargo test --no-run
+        run: cargo test --frozen --workspace --all-features --no-run --message-format=json | cargo-action-fmt
+      - name: cargo test
+        run: cargo test --frozen --workspace --all-features
