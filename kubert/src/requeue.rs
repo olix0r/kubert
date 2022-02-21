@@ -1,7 +1,7 @@
 //! A bounded, delayed, multi-producer, single-consumer queue for deferring work in response to
 //! scheduler updates.
 
-use futures::prelude::*;
+use futures::stream::StreamExt;
 use kube_core::Resource;
 use kube_runtime::reflector::ObjectRef;
 use std::{
