@@ -14,7 +14,7 @@ use tracing::{debug, error, info, info_span, Instrument};
 /// Command-line arguments used to configure a server
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "server"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "server")))]
 pub struct ServerArgs {
     /// The server's address
     #[cfg_attr(feature = "clap", clap(long, default_value = "0.0.0.0:443"))]
@@ -31,7 +31,7 @@ pub struct ServerArgs {
 
 /// A running server
 #[derive(Debug)]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "server"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "server")))]
 pub struct SpawnedServer {
     local_addr: SocketAddr,
     task: tokio::task::JoinHandle<()>,
@@ -39,17 +39,17 @@ pub struct SpawnedServer {
 
 /// The path to the server's TLS private key
 #[derive(Clone, Debug)]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "server"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "server")))]
 pub struct TlsKeyPath(PathBuf);
 
 /// The path to the server's TLS certificate bundle
 #[derive(Clone, Debug)]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "server"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "server")))]
 pub struct TlsCertPath(PathBuf);
 
 /// Describes an error that occurred while initializing a server
 #[derive(Debug, Error)]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "server"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "server")))]
 pub enum Error {
     /// No TLS key path was configured
     #[error("--server-tls-key must be set")]

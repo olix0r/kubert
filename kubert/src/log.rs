@@ -8,7 +8,7 @@ pub use tracing_subscriber::EnvFilter;
 /// Configures whether logs should be emitted in plaintext (the default) or as JSON-encoded
 /// messages
 #[derive(Clone, Debug)]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "log"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "log")))]
 pub enum LogFormat {
     /// The default plaintext format
     Plain,
@@ -20,7 +20,7 @@ pub enum LogFormat {
 /// Indicates that an invalid log format was specified
 #[derive(Debug, Error)]
 #[error("invalid log level: {0} must be 'plain' or 'json'")]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "log"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "log")))]
 pub struct InvalidLogFormat(String);
 
 // === impl LogFormat ===

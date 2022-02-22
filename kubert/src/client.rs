@@ -6,7 +6,7 @@ use thiserror::Error;
 /// Configures a Kubernetes client
 // TODO configure a --kubeconfig
 #[derive(Clone, Debug)]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "client"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct ClientArgs {
     /// The name of the kubeconfig cluster to use
@@ -24,7 +24,7 @@ pub struct ClientArgs {
 
 /// Indicates an error occurred while configuring the Kubernetes client
 #[derive(Debug, Error)]
-#[cfg_attr(docsrs, doc(cfg(any(feature = "shutdown"))))]
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 pub enum ConfigError {
     /// Indicates that the kubeconfig file could not be read
     #[error(transparent)]
