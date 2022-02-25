@@ -14,6 +14,10 @@ pub mod admin;
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 pub mod client;
 
+#[cfg(feature = "handle-errors")]
+#[cfg_attr(docsrs, doc(cfg(feature = "handle-errors")))]
+pub mod handle_errors;
+
 #[cfg(feature = "index")]
 #[cfg_attr(docsrs, doc(cfg(feature = "index")))]
 pub mod index;
@@ -34,8 +38,18 @@ pub mod server;
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 pub mod shutdown;
 
+#[cfg(feature = "track-init")]
+#[cfg_attr(docsrs, doc(cfg(feature = "track-init")))]
+pub mod track_init;
+
 #[cfg(all(feature = "admin", feature = "clap"))]
 pub use self::admin::AdminArgs;
 
 #[cfg(all(feature = "client"))]
 pub use self::client::ClientArgs;
+
+#[cfg(all(feature = "track-init"))]
+pub use self::handle_errors::HandleErrors;
+
+#[cfg(all(feature = "track-init"))]
+pub use self::track_init::TrackInit;

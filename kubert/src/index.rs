@@ -77,33 +77,6 @@ struct BackoffState {
     failed: bool,
 }
 
-pub fn handle_errors<S, T, E>(events: S, backoff: time::Duration) -> impl Stream<Item = T>
-where
-    S: Stream<Item = Result<T, E>>,
-    E: std::fmt::Display,
-{
-    stream! {
-        tokio::pin!(events);
-        let mut failed = false;
-        while let Some(res) = events.next().await {
-            match res {
-                Ok(ev) => {
-                    yield ev;
-                    failed = false;
-                }
-                Err(error) => {
-                    tracing::info!(%error, "stream failed");
-                    if failed {
-                        tracing::debug!(?backoff, "sleeping");
-                        time::sleep(backoff).await;
-                    }
-                    failed = true;
-                }
-            }
-        }
-    }
-}
-
 impl Default for Initialize {
     fn default() -> Self {
         Self {
@@ -133,18 +106,18 @@ impl Initialize {
 }
 
 impl Handle {
-    pub fn drop_on_first<S: Stream>(
-        self,
-        events: S,
-    ) -> Scan<
-        S,
-        Option<Self>,
-        future::Ready<Option<S::Item>>,
-        fn(&mut Option<Self>, S::Item) -> future::Ready<Option<S::Item>>,
-    > {
+    /// Wraps the provided [`Stream`] to drop
+    pub fn release_on_next<S: Stream>(self, events: S) -> ReleasesOnNext<S, S::Item> {
         events.scan(Some(self), |handle, ev| {
             drop(handle.take());
             future::ready(Some(ev))
         })
     }
 }
+
+pub type ReleasesOnNext<S, T> = Scan<
+    S,
+    Option<Handle>,
+    future::Ready<Option<T>>,
+    fn(&mut Option<Handle>, T) -> future::Ready<Option<T>>,
+>;

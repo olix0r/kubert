@@ -12,6 +12,7 @@ keywords = ["kubernetes", "client", "runtime", "server"]
 [features]
 admin = ["futures-util", "hyper/http1", "hyper/runtime", "hyper/server", "tokio/sync"]
 client = ["kube-client", "thiserror"]
+handle-errors = ["tokio/time"]
 # TODO controller = ["client", "kube/runtime"]
 log = ["thiserror", "tracing-subscriber"]
 index = [
@@ -40,6 +41,7 @@ server = [
     "tower-service",
 ]
 shutdown = ["drain", "tokio/macros", "tokio/signal"]
+track-init = ["futures-core", "futures-util", "tokio/sync"]
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
