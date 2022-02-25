@@ -14,6 +14,14 @@ admin = ["futures-util", "hyper/http1", "hyper/runtime", "hyper/server", "tokio/
 client = ["kube-client", "thiserror"]
 # TODO controller = ["client", "kube/runtime"]
 log = ["thiserror", "tracing-subscriber"]
+index = [
+    "async-stream",
+    "futures-core",
+    "futures-util",
+    "kube-core",
+    "kube-runtime",
+    "parking_lot",
+]
 requeue = ["futures-core", "tokio/macros", "tokio/sync", "tokio-util/time"]
 # TODO runtime = ["clap", "drain", "log", "tokio/signal"]
 server = [
@@ -39,6 +47,7 @@ features = [
     "admin",
     "client",
     "log",
+    "index",
     "requeue",
     "server",
     "shutdown",
@@ -46,10 +55,13 @@ features = [
 ]
 
 [dependencies]
+ahash = { version = "0.7.6", optional = true }
+async-stream = { version = "0.3", optional = true }
 drain = { version = "0.1.0", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
 hyper = { version = "0.14.17", optional = true, default-features = false }
+parking_lot = { version = "0.12", optional = true }
 rustls-pemfile = { version = "0.3.0", optional = true }
 thiserror = { version = "1.0.30", optional = true }
 tokio = { version = "1.17.0", optional = false, default-features = false }

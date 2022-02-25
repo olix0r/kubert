@@ -14,6 +14,10 @@ pub mod admin;
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 pub mod client;
 
+#[cfg(feature = "index")]
+#[cfg_attr(docsrs, doc(cfg(feature = "index")))]
+pub mod index;
+
 #[cfg(feature = "log")]
 #[cfg_attr(docsrs, doc(cfg(feature = "log")))]
 pub mod log;
