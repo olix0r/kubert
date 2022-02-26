@@ -18,10 +18,6 @@ pub mod client;
 #[cfg_attr(docsrs, doc(cfg(feature = "errors")))]
 pub mod errors;
 
-#[cfg(feature = "index")]
-#[cfg_attr(docsrs, doc(cfg(feature = "index")))]
-pub mod index;
-
 #[cfg(feature = "initialized")]
 #[cfg_attr(docsrs, doc(cfg(feature = "initialized")))]
 pub mod initialized;
@@ -33,6 +29,10 @@ pub mod log;
 #[cfg(feature = "requeue")]
 #[cfg_attr(docsrs, doc(cfg(feature = "requeue")))]
 pub mod requeue;
+
+// #[cfg(feature = "runtime")]
+// #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
+// pub mod runtime;
 
 #[cfg(feature = "server")]
 #[cfg_attr(docsrs, doc(cfg(feature = "server")))]

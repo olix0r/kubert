@@ -14,14 +14,6 @@ admin = ["futures-util", "hyper/http1", "hyper/runtime", "hyper/server", "tokio/
 client = ["kube-client", "thiserror"]
 errors = ["futures-core", "futures-util", "pin-project-lite", "tokio/time", "tracing"]
 # TODO controller = ["client", "kube/runtime"]
-index = [
-    "futures-core",
-    "futures-util",
-    "kube-core",
-    "kube-runtime",
-    "parking_lot",
-    "tracing",
-]
 initialized = ["futures-core", "futures-util", "pin-project-lite", "tokio/sync"]
 log = ["thiserror", "tracing", "tracing-subscriber"]
 requeue = ["futures-core", "tokio/macros", "tokio/sync", "tokio-util/time", "tracing"]
@@ -49,8 +41,9 @@ rustdoc-args = ["--cfg", "docsrs"]
 features = [
     "admin",
     "client",
+    "errors",
+    "initialized",
     "log",
-    "index",
     "requeue",
     "server",
     "shutdown",
@@ -58,7 +51,6 @@ features = [
 ]
 
 [dependencies]
-ahash = { version = "0.7.6", optional = true }
 drain = { version = "0.1.0", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
