@@ -22,6 +22,7 @@ index = [
     "parking_lot",
     "tracing",
 ]
+initialized = ["futures-core", "futures-util", "pin-project-lite", "tokio/sync"]
 log = ["thiserror", "tracing", "tracing-subscriber"]
 requeue = ["futures-core", "tokio/macros", "tokio/sync", "tokio-util/time", "tracing"]
 # TODO runtime = ["clap", "drain", "log", "tokio/signal"]
@@ -42,7 +43,6 @@ server = [
     "tracing",
 ]
 shutdown = ["drain", "tokio/macros", "tokio/signal", "tracing"]
-track-init = ["futures-core", "futures-util", "tokio/sync"]
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]

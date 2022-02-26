@@ -22,6 +22,10 @@ pub mod errors;
 #[cfg_attr(docsrs, doc(cfg(feature = "index")))]
 pub mod index;
 
+#[cfg(feature = "initialized")]
+#[cfg_attr(docsrs, doc(cfg(feature = "initialized")))]
+pub mod initialized;
+
 #[cfg(feature = "log")]
 #[cfg_attr(docsrs, doc(cfg(feature = "log")))]
 pub mod log;
@@ -37,10 +41,6 @@ pub mod server;
 #[cfg(feature = "shutdown")]
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 pub mod shutdown;
-
-#[cfg(feature = "track-init")]
-#[cfg_attr(docsrs, doc(cfg(feature = "track-init")))]
-pub mod track_init;
 
 #[cfg(all(feature = "admin", feature = "clap"))]
 pub use self::admin::AdminArgs;
