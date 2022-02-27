@@ -35,6 +35,14 @@ pub struct Builder {
     ready: Readiness,
 }
 
+#[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
+#[derive(Debug)]
+pub struct Bound {
+    addr: SocketAddr,
+    ready: Readiness,
+    server: hyper::server::Builder<hyper::server::conn::AddrIncoming>,
+}
+
 /// Controls how the admin server advertises readiness
 #[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
 #[derive(Clone, Debug)]
@@ -64,13 +72,6 @@ impl AdminArgs {
     pub fn into_builder(self) -> Builder {
         Builder::new(self.admin_addr)
     }
-
-    /// Binds and runs the server on a background task, returning a handle
-    ///
-    /// The server starts unready by default and it's up to the caller to mark it as ready.
-    pub fn spawn(self) -> Result<Server> {
-        self.into_builder().spawn()
-    }
 }
 
 // === impl Builder ===
@@ -96,11 +97,10 @@ impl Builder {
         self.ready.set(true);
     }
 
-    /// Binds and runs the server on a background task, returning a handle
-    pub fn spawn(self) -> Result<Server> {
+    pub fn bind(self) -> Result<Bound> {
         let Self { addr, ready } = self;
 
-        let http = hyper::server::Server::try_bind(&addr)?
+        let server = hyper::server::Server::try_bind(&addr)?
             // Allow weird clients (like netcat).
             .http1_half_close(true)
             // Prevent port scanners, etc, from holding connections ope.n
@@ -108,9 +108,25 @@ impl Builder {
             // Use a small buffer, since we don't really transfer much data.
             .http1_max_buf_size(8 * 1024);
 
-        let server = {
-            let ready = ready.clone();
-            http.serve(hyper::service::make_service_fn(move |_conn| {
+        Ok(Bound {
+            addr,
+            ready,
+            server,
+        })
+    }
+}
+
+impl Bound {
+    pub fn readiness(&self) -> Readiness {
+        self.ready.clone()
+    }
+
+    /// Binds and runs the server on a background task, returning a handle
+    pub fn spawn(self) -> Server {
+        let ready = self.ready.clone();
+        let server = self
+            .server
+            .serve(hyper::service::make_service_fn(move |_conn| {
                 let ready = ready.clone();
                 future::ok::<_, hyper::Error>(hyper::service::service_fn(
                     move |req: hyper::Request<hyper::Body>| match req.uri().path() {
@@ -124,11 +140,9 @@ impl Builder {
                         ),
                     },
                 ))
-            }))
-        };
+            }));
 
         let addr = server.local_addr();
-
         let task = tokio::spawn(
             async move {
                 debug!("Serving");
@@ -137,7 +151,11 @@ impl Builder {
             .instrument(info_span!("admin", port = %addr.port())),
         );
 
-        Ok(Server { addr, ready, task })
+        Server {
+            addr,
+            task,
+            ready: self.ready,
+        }
     }
 }
 

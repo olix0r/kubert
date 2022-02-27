@@ -124,7 +124,7 @@ impl Bound {
     /// certificate rotation. As such, it is not recommended to expose this server to the open
     /// internet or to clients that open many short-lived connections. It is primarily intended for
     /// kubernetes admission controllers.
-    pub async fn spawn<S, B>(self, service: S, drain: drain::Watch) -> SpawnedServer
+    pub fn spawn<S, B>(self, service: S, drain: drain::Watch) -> SpawnedServer
     where
         S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
             + Clone
