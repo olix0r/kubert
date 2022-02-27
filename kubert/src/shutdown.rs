@@ -1,10 +1,15 @@
 //! Drives graceful shutdown when the process receives a signal.
 
+use futures_core::{Future, Stream};
 use tokio::signal::unix::{signal, Signal, SignalKind};
 use tracing::debug;
 
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 pub use drain::Watch;
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 /// Drives shutdown by watching signals
 #[derive(Debug)]
@@ -27,6 +32,17 @@ pub struct Aborted(());
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 #[error("failed to register signal handler: {0}")]
 pub struct RegisterError(#[from] std::io::Error);
+
+pin_project_lite::pin_project! {
+    /// Indicates an error registering a signal handler
+    #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
+    pub struct ShutdownStream<T> {
+        #[pin]
+        inner: T,
+        #[pin]
+        shutdown: Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>>,
+    }
+}
 
 /// Creates a shutdown channel
 ///
@@ -95,5 +111,31 @@ impl Shutdown {
                 Err(Aborted(()))
             }
         }
+    }
+}
+
+impl<S> ShutdownStream<S> {
+    /// Creates a stream that completes when the shutdown watch fires.
+    pub fn new(inner: S, shutdown: Watch) -> Self {
+        // XXX Unfortunately the `Watch` API doesn't give us any means to poll for updates, so we
+        // have to box the async call to poll it from the stream.
+        let shutdown = Box::pin(async move {
+            let _ = shutdown.signaled().await;
+        });
+        Self { inner, shutdown }
+    }
+}
+
+impl<S: Stream> Stream for ShutdownStream<S> {
+    type Item = S::Item;
+
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<S::Item>> {
+        let mut this = self.project();
+
+        if this.shutdown.as_mut().poll(cx).is_ready() {
+            return Poll::Ready(None);
+        }
+
+        this.inner.poll_next(cx)
     }
 }

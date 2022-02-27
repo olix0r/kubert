@@ -7,7 +7,8 @@ use crate::{
     client::{self, Client, ClientArgs},
     errors,
     initialized::{self, Initialized},
-    shutdown, LogFilter, LogFormat, LogInitError,
+    shutdown::{self, ShutdownStream},
+    LogFilter, LogFormat, LogInitError,
 };
 use futures_core::Stream;
 use kube_core::{params::ListParams, Resource};
@@ -242,12 +243,14 @@ impl<S> Runtime<S> {
         T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
-        self.initialized
-            .add_handle()
-            .release_on_ready(errors::LogAndSleep::fixed_delay(
-                self.error_delay,
-                watcher::watcher(api, params),
-            ))
+        let stream =
+            self.initialized
+                .add_handle()
+                .release_on_ready(errors::LogAndSleep::fixed_delay(
+                    self.error_delay,
+                    watcher::watcher(api, params),
+                ));
+        ShutdownStream::new(stream, self.shutdown_rx.clone())
     }
 
     /// Creates a cached watch with the given [`Api`]
@@ -269,6 +272,7 @@ impl<S> Runtime<S> {
                     self.error_delay,
                     reflector::reflector(writer, watcher::watcher(api, params)),
                 ));
+        let stream = ShutdownStream::new(stream, self.shutdown_rx.clone());
         (store, stream)
     }
 
