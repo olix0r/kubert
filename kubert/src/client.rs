@@ -5,7 +5,7 @@ use thiserror::Error;
 
 /// Configures a Kubernetes client
 // TODO configure a --kubeconfig
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
 pub struct ClientArgs {

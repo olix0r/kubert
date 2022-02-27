@@ -1,6 +1,6 @@
 //! Drives graceful shutdown when the process receives a signal.
 
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{signal, Signal, SignalKind};
 use tracing::debug;
 
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
@@ -10,18 +10,23 @@ pub use drain::Watch;
 #[derive(Debug)]
 #[must_use = "call `Shutdown::on_signal` to await a signal"]
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
-pub struct Shutdown(drain::Signal);
+pub struct Shutdown {
+    interrupt: Signal,
+    terminate: Signal,
+    tx: drain::Signal,
+}
 
 /// Indicates whether shutdown completed gracefully or was forced by a second signal
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Debug, thiserror::Error)]
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
-pub enum Completion {
-    /// Indicates that shutdown completed gracefully
-    Graceful,
+#[error("process aborted by signal")]
+pub struct Aborted(());
 
-    /// Indicates that shutdown did not complete gracefully
-    Aborted,
-}
+/// Indicates an error registering a signal handler
+#[derive(Debug, thiserror::Error)]
+#[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
+#[error("failed to register signal handler: {0}")]
+pub struct RegisterError(#[from] std::io::Error);
 
 /// Creates a shutdown channel
 ///
@@ -31,12 +36,23 @@ pub enum Completion {
 ///
 /// If a second signal is received while waiting for shutdown to complete, the process
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
-pub fn channel() -> (Shutdown, Watch) {
+pub fn try_register() -> Result<(Shutdown, Watch), RegisterError> {
     let (drain_tx, drain_rx) = drain::channel();
-    (Shutdown(drain_tx), drain_rx)
+    let shutdown = Shutdown::from_drain(drain_tx)?;
+    Ok((shutdown, drain_rx))
 }
 
 impl Shutdown {
+    pub(crate) fn from_drain(tx: drain::Signal) -> Result<Self, RegisterError> {
+        let interrupt = signal(SignalKind::interrupt())?;
+        let terminate = signal(SignalKind::terminate())?;
+        Ok(Shutdown {
+            interrupt,
+            terminate,
+            tx,
+        })
+    }
+
     /// Watches for signals and drives shutdown
     ///
     /// When a `SIGINT` or `SIGTERM` signal is received, the shutdown is initiated, notifying all
@@ -46,9 +62,12 @@ impl Shutdown {
     /// completes immediately and [`Completion::Aborted`] is returned.
     ///
     /// An error is returned when signal registration fails.
-    pub async fn on_signal(self) -> std::io::Result<Completion> {
-        let mut interrupt = signal(SignalKind::interrupt())?;
-        let mut terminate = signal(SignalKind::terminate())?;
+    pub async fn signaled(self) -> Result<(), Aborted> {
+        let Self {
+            mut interrupt,
+            mut terminate,
+            tx,
+        } = self;
 
         tokio::select! {
             _ = interrupt.recv() => {
@@ -61,32 +80,20 @@ impl Shutdown {
         }
 
         tokio::select! {
-            _ = self.0.drain() => {
+            _ = tx.drain() => {
                 debug!("Drained");
-                Ok(Completion::Graceful)
+                Ok(())
             },
 
             _ = interrupt.recv() => {
                 debug!("Received SIGINT; aborting");
-                Ok(Completion::Aborted)
+                Err(Aborted(()))
             },
 
             _ = terminate.recv() => {
                 debug!("Received SIGTERM; aborting");
-                Ok(Completion::Aborted)
+                Err(Aborted(()))
             }
         }
-    }
-}
-
-impl Completion {
-    /// Returns `true` if the shutdown completed gracefully
-    pub fn is_graceful(&self) -> bool {
-        matches!(self, Completion::Graceful)
-    }
-
-    /// Returns `true` if the shutdown was aborted
-    pub fn is_aborted(&self) -> bool {
-        matches!(self, Completion::Aborted)
     }
 }

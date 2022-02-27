@@ -32,6 +32,16 @@ pub struct ServerArgs {
 /// A running server
 #[derive(Debug)]
 #[cfg_attr(docsrs, doc(cfg(feature = "server")))]
+pub struct Bound {
+    local_addr: SocketAddr,
+    tcp: tokio::net::TcpListener,
+    tls_key: TlsKeyPath,
+    tls_certs: TlsCertPath,
+}
+
+/// A running server
+#[derive(Debug)]
+#[cfg_attr(docsrs, doc(cfg(feature = "server")))]
 pub struct SpawnedServer {
     local_addr: SocketAddr,
     task: tokio::task::JoinHandle<()>,
@@ -83,26 +93,8 @@ pub enum Error {
 // === impl ServerArgs ===
 
 impl ServerArgs {
-    /// Bind an HTTPS server to the configured address with the provided service
-    ///
-    /// The server terminates gracefully when the provided `drain` handle is signaled.
-    ///
-    /// TLS credentials are read from the configured paths _for each connection_ to support
-    /// certificate rotation. As such, it is not recommended to expose this server to the open
-    /// internet or to clients that open many short-lived connections. It is primarily intended for
-    /// kubernetes admission controllers.
-    pub async fn spawn<S, B>(self, service: S, drain: drain::Watch) -> Result<SpawnedServer, Error>
-    where
-        S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
-            + Clone
-            + Send
-            + 'static,
-        S::Error: std::error::Error + Send + Sync,
-        S::Future: Send,
-        B: hyper::body::HttpBody + Send + 'static,
-        B::Data: Send,
-        B::Error: std::error::Error + Send + Sync,
-    {
+    /// Attempts to load credentials and bind the server socket
+    pub async fn bind(self) -> Result<Bound, Error> {
         let tls_key = self.server_tls_key.ok_or(Error::NoTlsKey)?;
         let tls_certs = self.server_tls_certs.ok_or(Error::NoTlsCerts)?;
 
@@ -114,13 +106,49 @@ impl ServerArgs {
             .await
             .map_err(|e| Error::Bind(self.server_addr, e))?;
         let local_addr = tcp.local_addr().map_err(Error::LocalAddr)?;
+        Ok(Bound {
+            local_addr,
+            tcp,
+            tls_key,
+            tls_certs,
+        })
+    }
+}
+
+impl Bound {
+    /// Bind an HTTPS server to the configured address with the provided service
+    ///
+    /// The server terminates gracefully when the provided `drain` handle is signaled.
+    ///
+    /// TLS credentials are read from the configured paths _for each connection_ to support
+    /// certificate rotation. As such, it is not recommended to expose this server to the open
+    /// internet or to clients that open many short-lived connections. It is primarily intended for
+    /// kubernetes admission controllers.
+    pub async fn spawn<S, B>(self, service: S, drain: drain::Watch) -> SpawnedServer
+    where
+        S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
+            + Clone
+            + Send
+            + 'static,
+        S::Error: std::error::Error + Send + Sync,
+        S::Future: Send,
+        B: hyper::body::HttpBody + Send + 'static,
+        B::Data: Send,
+        B::Error: std::error::Error + Send + Sync,
+    {
+        let Self {
+            local_addr,
+            tcp,
+            tls_key,
+            tls_certs,
+        } = self;
 
         let task = tokio::spawn(
             accept_loop(tcp, drain, service, tls_key, tls_certs)
                 .instrument(info_span!("server", port = %local_addr.port())),
         );
 
-        Ok(SpawnedServer { local_addr, task })
+        SpawnedServer { local_addr, task }
     }
 }
 

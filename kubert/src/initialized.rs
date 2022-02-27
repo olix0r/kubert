@@ -34,6 +34,8 @@ pin_project_lite::pin_project! {
     }
 }
 
+// === impl Initialized ===
+
 impl Default for Initialized {
     fn default() -> Self {
         Self {
@@ -66,9 +68,19 @@ impl Initialized {
     }
 }
 
+// === impl Handle ===
+
+impl Handle {
+    /// Wraps a [`Future`] or [`Stream`] in a [`ReleasesOnReady`]
+    pub fn release_on_ready<T>(self, unready: T) -> ReleasesOnReady<T> {
+        ReleasesOnReady::new(unready, self)
+    }
+}
+
+// === impl ReleasesOnReady ===
+
 impl<T> ReleasesOnReady<T> {
-    /// Wraps `T` so that the [`Handle`] is dropped when `T` is ready
-    pub fn new(inner: T, handle: Handle) -> Self {
+    fn new(inner: T, handle: Handle) -> Self {
         Self {
             inner,
             handle: Some(handle),

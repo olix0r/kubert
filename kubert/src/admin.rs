@@ -11,10 +11,16 @@ use std::{
 };
 use tracing::{debug, info_span, Instrument};
 
+/// Results that may fail with a server error
+pub type Result<T> = hyper::Result<T>;
+
+/// Server errors
+pub type Error = hyper::Error;
+
 /// Command-line arguments used to configure an admin server
-#[cfg(feature = "clap")]
-#[derive(Clone, Debug, clap::Parser)]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "admin", feature = "clap"))))]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
+#[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
 pub struct AdminArgs {
     /// The admin server's address
     #[cfg_attr(feature = "clap", clap(long, default_value = "0.0.0.0:8080"))]
@@ -23,7 +29,7 @@ pub struct AdminArgs {
 
 /// Supports configuring and running an admin server
 #[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Builder {
     addr: SocketAddr,
     ready: Readiness,
@@ -40,12 +46,19 @@ pub struct Readiness(Arc<AtomicBool>);
 pub struct Server {
     addr: SocketAddr,
     ready: Readiness,
-    task: tokio::task::JoinHandle<hyper::Result<()>>,
+    task: tokio::task::JoinHandle<Result<()>>,
 }
 
 // === impl AdminArgs ===
 
-#[cfg(feature = "clap")]
+impl Default for AdminArgs {
+    fn default() -> Self {
+        Self {
+            admin_addr: SocketAddr::from(([0, 0, 0, 0], 8080)),
+        }
+    }
+}
+
 impl AdminArgs {
     /// Creates a new [`Builder`] frm the command-line arguments
     pub fn into_builder(self) -> Builder {
@@ -55,7 +68,7 @@ impl AdminArgs {
     /// Binds and runs the server on a background task, returning a handle
     ///
     /// The server starts unready by default and it's up to the caller to mark it as ready.
-    pub fn spawn(self) -> Server {
+    pub fn spawn(self) -> Result<Server> {
         self.into_builder().spawn()
     }
 }
@@ -84,10 +97,10 @@ impl Builder {
     }
 
     /// Binds and runs the server on a background task, returning a handle
-    pub fn spawn(self) -> Server {
+    pub fn spawn(self) -> Result<Server> {
         let Self { addr, ready } = self;
 
-        let http = hyper::server::Server::bind(&addr)
+        let http = hyper::server::Server::try_bind(&addr)?
             // Allow weird clients (like netcat).
             .http1_half_close(true)
             // Prevent port scanners, etc, from holding connections ope.n
@@ -124,7 +137,7 @@ impl Builder {
             .instrument(info_span!("admin", port = %addr.port())),
         );
 
-        Server { addr, ready, task }
+        Ok(Server { addr, ready, task })
     }
 }
 
@@ -156,7 +169,7 @@ impl Server {
     }
 
     /// Returns the server tasks's join handle
-    pub fn into_join_handle(self) -> tokio::task::JoinHandle<hyper::Result<()>> {
+    pub fn into_join_handle(self) -> tokio::task::JoinHandle<Result<()>> {
         self.task
     }
 }

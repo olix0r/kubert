@@ -1,9 +1,8 @@
 //! Configures the global default tracing subscriber
 
 use thiserror::Error;
-use tracing_subscriber::util::TryInitError;
 
-pub use tracing_subscriber::EnvFilter;
+pub use tracing_subscriber::{util::TryInitError, EnvFilter};
 
 /// Configures whether logs should be emitted in plaintext (the default) or as JSON-encoded
 /// messages

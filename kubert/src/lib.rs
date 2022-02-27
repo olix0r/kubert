@@ -30,9 +30,9 @@ pub mod log;
 #[cfg_attr(docsrs, doc(cfg(feature = "requeue")))]
 pub mod requeue;
 
-// #[cfg(feature = "runtime")]
-// #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
-// pub mod runtime;
+#[cfg(feature = "runtime")]
+#[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
+pub mod runtime;
 
 #[cfg(feature = "server")]
 #[cfg_attr(docsrs, doc(cfg(feature = "server")))]
