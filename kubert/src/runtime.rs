@@ -355,9 +355,28 @@ impl Runtime<server::Bound> {
 
 #[cfg(feature = "server")]
 impl Runtime<Option<server::Bound>> {
-    /// Spawns the HTTPS server with the given `service`, returning the runtime.
-    pub fn spawn_server<S, B>(self, service: S) -> Runtime<NoServer>
+    /// Indicates whether a server is bound
+    pub fn has_server(&self) -> bool {
+        self.server.is_some()
+    }
+
+    /// Drops the server, if any
+    pub fn without_server(self) -> Runtime<NoServer> {
+        Runtime {
+            admin: self.admin,
+            client: self.client,
+            error_delay: self.error_delay,
+            initialized: self.initialized,
+            server: NoServer(()),
+            shutdown_rx: self.shutdown_rx,
+            shutdown: self.shutdown,
+        }
+    }
+
+    /// Attempts to spawn the HTTPS server, if bound with the given `service`, returning the runtime.
+    pub fn spawn_server<S, B, F>(self, mk: F) -> Runtime<NoServer>
     where
+        F: FnOnce() -> S,
         S: tower_service::Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
             + Clone
             + Send
@@ -369,7 +388,7 @@ impl Runtime<Option<server::Bound>> {
         B::Error: std::error::Error + Send + Sync,
     {
         if let Some(s) = self.server {
-            s.spawn(service, self.shutdown_rx.clone());
+            s.spawn(mk(), self.shutdown_rx.clone());
         }
 
         Runtime {
