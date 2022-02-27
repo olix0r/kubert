@@ -144,6 +144,18 @@ impl Builder<NoServer> {
         }
     }
 
+    #[cfg(feature = "server")]
+    /// Configures the runtime to optionally start a server with the given [`ServerArgs`]
+    pub fn with_optional_server(self, server: Option<ServerArgs>) -> Builder<Option<ServerArgs>> {
+        Builder {
+            server,
+            admin: self.admin,
+            client: self.client,
+            error_delay: self.error_delay,
+            log: self.log,
+        }
+    }
+
     /// Attempts to build a runtime
     pub async fn try_build(self) -> Result<Runtime<NoServer>, BuildError> {
         self.try_build_inner().await
@@ -156,6 +168,28 @@ impl Builder<ServerArgs> {
     pub async fn try_build(self) -> Result<Runtime<server::Bound>, BuildError> {
         let rt = self.try_build_inner().await?;
         let server = rt.server.bind().await?;
+
+        Ok(Runtime {
+            server,
+            admin: rt.admin,
+            client: rt.client,
+            error_delay: rt.error_delay,
+            initialized: rt.initialized,
+            shutdown_rx: rt.shutdown_rx,
+            shutdown: rt.shutdown,
+        })
+    }
+}
+
+#[cfg(feature = "server")]
+impl Builder<Option<ServerArgs>> {
+    /// Attempts to build a runtime
+    pub async fn try_build(self) -> Result<Runtime<Option<server::Bound>>, BuildError> {
+        let rt = self.try_build_inner().await?;
+        let server = match rt.server {
+            Some(s) => Some(s.bind().await?),
+            None => None,
+        };
 
         Ok(Runtime {
             server,
@@ -306,6 +340,37 @@ impl Runtime<server::Bound> {
         B::Error: std::error::Error + Send + Sync,
     {
         self.server.spawn(service, self.shutdown_rx.clone());
+
+        Runtime {
+            admin: self.admin,
+            client: self.client,
+            error_delay: self.error_delay,
+            initialized: self.initialized,
+            server: NoServer(()),
+            shutdown_rx: self.shutdown_rx,
+            shutdown: self.shutdown,
+        }
+    }
+}
+
+#[cfg(feature = "server")]
+impl Runtime<Option<server::Bound>> {
+    /// Spawns the HTTPS server with the given `service`, returning the runtime.
+    pub fn spawn_server<S, B>(self, service: S) -> Runtime<NoServer>
+    where
+        S: tower_service::Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
+            + Clone
+            + Send
+            + 'static,
+        S::Error: std::error::Error + Send + Sync,
+        S::Future: Send,
+        B: hyper::body::HttpBody + Send + 'static,
+        B::Data: Send,
+        B::Error: std::error::Error + Send + Sync,
+    {
+        if let Some(s) = self.server {
+            s.spawn(service, self.shutdown_rx.clone());
+        }
 
         Runtime {
             admin: self.admin,
