@@ -2,7 +2,7 @@
 
 use thiserror::Error;
 
-pub use tracing_subscriber::{util::TryInitError, EnvFilter};
+pub use tracing_subscriber::{util::TryInitError as LogInitError, EnvFilter as LogFilter};
 
 /// Configures whether logs should be emitted in plaintext (the default) or as JSON-encoded
 /// messages
@@ -48,7 +48,7 @@ impl LogFormat {
     ///
     /// This method returns an error if a global default subscriber has already been set, or if a
     /// `log` logger has already been set.
-    pub fn try_init(self, filter: EnvFilter) -> Result<(), TryInitError> {
+    pub fn try_init(self, filter: LogFilter) -> Result<(), LogInitError> {
         use tracing_subscriber::prelude::*;
 
         let registry = tracing_subscriber::registry().with(filter);

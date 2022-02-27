@@ -7,7 +7,7 @@ use crate::{
     client::{self, Client, ClientArgs},
     errors,
     initialized::{self, Initialized},
-    log, shutdown,
+    shutdown, LogFilter, LogFormat, LogInitError,
 };
 use futures_core::Stream;
 use kube_core::{params::ListParams, Resource};
@@ -58,7 +58,7 @@ pub struct NoServer(());
 pub enum BuildError {
     /// Indicates that logging could not be initialized
     #[error(transparent)]
-    LogInit(#[from] log::TryInitError),
+    LogInit(#[from] LogInitError),
 
     /// Indicates that the admin server could not be bound
     #[error(transparent)]
@@ -80,8 +80,8 @@ pub enum BuildError {
 
 #[derive(Debug)]
 struct LogSettings {
-    filter: log::EnvFilter,
-    format: log::LogFormat,
+    filter: LogFilter,
+    format: LogFormat,
 }
 
 // === impl Builder ===
@@ -102,7 +102,7 @@ impl<S> Builder<S> {
     }
 
     /// Configures the runtime to use the given logging configuration
-    pub fn with_log(mut self, filter: log::EnvFilter, format: log::LogFormat) -> Self {
+    pub fn with_log(mut self, filter: LogFilter, format: LogFormat) -> Self {
         self.log = Some(LogSettings { filter, format });
         self
     }
@@ -350,14 +350,14 @@ impl Runtime<NoServer> {
 impl Default for LogSettings {
     fn default() -> Self {
         Self {
-            filter: log::EnvFilter::from_default_env(),
-            format: log::LogFormat::default(),
+            filter: LogFilter::from_default_env(),
+            format: LogFormat::default(),
         }
     }
 }
 
 impl LogSettings {
-    fn try_init(self) -> Result<(), log::TryInitError> {
+    fn try_init(self) -> Result<(), LogInitError> {
         self.format.try_init(self.filter)
     }
 }

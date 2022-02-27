@@ -48,5 +48,14 @@ pub use self::admin::AdminArgs;
 #[cfg(all(feature = "client"))]
 pub use self::client::ClientArgs;
 
-#[cfg(all(feature = "track-init"))]
-pub use self::track_init::TrackInit;
+#[cfg(all(feature = "initialized"))]
+pub use self::initialized::Initialized;
+
+#[cfg(all(feature = "log"))]
+pub use self::log::{LogFilter, LogFormat, LogInitError};
+
+#[cfg(all(feature = "runtime"))]
+pub use self::runtime::{Builder, Runtime};
+
+#[cfg(all(feature = "server"))]
+pub use self::server::ServerArgs;
