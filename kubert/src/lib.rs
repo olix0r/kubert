@@ -55,7 +55,7 @@ pub use self::initialized::Initialized;
 pub use self::log::{LogFilter, LogFormat, LogInitError};
 
 #[cfg(all(feature = "runtime"))]
-pub use self::runtime::{Builder, Runtime};
+pub use self::runtime::Runtime;
 
 #[cfg(all(feature = "server"))]
 pub use self::server::ServerArgs;

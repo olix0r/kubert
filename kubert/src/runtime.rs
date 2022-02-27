@@ -406,6 +406,11 @@ impl Runtime<Option<server::Bound>> {
 }
 
 impl Runtime<NoServer> {
+    /// Creates a runtime builder
+    pub fn builder() -> Builder<NoServer> {
+        Builder::default()
+    }
+
     /// Runs the runtime until it is shutdown
     pub async fn run(self) -> Result<(), shutdown::Aborted> {
         let Self {
