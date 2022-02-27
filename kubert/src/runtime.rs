@@ -50,7 +50,7 @@ pub struct Runtime<S = NoServer> {
 }
 
 /// Indicates that no HTTPS server is configured
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct NoServer(());
 
 /// Indicates that the [`Builder`] could not configure a [`Runtime`]
