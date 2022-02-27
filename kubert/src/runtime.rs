@@ -167,7 +167,7 @@ impl Builder<NoServer> {
 
 #[cfg(feature = "server")]
 impl Builder<ServerArgs> {
-    /// Attempts to build a runtime
+    /// Attempts to build a runtime, binding a server
     pub async fn build(self) -> Result<Runtime<server::Bound>, BuildError> {
         let rt = self.build_inner().await?;
         let server = rt.server.bind().await?;
@@ -186,7 +186,7 @@ impl Builder<ServerArgs> {
 
 #[cfg(feature = "server")]
 impl Builder<Option<ServerArgs>> {
-    /// Attempts to build a runtime
+    /// Attempts to build a runtime, optionally binding a server
     pub async fn build(self) -> Result<Runtime<Option<server::Bound>>, BuildError> {
         let rt = self.build_inner().await?;
         let server = match rt.server {
@@ -229,7 +229,7 @@ impl<S> Runtime<S> {
 
     /// Obtains a handle that can be used to instrument graceful shutdown
     #[inline]
-    pub fn shutdown_handle(&self) -> drain::Watch {
+    pub fn shutdown_handle(&self) -> shutdown::Watch {
         self.shutdown_rx.clone()
     }
 
