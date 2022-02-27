@@ -36,7 +36,7 @@ pub struct RegisterError(#[from] std::io::Error);
 pin_project_lite::pin_project! {
     /// Indicates an error registering a signal handler
     #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
-    pub struct TaskShutdown<T> {
+    pub struct CancelOnShutdown<T> {
         #[pin]
         inner: T,
         #[pin]
@@ -114,7 +114,7 @@ impl Shutdown {
     }
 }
 
-impl<T> TaskShutdown<T> {
+impl<T> CancelOnShutdown<T> {
     /// Wraps a `Future` or `Stream` that completes when the shutdown watch fires.
     pub fn new(inner: T, shutdown: Watch) -> Self {
         // XXX Unfortunately the `Watch` API doesn't give us any means to poll for updates, so we
@@ -126,7 +126,7 @@ impl<T> TaskShutdown<T> {
     }
 }
 
-impl<F: Future<Output = ()>> Future for TaskShutdown<F> {
+impl<F: Future<Output = ()>> Future for CancelOnShutdown<F> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
@@ -140,7 +140,7 @@ impl<F: Future<Output = ()>> Future for TaskShutdown<F> {
     }
 }
 
-impl<S: Stream> Stream for TaskShutdown<S> {
+impl<S: Stream> Stream for CancelOnShutdown<S> {
     type Item = S::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<S::Item>> {

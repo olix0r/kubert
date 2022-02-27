@@ -232,6 +232,11 @@ impl<S> Runtime<S> {
         self.shutdown_rx.clone()
     }
 
+    /// Wraps the given `Future` or `Stream` so that it completes when the runtime is shutdown
+    pub fn cancel_on_shutdown<T>(&self, inner: T) -> shutdown::CancelOnShutdown<T> {
+        shutdown::CancelOnShutdown::new(inner, self.shutdown_rx.clone())
+    }
+
     /// Creates a watch with the given [`Api`]
     pub fn watch<T>(
         &mut self,
@@ -249,7 +254,7 @@ impl<S> Runtime<S> {
                     self.error_delay,
                     watcher::watcher(api, params),
                 ));
-        shutdown::TaskShutdown::new(stream, self.shutdown_rx.clone())
+        shutdown::CancelOnShutdown::new(stream, self.shutdown_rx.clone())
     }
 
     /// Creates a cached watch with the given [`Api`]
@@ -271,7 +276,7 @@ impl<S> Runtime<S> {
                     self.error_delay,
                     reflector::reflector(writer, watcher::watcher(api, params)),
                 ));
-        let stream = shutdown::TaskShutdown::new(stream, self.shutdown_rx.clone());
+        let stream = shutdown::CancelOnShutdown::new(stream, self.shutdown_rx.clone());
         (store, stream)
     }
 
