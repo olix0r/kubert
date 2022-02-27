@@ -326,6 +326,7 @@ impl Runtime<NoServer> {
             admin,
             initialized,
             shutdown,
+            shutdown_rx,
             ..
         } = self;
 
@@ -336,7 +337,11 @@ impl Runtime<NoServer> {
         tokio::spawn(async move {
             initialized.initialized().await;
             ready.set(true);
-            tracing::debug!("initialized")
+            tracing::debug!("initialized");
+
+            drop(shutdown_rx.signaled().await);
+            ready.set(false);
+            tracing::debug!("shutdown");
         });
 
         shutdown.signaled().await?;
