@@ -14,6 +14,8 @@ use kube_core::{params::ListParams, Resource};
 use kube_runtime::{reflector, watcher};
 use serde::de::DeserializeOwned;
 use std::{fmt::Debug, hash::Hash, time::Duration};
+#[cfg(feature = "server")]
+use tower_service::Service;
 
 pub use kube_client::Api;
 pub use reflector::Store;
@@ -237,7 +239,7 @@ impl<S> Runtime<S> {
         params: ListParams,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource + DeserializeOwned + Clone + Debug + Default + Send + 'static,
+        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
         self.initialized
@@ -255,7 +257,7 @@ impl<S> Runtime<S> {
         params: ListParams,
     ) -> (Store<T>, impl Stream<Item = watcher::Event<T>>)
     where
-        T: Resource + DeserializeOwned + Clone + Debug + Default + Send + 'static,
+        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Clone + Default + Eq + Hash + Clone,
     {
         let writer = reflector::store::Writer::<T>::default();
@@ -274,7 +276,7 @@ impl<S> Runtime<S> {
     #[inline]
     pub fn watch_all<T>(&mut self, params: ListParams) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource + DeserializeOwned + Clone + Debug + Default + Send + 'static,
+        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
         self.watch(Api::all(self.client()), params)
@@ -288,7 +290,7 @@ impl<S> Runtime<S> {
         params: ListParams,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource + DeserializeOwned + Clone + Debug + Default + Send + 'static,
+        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
         let api = Api::namespaced(self.client(), ns.as_ref());
@@ -302,7 +304,7 @@ impl<S> Runtime<S> {
         params: ListParams,
     ) -> (Store<T>, impl Stream<Item = watcher::Event<T>>)
     where
-        T: Resource + DeserializeOwned + Clone + Debug + Default + Send + 'static,
+        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Clone + Default + Eq + Hash + Clone,
     {
         self.cache(Api::all(self.client()), params)
@@ -316,7 +318,7 @@ impl<S> Runtime<S> {
         params: ListParams,
     ) -> (Store<T>, impl Stream<Item = watcher::Event<T>>)
     where
-        T: Resource + DeserializeOwned + Clone + Debug + Default + Send + 'static,
+        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Clone + Default + Eq + Hash + Clone,
     {
         let api = Api::namespaced(self.client(), ns.as_ref());
@@ -329,7 +331,7 @@ impl Runtime<server::Bound> {
     /// Spawns the HTTPS server with the given `service`, returning the runtime.
     pub fn spawn_server<S, B>(self, service: S) -> Runtime<NoServer>
     where
-        S: tower_service::Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
+        S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
             + Clone
             + Send
             + 'static,
@@ -377,7 +379,7 @@ impl Runtime<Option<server::Bound>> {
     pub fn spawn_server<S, B, F>(self, mk: F) -> Runtime<NoServer>
     where
         F: FnOnce() -> S,
-        S: tower_service::Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
+        S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
             + Clone
             + Send
             + 'static,
