@@ -26,7 +26,11 @@ pub struct Builder<S = NoServer> {
     client: Option<ClientArgs>,
     error_delay: Option<Duration>,
     log: Option<LogSettings>,
+
+    #[cfg(feature = "server")]
     server: S,
+    #[cfg(not(feature = "server"))]
+    server: std::marker::PhantomData<S>,
 }
 
 /// A configured runtime that can be used to instrument and run a controller
@@ -39,30 +43,37 @@ pub struct Runtime<S = NoServer> {
     shutdown_rx: drain::Watch,
     shutdown: shutdown::Shutdown,
 
-    #[cfg_attr(not(feature = "server"), allow(dead_code))]
+    #[cfg(feature = "server")]
     server: S,
+    #[cfg(not(feature = "server"))]
+    server: std::marker::PhantomData<S>,
 }
 
 /// Indicates that no HTTPS server is configured
 #[derive(Debug)]
 pub struct NoServer(());
 
+/// Indicates that the [`Builder`] could not configure a [`Runtime`]
 #[derive(Debug, thiserror::Error)]
 pub enum BuildError {
+    /// Indicates that logging could not be initialized
     #[error(transparent)]
     LogInit(#[from] log::TryInitError),
 
-    /// Shutdown signals could not be registered
+    /// Indicates that the admin server could not be bound
     #[error(transparent)]
     Admin(#[from] admin::Error),
 
+    /// Indicates that the Kubernetes client could not be iniialized.
     #[error(transparent)]
     Client(#[from] client::ConfigError),
 
     #[cfg(feature = "server")]
+    /// Indicates that the HTTPS server could not be initialized
     #[error(transparent)]
     Server(#[from] server::Error),
 
+    /// Indicates that a signal handler could not be registered
     #[error(transparent)]
     Signal(#[from] shutdown::RegisterError),
 }

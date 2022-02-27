@@ -45,7 +45,7 @@ server = [
     "tower-service",
     "tracing",
 ]
-shutdown = ["drain", "tokio/macros", "tokio/signal", "tracing"]
+shutdown = ["drain", "tokio/macros", "tokio/signal", "thiserror", "tracing"]
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]

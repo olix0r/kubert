@@ -43,7 +43,7 @@ pub fn try_register() -> Result<(Shutdown, Watch), RegisterError> {
 }
 
 impl Shutdown {
-    pub(crate) fn from_drain(tx: drain::Signal) -> Result<Self, RegisterError> {
+    fn from_drain(tx: drain::Signal) -> Result<Self, RegisterError> {
         let interrupt = signal(SignalKind::interrupt())?;
         let terminate = signal(SignalKind::terminate())?;
         Ok(Shutdown {

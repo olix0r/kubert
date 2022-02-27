@@ -27,7 +27,7 @@ pub struct AdminArgs {
     pub admin_addr: SocketAddr,
 }
 
-/// Supports configuring and running an admin server
+/// Supports configuring an admin server
 #[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
 #[derive(Clone, Debug)]
 pub struct Builder {
@@ -35,6 +35,7 @@ pub struct Builder {
     ready: Readiness,
 }
 
+/// Supports spawning an admin server
 #[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
 #[derive(Debug)]
 pub struct Bound {
@@ -97,6 +98,7 @@ impl Builder {
         self.ready.set(true);
     }
 
+    /// Binds the admin server without accepting connections
     pub fn bind(self) -> Result<Bound> {
         let Self { addr, ready } = self;
 
@@ -117,8 +119,14 @@ impl Builder {
 }
 
 impl Bound {
+    /// Returns a readiness handle
     pub fn readiness(&self) -> Readiness {
         self.ready.clone()
+    }
+
+    /// Sets the initial readiness state to ready
+    pub fn set_ready(&self) {
+        self.ready.set(true);
     }
 
     /// Binds and runs the server on a background task, returning a handle
