@@ -36,7 +36,7 @@ pub struct RegisterError(#[from] std::io::Error);
 pin_project_lite::pin_project! {
     /// Indicates an error registering a signal handler
     #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
-    pub struct ShutdownStream<T> {
+    pub struct TaskShutdown<T> {
         #[pin]
         inner: T,
         #[pin]
@@ -114,9 +114,9 @@ impl Shutdown {
     }
 }
 
-impl<S> ShutdownStream<S> {
-    /// Creates a stream that completes when the shutdown watch fires.
-    pub fn new(inner: S, shutdown: Watch) -> Self {
+impl<T> TaskShutdown<T> {
+    /// Wraps a `Future` or `Stream` that completes when the shutdown watch fires.
+    pub fn new(inner: T, shutdown: Watch) -> Self {
         // XXX Unfortunately the `Watch` API doesn't give us any means to poll for updates, so we
         // have to box the async call to poll it from the stream.
         let shutdown = Box::pin(async move {
@@ -126,7 +126,21 @@ impl<S> ShutdownStream<S> {
     }
 }
 
-impl<S: Stream> Stream for ShutdownStream<S> {
+impl<F: Future<Output = ()>> Future for TaskShutdown<F> {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+        let mut this = self.project();
+
+        if this.shutdown.as_mut().poll(cx).is_ready() {
+            return Poll::Ready(());
+        }
+
+        this.inner.poll(cx)
+    }
+}
+
+impl<S: Stream> Stream for TaskShutdown<S> {
     type Item = S::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<S::Item>> {
