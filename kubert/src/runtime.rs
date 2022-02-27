@@ -116,7 +116,7 @@ impl<S> Builder<S> {
     }
 
     #[inline]
-    async fn try_build_inner(self) -> Result<Runtime<S>, BuildError> {
+    async fn build_inner(self) -> Result<Runtime<S>, BuildError> {
         self.log.unwrap_or_default().try_init()?;
         let admin = self.admin.unwrap_or_default().into_builder().bind()?;
         let client = self.client.unwrap_or_default().try_client().await?;
@@ -159,16 +159,16 @@ impl Builder<NoServer> {
     }
 
     /// Attempts to build a runtime
-    pub async fn try_build(self) -> Result<Runtime<NoServer>, BuildError> {
-        self.try_build_inner().await
+    pub async fn build(self) -> Result<Runtime<NoServer>, BuildError> {
+        self.build_inner().await
     }
 }
 
 #[cfg(feature = "server")]
 impl Builder<ServerArgs> {
     /// Attempts to build a runtime
-    pub async fn try_build(self) -> Result<Runtime<server::Bound>, BuildError> {
-        let rt = self.try_build_inner().await?;
+    pub async fn build(self) -> Result<Runtime<server::Bound>, BuildError> {
+        let rt = self.build_inner().await?;
         let server = rt.server.bind().await?;
 
         Ok(Runtime {
@@ -186,8 +186,8 @@ impl Builder<ServerArgs> {
 #[cfg(feature = "server")]
 impl Builder<Option<ServerArgs>> {
     /// Attempts to build a runtime
-    pub async fn try_build(self) -> Result<Runtime<Option<server::Bound>>, BuildError> {
-        let rt = self.try_build_inner().await?;
+    pub async fn build(self) -> Result<Runtime<Option<server::Bound>>, BuildError> {
+        let rt = self.build_inner().await?;
         let server = match rt.server {
             Some(s) => Some(s.bind().await?),
             None => None,
