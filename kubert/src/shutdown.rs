@@ -1,6 +1,6 @@
 //! Drives graceful shutdown when the process receives a signal.
 
-use futures_core::{Future, Stream};
+#[cfg(feature = "runtime")]
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -33,14 +33,15 @@ pub struct Aborted(());
 #[error("failed to register signal handler: {0}")]
 pub struct RegisterError(#[from] std::io::Error);
 
+#[cfg(feature = "runtime")]
 pin_project_lite::pin_project! {
     /// Indicates an error registering a signal handler
-    #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
     pub struct CancelOnShutdown<T> {
         #[pin]
         inner: T,
         #[pin]
-        shutdown: Pin<Box<dyn Future<Output = ()> + Send + Sync + 'static>>,
+        shutdown: Pin<Box<dyn std::future::Future<Output = ()> + Send + Sync + 'static>>,
     }
 }
 
@@ -115,6 +116,7 @@ impl Shutdown {
     }
 }
 
+#[cfg(feature = "runtime")]
 impl<T> CancelOnShutdown<T> {
     /// Wraps a `Future` or `Stream` that completes when the shutdown watch fires.
     pub(crate) fn new(watch: Watch, inner: T) -> Self {
@@ -127,7 +129,8 @@ impl<T> CancelOnShutdown<T> {
     }
 }
 
-impl<F: Future<Output = ()>> Future for CancelOnShutdown<F> {
+#[cfg(feature = "runtime")]
+impl<F: std::future::Future<Output = ()>> std::future::Future for CancelOnShutdown<F> {
     type Output = ();
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
@@ -141,10 +144,13 @@ impl<F: Future<Output = ()>> Future for CancelOnShutdown<F> {
     }
 }
 
-impl<S: Stream> Stream for CancelOnShutdown<S> {
+#[cfg(feature = "runtime")]
+impl<S: futures_core::Stream> futures_core::Stream for CancelOnShutdown<S> {
     type Item = S::Item;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<S::Item>> {
+        use std::future::Future;
+
         let mut this = self.project();
 
         if this.shutdown.as_mut().poll(cx).is_ready() {

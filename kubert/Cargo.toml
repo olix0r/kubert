@@ -48,7 +48,6 @@ server = [
 shutdown = [
     "drain",
     "futures-core",
-    "pin-project-lite",
     "tokio/macros",
     "tokio/signal",
     "thiserror",
