@@ -4,9 +4,7 @@
 //! Unlike a normal `hyper` server, this server reloads its TLS credentials for each connection to
 //! support certificate rotation.
 
-use std::{
-    convert::Infallible, io::BufReader, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc,
-};
+use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use thiserror::Error;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::{rustls, TlsAcceptor};
@@ -300,10 +298,9 @@ impl TlsCertPath {
     async fn load_certs(&self) -> std::io::Result<Vec<rustls::Certificate>> {
         // Open certificate file.
         let pem = tokio::fs::read(&self.0).await?;
-        let mut reader = BufReader::new(pem.as_slice());
 
         // Load and return certificate.
-        let certs = rustls_pemfile::certs(&mut reader)?;
+        let certs = rustls_pemfile::certs(&mut pem.as_slice())?;
         Ok(certs.into_iter().map(rustls::Certificate).collect())
     }
 }
@@ -324,8 +321,8 @@ impl TlsKeyPath {
         let pem = tokio::fs::read(&self.0).await?;
 
         // Load and return a single private key.
-        let keys = rustls_pemfile::pkcs8_private_keys(&mut BufReader::new(pem.as_slice()))
-            .or_else(|_| rustls_pemfile::rsa_private_keys(&mut BufReader::new(pem.as_slice())))?;
+        let keys = rustls_pemfile::pkcs8_private_keys(&mut pem.as_slice())
+            .or_else(|_| rustls_pemfile::rsa_private_keys(&mut pem.as_slice()))?;
         if keys.len() != 1 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
