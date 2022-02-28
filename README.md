@@ -8,7 +8,7 @@ Rust Kubernetes runtime helpers. Based on [`kube-rs`][krs].
 [![Documentation][docs-badge]][docs-url]
 [![License][lic-badge]](LICENSE)
 
-[crate-badge]: https://img.shields.io/crates/v/kube.svg
+[crate-badge]: https://img.shields.io/crates/v/kubert.svg
 [crate-url]: https://crates.io/crates/kube
 [docs-badge]: https://docs.rs/kubert/badge.svg
 [docs-url]: https://docs.rs/kubert
