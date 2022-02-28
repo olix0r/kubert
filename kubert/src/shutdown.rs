@@ -72,9 +72,7 @@ impl Shutdown {
     /// [`Watch`] instances. When all watches are dropped, the shutdown is completed.
     ///
     /// If a second signal is received while waiting for watches to be dropped, this future
-    /// completes immediately and [`Completion::Aborted`] is returned.
-    ///
-    /// An error is returned when signal registration fails.
+    /// completes immediately with an [`Aborted`] error.
     pub async fn signaled(self) -> Result<(), Aborted> {
         let Self {
             mut interrupt,
