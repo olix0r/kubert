@@ -150,18 +150,17 @@ impl Bound {
                 ))
             }));
 
-        let addr = server.local_addr();
         let task = tokio::spawn(
             async move {
                 debug!("Serving");
                 server.await
             }
-            .instrument(info_span!("admin", port = %addr.port())),
+            .instrument(info_span!("admin", port = %self.addr.port())),
         );
 
         Server {
-            addr,
             task,
+            addr: self.addr,
             ready: self.ready,
         }
     }
