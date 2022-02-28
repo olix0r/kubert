@@ -321,9 +321,20 @@ impl TlsKeyPath {
         let pem = tokio::fs::read(&self.0).await?;
 
         // Load and return a single private key.
-        let keys = rustls_pemfile::pkcs8_private_keys(&mut pem.as_slice())
-            .or_else(|_| rustls_pemfile::rsa_private_keys(&mut pem.as_slice()))?;
-        if keys.len() != 1 {
+        let mut keys = rustls_pemfile::pkcs8_private_keys(&mut pem.as_slice())?;
+
+        if keys.is_empty() {
+            keys = rustls_pemfile::rsa_private_keys(&mut pem.as_slice())?;
+
+            if keys.is_empty() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "could not load private key",
+                ));
+            }
+        }
+
+        if keys.len() > 1 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "too many private keys",
