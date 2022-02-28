@@ -25,7 +25,7 @@ pub struct Sender<T> {
 /// Instances are created by the [`channel`] function.
 pub struct Receiver<T>
 where
-    T: PartialEq + Eq + Hash,
+    T: Eq + Hash,
 {
     rx: mpsc::Receiver<Op<T>>,
     rx_closed: bool,
@@ -36,7 +36,7 @@ where
 /// Creates a bounded, delayed mpsc channel for requeuing controller updates.
 pub fn channel<T>(capacity: usize) -> (Sender<T>, Receiver<T>)
 where
-    T: PartialEq + Eq + Hash,
+    T: Eq + Hash,
 {
     let (tx, rx) = mpsc::channel(capacity);
     let rx = Receiver {
@@ -58,7 +58,7 @@ enum Op<T> {
 
 impl<T> Receiver<T>
 where
-    T: Clone + PartialEq + Eq + Hash,
+    T: Clone + Eq + Hash,
 {
     /// Attempts to process requeues, obtaining the next value from the delay queueand registering
     /// current task for wakeup if the value is not yet available, and returning `None` if the
@@ -124,9 +124,9 @@ where
 }
 
 // We never put `T` in a `Pin`...
-impl<T: PartialEq + Eq + Hash> Unpin for Receiver<T> {}
+impl<T: Eq + Hash> Unpin for Receiver<T> {}
 
-impl<T: Clone + PartialEq + Eq + Hash> futures_core::Stream for Receiver<T> {
+impl<T: Clone + Eq + Hash> futures_core::Stream for Receiver<T> {
     type Item = T;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {

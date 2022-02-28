@@ -119,7 +119,7 @@ impl Shutdown {
 
 impl<T> CancelOnShutdown<T> {
     /// Wraps a `Future` or `Stream` that completes when the shutdown watch fires.
-    fn new(watch: Watch, inner: T) -> Self {
+    pub(crate) fn new(watch: Watch, inner: T) -> Self {
         // XXX Unfortunately the `Watch` API doesn't give us any means to poll for updates, so we
         // have to box the async call to poll it from the stream.
         let shutdown = Box::pin(async move {

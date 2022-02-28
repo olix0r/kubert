@@ -22,6 +22,7 @@ pub use reflector::Store;
 
 /// Configures a controller [`Runtime`]
 #[derive(Debug, Default)]
+#[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
 #[must_use]
 pub struct Builder<S = NoServer> {
     admin: Option<AdminArgs>,
@@ -44,6 +45,7 @@ pub struct Builder<S = NoServer> {
 ///
 /// The runtime facilitates creating watches (with and without caches) that include error handling
 /// and graceful shutdown.
+#[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
 #[must_use]
 pub struct Runtime<S = NoServer> {
     admin: admin::Bound,
@@ -65,6 +67,7 @@ pub struct NoServer(());
 
 /// Indicates that the [`Builder`] could not configure a [`Runtime`]
 #[derive(Debug, thiserror::Error)]
+#[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
 pub enum BuildError {
     /// Indicates that logging could not be initialized
     #[error(transparent)]
@@ -142,9 +145,10 @@ impl<S> Builder<S> {
     }
 }
 
+#[cfg(feature = "server")]
 impl Builder<NoServer> {
-    #[cfg(feature = "server")]
     /// Configures the runtime to start a server with the given [`ServerArgs`]
+    #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "server"))))]
     pub fn with_server(self, server: ServerArgs) -> Builder<ServerArgs> {
         Builder {
             server,
@@ -155,11 +159,11 @@ impl Builder<NoServer> {
         }
     }
 
-    #[cfg(feature = "server")]
     /// Configures the runtime to optionally start a server with the given [`ServerArgs`]
     ///
     /// This is useful for runtimes that usually run an admission controller, but may want to
     /// support running without it when running outside the cluster.
+    #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "server"))))]
     pub fn with_optional_server(self, server: Option<ServerArgs>) -> Builder<Option<ServerArgs>> {
         Builder {
             server,
@@ -169,7 +173,9 @@ impl Builder<NoServer> {
             log: self.log,
         }
     }
+}
 
+impl Builder<NoServer> {
     /// Attempts to build a runtime by initializing logs, loading the default Kubernetes client,
     /// registering signal handlers and binding an admin server
     pub async fn build(self) -> Result<Runtime<NoServer>, BuildError> {
@@ -181,6 +187,7 @@ impl Builder<NoServer> {
 impl Builder<ServerArgs> {
     /// Attempts to build a runtime by initializing logs, loading the default Kubernetes client,
     /// registering signal handlers and binding admin and HTTPS servers
+    #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "server"))))]
     pub async fn build(self) -> Result<Runtime<server::Bound>, BuildError> {
         let rt = self.build_inner().await?;
         let server = rt.server.bind().await?;
@@ -201,6 +208,7 @@ impl Builder<ServerArgs> {
 impl Builder<Option<ServerArgs>> {
     /// Attempts to build a runtime by initializing logs, loading the default Kubernetes client,
     /// registering signal handlers and binding admin and HTTPS servers
+    #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "server"))))]
     pub async fn build(self) -> Result<Runtime<Option<server::Bound>>, BuildError> {
         let rt = self.build_inner().await?;
         let server = match rt.server {
@@ -249,7 +257,25 @@ impl<S> Runtime<S> {
 
     /// Wraps the given `Future` or `Stream` so that it completes when the runtime is shutdown
     pub fn cancel_on_shutdown<T>(&self, inner: T) -> shutdown::CancelOnShutdown<T> {
-        shutdown::CancelOnShutdown::new(inner, self.shutdown_rx.clone())
+        shutdown::CancelOnShutdown::new(self.shutdown_rx.clone(), inner)
+    }
+
+    #[cfg(feature = "requeue")]
+    #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "requeue"))))]
+    /// Wraps the given `Future` or `Stream` so that it completes when the runtime is shutdown
+    pub fn requeue<T>(
+        &self,
+        capacity: usize,
+    ) -> (
+        crate::requeue::Sender<T>,
+        shutdown::CancelOnShutdown<crate::requeue::Receiver<T>>,
+    )
+    where
+        T: Eq + std::hash::Hash,
+    {
+        let (tx, rx) = crate::requeue::channel(capacity);
+        let rx = shutdown::CancelOnShutdown::new(self.shutdown_rx.clone(), rx);
+        (tx, rx)
     }
 
     /// Creates a watch with the given [`Api`]
@@ -273,7 +299,7 @@ impl<S> Runtime<S> {
         let watch = watcher::watcher(api, params);
         let successful = errors::LogAndSleep::fixed_delay(self.error_delay, watch);
         let initialized = self.initialized.add_handle().release_on_ready(successful);
-        shutdown::CancelOnShutdown::new(self.shutdown_rx.clone(), initialized);
+        shutdown::CancelOnShutdown::new(self.shutdown_rx.clone(), initialized)
     }
 
     /// Creates a cluster-level watch on the default Kubernetes client
