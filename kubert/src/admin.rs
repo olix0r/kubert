@@ -11,22 +11,37 @@ use std::{
 };
 use tracing::{debug, info_span, Instrument};
 
+/// Results that may fail with a server error
+pub type Result<T> = hyper::Result<T>;
+
+/// Server errors
+pub type Error = hyper::Error;
+
 /// Command-line arguments used to configure an admin server
-#[cfg(feature = "clap")]
-#[derive(Clone, Debug, clap::Parser)]
-#[cfg_attr(docsrs, doc(cfg(all(feature = "admin", feature = "clap"))))]
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "clap", derive(clap::Parser))]
+#[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
 pub struct AdminArgs {
     /// The admin server's address
     #[cfg_attr(feature = "clap", clap(long, default_value = "0.0.0.0:8080"))]
     pub admin_addr: SocketAddr,
 }
 
-/// Supports configuring and running an admin server
+/// Supports configuring an admin server
 #[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Builder {
     addr: SocketAddr,
     ready: Readiness,
+}
+
+/// Supports spawning an admin server
+#[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
+#[derive(Debug)]
+pub struct Bound {
+    addr: SocketAddr,
+    ready: Readiness,
+    server: hyper::server::Builder<hyper::server::conn::AddrIncoming>,
 }
 
 /// Controls how the admin server advertises readiness
@@ -40,23 +55,23 @@ pub struct Readiness(Arc<AtomicBool>);
 pub struct Server {
     addr: SocketAddr,
     ready: Readiness,
-    task: tokio::task::JoinHandle<hyper::Result<()>>,
+    task: tokio::task::JoinHandle<Result<()>>,
 }
 
 // === impl AdminArgs ===
 
-#[cfg(feature = "clap")]
+impl Default for AdminArgs {
+    fn default() -> Self {
+        Self {
+            admin_addr: SocketAddr::from(([0, 0, 0, 0], 8080)),
+        }
+    }
+}
+
 impl AdminArgs {
     /// Creates a new [`Builder`] frm the command-line arguments
     pub fn into_builder(self) -> Builder {
         Builder::new(self.admin_addr)
-    }
-
-    /// Binds and runs the server on a background task, returning a handle
-    ///
-    /// The server starts unready by default and it's up to the caller to mark it as ready.
-    pub fn spawn(self) -> Server {
-        self.into_builder().spawn()
     }
 }
 
@@ -83,11 +98,11 @@ impl Builder {
         self.ready.set(true);
     }
 
-    /// Binds and runs the server on a background task, returning a handle
-    pub fn spawn(self) -> Server {
+    /// Binds the admin server without accepting connections
+    pub fn bind(self) -> Result<Bound> {
         let Self { addr, ready } = self;
 
-        let http = hyper::server::Server::bind(&addr)
+        let server = hyper::server::Server::try_bind(&addr)?
             // Allow weird clients (like netcat).
             .http1_half_close(true)
             // Prevent port scanners, etc, from holding connections ope.n
@@ -95,9 +110,31 @@ impl Builder {
             // Use a small buffer, since we don't really transfer much data.
             .http1_max_buf_size(8 * 1024);
 
-        let server = {
-            let ready = ready.clone();
-            http.serve(hyper::service::make_service_fn(move |_conn| {
+        Ok(Bound {
+            addr,
+            ready,
+            server,
+        })
+    }
+}
+
+impl Bound {
+    /// Returns a readiness handle
+    pub fn readiness(&self) -> Readiness {
+        self.ready.clone()
+    }
+
+    /// Sets the initial readiness state to ready
+    pub fn set_ready(&self) {
+        self.ready.set(true);
+    }
+
+    /// Binds and runs the server on a background task, returning a handle
+    pub fn spawn(self) -> Server {
+        let ready = self.ready.clone();
+        let server = self
+            .server
+            .serve(hyper::service::make_service_fn(move |_conn| {
                 let ready = ready.clone();
                 future::ok::<_, hyper::Error>(hyper::service::service_fn(
                     move |req: hyper::Request<hyper::Body>| match req.uri().path() {
@@ -111,20 +148,21 @@ impl Builder {
                         ),
                     },
                 ))
-            }))
-        };
-
-        let addr = server.local_addr();
+            }));
 
         let task = tokio::spawn(
             async move {
                 debug!("Serving");
                 server.await
             }
-            .instrument(info_span!("admin", port = %addr.port())),
+            .instrument(info_span!("admin", port = %self.addr.port())),
         );
 
-        Server { addr, ready, task }
+        Server {
+            task,
+            addr: self.addr,
+            ready: self.ready,
+        }
     }
 }
 
@@ -156,7 +194,7 @@ impl Server {
     }
 
     /// Returns the server tasks's join handle
-    pub fn into_join_handle(self) -> tokio::task::JoinHandle<hyper::Result<()>> {
+    pub fn into_join_handle(self) -> tokio::task::JoinHandle<Result<()>> {
         self.task
     }
 }
