@@ -19,7 +19,7 @@ env:
 
 jobs:
   features:
-    timeout-minutes: 5
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     container:
       image: docker://rust:1.58.1
