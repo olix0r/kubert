@@ -298,10 +298,9 @@ impl TlsCertPath {
     async fn load_certs(&self) -> std::io::Result<Vec<rustls::Certificate>> {
         // Open certificate file.
         let pem = tokio::fs::read(&self.0).await?;
-        let mut reader = std::io::BufReader::new(pem.as_slice());
 
         // Load and return certificate.
-        let certs = rustls_pemfile::certs(&mut reader)?;
+        let certs = rustls_pemfile::certs(&mut pem.as_slice())?;
         Ok(certs.into_iter().map(rustls::Certificate).collect())
     }
 }
@@ -320,11 +319,22 @@ impl TlsKeyPath {
     async fn load_private_key(&self) -> std::io::Result<rustls::PrivateKey> {
         // Open keyfile.
         let pem = tokio::fs::read(&self.0).await?;
-        let mut reader = std::io::BufReader::new(pem.as_slice());
 
         // Load and return a single private key.
-        let keys = rustls_pemfile::rsa_private_keys(&mut reader)?;
-        if keys.len() != 1 {
+        let mut keys = rustls_pemfile::pkcs8_private_keys(&mut pem.as_slice())?;
+
+        if keys.is_empty() {
+            keys = rustls_pemfile::rsa_private_keys(&mut pem.as_slice())?;
+
+            if keys.is_empty() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "could not load private key",
+                ));
+            }
+        }
+
+        if keys.len() > 1 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "too many private keys",
