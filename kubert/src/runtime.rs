@@ -35,7 +35,15 @@ pub struct Builder<S = NoServer> {
     server: std::marker::PhantomData<S>,
 }
 
-/// A configured runtime that can be used to instrument and run a controller
+/// Provides infrastructure for running:
+///
+/// * a Kubernetes controller including logging
+/// * a default Kubernetes client
+/// * signal handling and graceful shutdown
+/// * an admin server with readiness and liveness probe endpoints
+///
+/// The runtime facilitates creating watches (with and without caches) that include error handling
+/// and graceful shutdown.
 #[must_use]
 pub struct Runtime<S = NoServer> {
     admin: admin::Bound,
@@ -118,9 +126,9 @@ impl<S> Builder<S> {
     #[inline]
     async fn build_inner(self) -> Result<Runtime<S>, BuildError> {
         self.log.unwrap_or_default().try_init()?;
-        let admin = self.admin.unwrap_or_default().into_builder().bind()?;
         let client = self.client.unwrap_or_default().try_client().await?;
-        let (shutdown, shutdown_rx) = shutdown::try_register()?;
+        let (shutdown, shutdown_rx) = shutdown::sigint_or_sigterm()?;
+        let admin = self.admin.unwrap_or_default().into_builder().bind()?;
         Ok(Runtime {
             client,
             shutdown_rx,
@@ -128,6 +136,7 @@ impl<S> Builder<S> {
             admin,
             error_delay: self.error_delay.unwrap_or(Self::DEFAULT_ERROR_DELAY),
             initialized: Initialized::default(),
+            // Server must be built by `Builder::build`
             server: self.server,
         })
     }
@@ -148,6 +157,9 @@ impl Builder<NoServer> {
 
     #[cfg(feature = "server")]
     /// Configures the runtime to optionally start a server with the given [`ServerArgs`]
+    ///
+    /// This is useful for runtimes that usually run an admission controller, but may want to
+    /// support running without it when running outside the cluster.
     pub fn with_optional_server(self, server: Option<ServerArgs>) -> Builder<Option<ServerArgs>> {
         Builder {
             server,
@@ -158,7 +170,8 @@ impl Builder<NoServer> {
         }
     }
 
-    /// Attempts to build a runtime
+    /// Attempts to build a runtime by initializing logs, loading the default Kubernetes client,
+    /// registering signal handlers and binding an admin server
     pub async fn build(self) -> Result<Runtime<NoServer>, BuildError> {
         self.build_inner().await
     }
@@ -166,7 +179,8 @@ impl Builder<NoServer> {
 
 #[cfg(feature = "server")]
 impl Builder<ServerArgs> {
-    /// Attempts to build a runtime, binding a server
+    /// Attempts to build a runtime by initializing logs, loading the default Kubernetes client,
+    /// registering signal handlers and binding admin and HTTPS servers
     pub async fn build(self) -> Result<Runtime<server::Bound>, BuildError> {
         let rt = self.build_inner().await?;
         let server = rt.server.bind().await?;
@@ -185,7 +199,8 @@ impl Builder<ServerArgs> {
 
 #[cfg(feature = "server")]
 impl Builder<Option<ServerArgs>> {
-    /// Attempts to build a runtime, optionally binding a server
+    /// Attempts to build a runtime by initializing logs, loading the default Kubernetes client,
+    /// registering signal handlers and binding admin and HTTPS servers
     pub async fn build(self) -> Result<Runtime<Option<server::Bound>>, BuildError> {
         let rt = self.build_inner().await?;
         let server = match rt.server {
@@ -238,6 +253,14 @@ impl<S> Runtime<S> {
     }
 
     /// Creates a watch with the given [`Api`]
+    ///
+    /// If the underlying stream encounters errors, the request is retried (potentially after a
+    /// delay).
+    ///
+    /// The runtime is not considered initialized until the returned stream returns at least one
+    /// event.
+    ///
+    /// The return stream terminates when the runtime receives a shutdown signal.
     pub fn watch<T>(
         &mut self,
         api: Api<T>,
@@ -247,40 +270,15 @@ impl<S> Runtime<S> {
         T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
-        let stream =
-            self.initialized
-                .add_handle()
-                .release_on_ready(errors::LogAndSleep::fixed_delay(
-                    self.error_delay,
-                    watcher::watcher(api, params),
-                ));
-        shutdown::CancelOnShutdown::new(stream, self.shutdown_rx.clone())
-    }
-
-    /// Creates a cached watch with the given [`Api`]
-    pub fn cache<T>(
-        &mut self,
-        api: Api<T>,
-        params: ListParams,
-    ) -> (Store<T>, impl Stream<Item = watcher::Event<T>>)
-    where
-        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
-        T::DynamicType: Clone + Default + Eq + Hash + Clone,
-    {
-        let writer = reflector::store::Writer::<T>::default();
-        let store = writer.as_reader();
-        let stream =
-            self.initialized
-                .add_handle()
-                .release_on_ready(errors::LogAndSleep::fixed_delay(
-                    self.error_delay,
-                    reflector::reflector(writer, watcher::watcher(api, params)),
-                ));
-        let stream = shutdown::CancelOnShutdown::new(stream, self.shutdown_rx.clone());
-        (store, stream)
+        let watch = watcher::watcher(api, params);
+        let successful = errors::LogAndSleep::fixed_delay(self.error_delay, watch);
+        let initialized = self.initialized.add_handle().release_on_ready(successful);
+        shutdown::CancelOnShutdown::new(self.shutdown_rx.clone(), initialized);
     }
 
     /// Creates a cluster-level watch on the default Kubernetes client
+    ///
+    /// See [`Runtime::watch`] for more details.
     #[inline]
     pub fn watch_all<T>(&mut self, params: ListParams) -> impl Stream<Item = watcher::Event<T>>
     where
@@ -291,6 +289,8 @@ impl<S> Runtime<S> {
     }
 
     /// Creates a namespace-level watch on the default Kubernetes client
+    ///
+    /// See [`Runtime::watch`] for more details.
     #[inline]
     pub fn watch_namespaced<T>(
         &mut self,
@@ -305,7 +305,39 @@ impl<S> Runtime<S> {
         self.watch(api, params)
     }
 
+    /// Creates a cached watch with the given [`Api`]
+    ///
+    /// The returned [`Store`] is updated as the returned stream is polled. If the underlying stream
+    /// encounters errors, the request is retried (potentially after a delay).
+    ///
+    /// The runtime is not considered initialized until the returned stream returns at least one
+    /// event.
+    ///
+    /// The return stream terminates when the runtime receives a shutdown signal.
+    pub fn cache<T>(
+        &mut self,
+        api: Api<T>,
+        params: ListParams,
+    ) -> (Store<T>, impl Stream<Item = watcher::Event<T>>)
+    where
+        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
+        T::DynamicType: Clone + Default + Eq + Hash + Clone,
+    {
+        let writer = reflector::store::Writer::<T>::default();
+        let store = writer.as_reader();
+
+        let watch = watcher::watcher(api, params);
+        let cached = reflector::reflector(writer, watch);
+        let successful = errors::LogAndSleep::fixed_delay(self.error_delay, cached);
+        let initialized = self.initialized.add_handle().release_on_ready(successful);
+        let graceful = shutdown::CancelOnShutdown::new(self.shutdown_rx.clone(), initialized);
+
+        (store, graceful)
+    }
+
     /// Creates a cached cluster-level watch on the default Kubernetes client
+    ///
+    /// See [`Runtime::cache`] for more details.
     #[inline]
     pub fn cache_all<T>(
         &mut self,
@@ -319,6 +351,8 @@ impl<S> Runtime<S> {
     }
 
     /// Creates a cached namespace-level watch on the default Kubernetes client
+    ///
+    /// See [`Runtime::cache`] for more details.
     #[inline]
     pub fn cache_namespaced<T>(
         &mut self,
@@ -336,7 +370,10 @@ impl<S> Runtime<S> {
 
 #[cfg(feature = "server")]
 impl Runtime<server::Bound> {
-    /// Spawns the HTTPS server with the given `service`, returning the runtime.
+    /// Spawns the HTTPS server with the given `service`. A runtime handle without the bound server
+    /// configuration is returned.
+    ///
+    /// The server shuts down gracefully when the runtime is shutdown.
     pub fn spawn_server<S, B>(self, service: S) -> Runtime<NoServer>
     where
         S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
@@ -365,25 +402,10 @@ impl Runtime<server::Bound> {
 
 #[cfg(feature = "server")]
 impl Runtime<Option<server::Bound>> {
-    /// Indicates whether a server is bound
-    pub fn has_server(&self) -> bool {
-        self.server.is_some()
-    }
-
-    /// Drops the server, if any
-    pub fn without_server(self) -> Runtime<NoServer> {
-        Runtime {
-            admin: self.admin,
-            client: self.client,
-            error_delay: self.error_delay,
-            initialized: self.initialized,
-            server: NoServer(()),
-            shutdown_rx: self.shutdown_rx,
-            shutdown: self.shutdown,
-        }
-    }
-
-    /// Attempts to spawn the HTTPS server, if bound with the given `service`, returning the runtime.
+    /// Spawns the HTTPS server, if bound, with the given `service`. A runtime handle without the
+    /// bound server configuration is returned.
+    ///
+    /// The server shuts down gracefully when the runtime is shutdown.
     pub fn spawn_server<S, B, F>(self, mk: F) -> Runtime<NoServer>
     where
         F: FnOnce() -> S,
@@ -399,6 +421,8 @@ impl Runtime<Option<server::Bound>> {
     {
         if let Some(s) = self.server {
             s.spawn(mk(), self.shutdown_rx.clone());
+        } else {
+            tracing::debug!("No server is configured")
         }
 
         Runtime {
@@ -420,6 +444,13 @@ impl Runtime<NoServer> {
     }
 
     /// Runs the runtime until it is shutdown
+    ///
+    /// Shutdown starts when a SIGINT or SIGTERM signal is received and completes when all
+    /// components have terminated gracefully or when a subsequent signal is received.
+    ///
+    /// The admin server's readiness endpoint returns success only once all watches (and other
+    /// initalized components) have become ready and then returns an error after shutdown is
+    /// initiated.
     pub async fn run(self) -> Result<(), shutdown::Aborted> {
         let Self {
             admin,

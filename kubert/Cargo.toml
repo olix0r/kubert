@@ -71,7 +71,7 @@ features = [
 ]
 
 [dependencies]
-drain = { version = "0.1.0", optional = true, default-features = false }
+drain = { version = "0.1.1", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
 hyper = { version = "0.14.17", optional = true, default-features = false }

@@ -1,15 +1,15 @@
 //! Drives graceful shutdown when the process receives a signal.
 
 use futures_core::{Future, Stream};
+use std::{
+    pin::Pin,
+    task::{Context, Poll},
+};
 use tokio::signal::unix::{signal, Signal, SignalKind};
 use tracing::debug;
 
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 pub use drain::Watch;
-use std::{
-    pin::Pin,
-    task::{Context, Poll},
-};
 
 /// Drives shutdown by watching signals
 #[derive(Debug)]
@@ -52,23 +52,20 @@ pin_project_lite::pin_project! {
 ///
 /// If a second signal is received while waiting for shutdown to complete, the process
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
-pub fn try_register() -> Result<(Shutdown, Watch), RegisterError> {
-    let (drain_tx, drain_rx) = drain::channel();
-    let shutdown = Shutdown::from_drain(drain_tx)?;
-    Ok((shutdown, drain_rx))
+pub fn sigint_or_sigterm() -> Result<(Shutdown, Watch), RegisterError> {
+    let interrupt = signal(SignalKind::interrupt())?;
+    let terminate = signal(SignalKind::terminate())?;
+
+    let (tx, rx) = drain::channel();
+    let shutdown = Shutdown {
+        interrupt,
+        terminate,
+        tx,
+    };
+    Ok((shutdown, rx))
 }
 
 impl Shutdown {
-    fn from_drain(tx: drain::Signal) -> Result<Self, RegisterError> {
-        let interrupt = signal(SignalKind::interrupt())?;
-        let terminate = signal(SignalKind::terminate())?;
-        Ok(Shutdown {
-            interrupt,
-            terminate,
-            tx,
-        })
-    }
-
     /// Watches for signals and drives shutdown
     ///
     /// When a `SIGINT` or `SIGTERM` signal is received, the shutdown is initiated, notifying all
@@ -82,7 +79,7 @@ impl Shutdown {
         let Self {
             mut interrupt,
             mut terminate,
-            tx,
+            mut tx,
         } = self;
 
         tokio::select! {
@@ -92,6 +89,12 @@ impl Shutdown {
 
             _ = terminate.recv() => {
                 debug!("Received SIGTERM; draining");
+            }
+
+            _ = tx.closed() => {
+                debug!("All shutdown receivers dropped");
+                // Drain can't do anything if the receivers have been dropped
+                return Ok(());
             }
         }
 
@@ -116,11 +119,11 @@ impl Shutdown {
 
 impl<T> CancelOnShutdown<T> {
     /// Wraps a `Future` or `Stream` that completes when the shutdown watch fires.
-    pub fn new(inner: T, shutdown: Watch) -> Self {
+    fn new(watch: Watch, inner: T) -> Self {
         // XXX Unfortunately the `Watch` API doesn't give us any means to poll for updates, so we
         // have to box the async call to poll it from the stream.
         let shutdown = Box::pin(async move {
-            let _ = shutdown.signaled().await;
+            let _ = watch.signaled().await;
         });
         Self { inner, shutdown }
     }
