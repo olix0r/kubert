@@ -33,6 +33,14 @@ controllers for [Linkerd](https://github.com/linkerd/linkerd2). It doesn't try t
 `kube`--though it does reduce boilerplate around initializing watches and caches (reflectors); and
 it expects you to schedule work via the `tokio` runtime.
 
+## Examples
+
+This repository includes a simple [example application](./examples) that demonstrates how to use a
+`kubert::Runtime`.
+
+Other examples include:
+* [Linkerd2 policy controller](https://github.com/linkerd/linkerd2/blob/d4543cd86e427b241ce961b50dd83b1738c0b069/policy-controller/src/main.rs)
+
 ## Status
 
 This crate is still fairly experimental, though it's based on production code from Linkerd; and we

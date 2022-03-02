@@ -1,3 +1,6 @@
 [workspace]
 default-members = ["kubert"]
-members = ["kubert"]
+members = [
+    "kubert",
+    "examples",
+]
