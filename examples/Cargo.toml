@@ -1,0 +1,44 @@
+[package]
+name = "kubert-examples"
+version = "0.1.0"
+publish = false
+edition = "2021"
+license = "Apache-2.0"
+rust-version = "1.56.1"
+
+[package.metadata.release]
+release = false
+
+[dev-dependencies]
+anyhow = "1"
+clap = { version = "3", default-features = false, features = ["derive", "env", "std"] }
+futures = { version = "0.3", default-features = false }
+k8s-openapi = { version = "0.14", default-features = false, features = ["v1_23"] }
+tracing = "0.1"
+
+[dev-dependencies.kube]
+version = "0.69.1"
+default-features = false
+features = [
+    "client",
+    "derive",
+    "native-tls",
+    "runtime",
+]
+
+[dev-dependencies.kubert]
+path = "../kubert"
+version = "0.3.0"
+default-features = false
+features = [
+    "clap",
+    "runtime",
+]
+
+[dev-dependencies.tokio]
+version = "1"
+features = ["macros", "parking_lot", "rt", "rt-multi-thread"]
+
+[[example]]
+name = "watch-pods"
+path = "watch_pods.rs"
