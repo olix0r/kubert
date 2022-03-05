@@ -116,6 +116,11 @@ impl ServerArgs {
 }
 
 impl Bound {
+    /// Returns the bound local address of the server
+    pub fn local_addr(&self) -> SocketAddr {
+        self.local_addr
+    }
+
     /// Bind an HTTPS server to the configured address with the provided service
     ///
     /// The server terminates gracefully when the provided `drain` handle is signaled.
@@ -185,7 +190,9 @@ async fn accept_loop<S, B>(
     B::Data: Send,
     B::Error: std::error::Error + Send + Sync,
 {
+    tracing::debug!("listening");
     loop {
+        tracing::trace!("accepting");
         // Wait for the shutdown to be signaled or for the next connection to be accepted.
         let socket = tokio::select! {
             biased;
@@ -211,6 +218,7 @@ async fn accept_loop<S, B>(
                 continue;
             }
         };
+
         tokio::spawn(
             serve_conn(
                 socket,
@@ -219,7 +227,11 @@ async fn accept_loop<S, B>(
                 tls_key.clone(),
                 tls_certs.clone(),
             )
-            .instrument(info_span!("conn", client.ip = %client_addr.ip())),
+            .instrument(info_span!(
+                "conn",
+                client.ip = %client_addr.ip(),
+                client.port = %client_addr.port(),
+            )),
         );
     }
 }
@@ -238,6 +250,8 @@ async fn serve_conn<S, B>(
     B::Data: Send,
     B::Error: std::error::Error + Send + Sync,
 {
+    tracing::debug!("accepted TCP connection");
+
     // Reload the TLS credentials for each connection.
     let tls = match load_tls(&tls_key, &tls_certs).await {
         Ok(tls) => tls,
@@ -246,6 +260,7 @@ async fn serve_conn<S, B>(
             return;
         }
     };
+    tracing::trace!("loaded TLS credentials");
 
     let socket = match tls.accept(tcp).await {
         Ok(s) => s,
@@ -254,6 +269,7 @@ async fn serve_conn<S, B>(
             return;
         }
     };
+    tracing::trace!("TLS handshake completed");
 
     // Serve the HTTP connection and wait for the drain signal. If a drain is
     // signaled, tell the HTTP connection to terminate gracefully when in-flight
