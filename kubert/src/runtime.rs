@@ -396,6 +396,11 @@ impl<S> Runtime<S> {
 
 #[cfg(feature = "server")]
 impl Runtime<server::Bound> {
+    /// Returns the bound local address of the server
+    pub fn server_addr(&self) -> std::net::SocketAddr {
+        self.server.local_addr()
+    }
+
     /// Spawns the HTTPS server with the given `service`. A runtime handle without the bound server
     /// configuration is returned.
     ///
@@ -428,6 +433,11 @@ impl Runtime<server::Bound> {
 
 #[cfg(feature = "server")]
 impl Runtime<Option<server::Bound>> {
+    /// Returns the bound local address of the server
+    pub fn server_addr(&self) -> Option<std::net::SocketAddr> {
+        self.server.as_ref().map(|s| s.local_addr())
+    }
+
     /// Spawns the HTTPS server, if bound, with the given `service`. A runtime handle without the
     /// bound server configuration is returned.
     ///
