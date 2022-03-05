@@ -1,0 +1,23 @@
+{
+	"name": "kubert.dev",
+	"image": "ghcr.io/linkerd/dev-proxy:v7",
+	"extensions": [
+		"matklad.rust-analyzer",
+		"NathanRidley.autotrim",
+		"samverschueren.final-newline",
+		"tamasfe.even-better-toml",
+	],
+	"runArgs": [
+		"--init",
+		// Use the host network so we can access k3d, etc.
+		"--net=host",
+		// For lldb
+		"--cap-add=SYS_PTRACE",
+		"--security-opt=seccomp=unconfined"
+	],
+	"overrideCommand": false,
+	"remoteUser": "code",
+	"mounts": [
+		"source=/var/run/docker.sock,target=/var/run/docker-host.sock,type=bind"
+	]
+}
