@@ -72,15 +72,15 @@ impl ClientArgs {
             None => Kubeconfig::from_env()?.ok_or(config::KubeconfigError::FindPath)?,
         };
 
-        if let Some(impersonate) = self.impersonate {
+        if let Some(user) = self.impersonate {
             for auth in kubeconfig.auth_infos.iter_mut() {
-                auth.auth_info.impersonate = Some(impersonate.clone());
+                auth.auth_info.impersonate = Some(user.clone());
             }
         }
 
-        if let Some(impersonate_group) = self.impoersonate_group {
+        if let Some(group) = self.impersonate_group {
             for mut auth in kubeconfig.auth_infos.iter_mut() {
-                auth.auth_info.impersonate_groups = Some(vec![impersonate_group.clone()]);
+                auth.auth_info.impersonate_groups = Some(vec![group.clone()]);
             }
         }
 
