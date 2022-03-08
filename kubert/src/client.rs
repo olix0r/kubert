@@ -32,7 +32,7 @@ pub struct ClientArgs {
 
     /// Group to impersonate for Kubernetes operations
     #[cfg_attr(feature = "clap", clap(long = "as-group"))]
-    pub impoersonate_group: Option<String>,
+    pub impersonate_group: Option<String>,
 }
 
 /// Indicates an error occurred while configuring the Kubernetes client
