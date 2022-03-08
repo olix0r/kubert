@@ -1,6 +1,8 @@
 //! Utilities for configuring a [`kube_client::Client`] from the command line
 
+use kube_client::config::Kubeconfig;
 pub use kube_client::*;
+use std::path::PathBuf;
 use thiserror::Error;
 
 /// Configures a Kubernetes client
@@ -20,6 +22,18 @@ pub struct ClientArgs {
     /// The name of the kubeconfig user to use
     #[cfg_attr(feature = "clap", clap(long))]
     pub user: Option<String>,
+
+    /// The path to the kubeconfig file to use
+    #[cfg_attr(feature = "clap", clap(long))]
+    pub kubeconfig: Option<PathBuf>,
+
+    /// Username to impersonate for Kubernetes operations
+    #[cfg_attr(feature = "clap", clap(long = "as"))]
+    pub impersonate: Option<String>,
+
+    /// Group to impersonate for Kubernetes operations
+    #[cfg_attr(feature = "clap", clap(long = "as-group"))]
+    pub impoersonate_group: Option<String>,
 }
 
 /// Indicates an error occurred while configuring the Kubernetes client
@@ -54,7 +68,24 @@ impl ClientArgs {
             user: self.user,
         };
 
-        let client = match kube_client::Config::from_kubeconfig(&c).await {
+        let mut kubeconfig = match self.kubeconfig {
+            Some(path) => Kubeconfig::read_from(path.as_path())?,
+            None => Kubeconfig::from_env()?.ok_or(config::KubeconfigError::FindPath)?,
+        };
+
+        if let Some(impersonate) = self.impersonate {
+            for auth in kubeconfig.auth_infos.iter_mut() {
+                auth.auth_info.impersonate = Some(impersonate.clone());
+            }
+        }
+
+        if let Some(impersonate_group) = self.impoersonate_group {
+            for mut auth in kubeconfig.auth_infos.iter_mut() {
+                auth.auth_info.impersonate_groups = Some(vec![impersonate_group.clone()]);
+            }
+        }
+
+        let client = match kube_client::Config::from_custom_kubeconfig(kubeconfig, &c).await {
             Ok(client) => client,
             Err(e) if c.context.is_some() || c.cluster.is_some() || c.user.is_some() => {
                 return Err(e.into())
