@@ -1,6 +1,6 @@
 //! Utilities for configuring a [`kube_client::Client`] from the command line
 
-use kube_client::config::{Kubeconfig, KubeConfigOptions};
+use kube_client::config::{KubeConfigOptions, Kubeconfig};
 pub use kube_client::*;
 use std::path::PathBuf;
 use thiserror::Error;
