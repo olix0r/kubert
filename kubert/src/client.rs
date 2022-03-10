@@ -1,6 +1,5 @@
 //! Utilities for configuring a [`kube_client::Client`] from the command line
 
-use kube_client::config::{KubeConfigOptions, Kubeconfig};
 pub use kube_client::*;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -61,15 +60,15 @@ impl ClientArgs {
     /// This is basically equivalent to using `kube_client::Client::try_default`, except that it
     /// supports kubeconfig configuration from the command-line.
     pub async fn try_client(self) -> Result<Client, ConfigError> {
-        let c = kube_client::config::KubeConfigOptions {
+        let c = config::KubeConfigOptions {
             context: self.context,
             cluster: self.cluster,
             user: self.user,
         };
 
         let mut kubeconfig = match self.kubeconfig {
-            Some(path) => Kubeconfig::read_from(path.as_path())?,
-            None => Kubeconfig::from_env()?.ok_or(config::KubeconfigError::FindPath)?,
+            Some(path) => config::Kubeconfig::read_from(path.as_path())?,
+            None => config::Kubeconfig::from_env()?.ok_or(config::KubeconfigError::FindPath)?,
         };
 
         if let Some(user) = self.impersonate {
@@ -84,12 +83,12 @@ impl ClientArgs {
             }
         }
 
-        let client = match kube_client::Config::from_custom_kubeconfig(kubeconfig, &c).await {
+        let client = match Config::from_custom_kubeconfig(kubeconfig, &c).await {
             Ok(client) => client,
             Err(e) if c.context.is_some() || c.cluster.is_some() || c.user.is_some() => {
                 return Err(e.into())
             }
-            Err(_) => kube_client::Config::from_cluster_env()?,
+            Err(_) => Config::from_cluster_env()?,
         };
 
         client.try_into().map_err(Into::into)
