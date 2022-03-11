@@ -27,7 +27,7 @@ jobs:
       - name: Install rust
         run: |
           rm -rf $HOME/.cargo
-          bin/scurl -v https://sh.rustup.rs | sh -s -- -y --default-toolchain=${RUST_VERSION}
+          curl --proto =https --tlsv1.3 -fLsSv https://sh.rustup.rs | sh -s -- -y --default-toolchain=${RUST_VERSION}
           source $HOME/.cargo/env
           echo "PATH=$PATH" >> $GITHUB_ENV
           cargo version
