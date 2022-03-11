@@ -66,9 +66,13 @@ impl ClientArgs {
             user: self.user,
         };
 
+        // kubeconfig location tried in this order:
+        // -- kubeconfig flag
+        // KUBECONFIG env var
+        // $HOME/.kube/config
         let mut kubeconfig = match self.kubeconfig {
             Some(path) => config::Kubeconfig::read_from(path.as_path())?,
-            None => config::Kubeconfig::from_env()?.ok_or(config::KubeconfigError::FindPath)?,
+            None => config::Kubeconfig::read().map_err(|_| config::KubeconfigError::FindPath)?,
         };
 
         if let Some(user) = self.impersonate {
