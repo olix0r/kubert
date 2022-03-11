@@ -28,7 +28,12 @@ jobs:
       # Setup a cluster
       - run: curl --proto =https --tlsv1.3 -fLsSv https://raw.githubusercontent.com/k3d-io/k3d/${K3D_VERSION}/install.sh | bash
       - run: k3d --version
-      - run: k3d cluster create --no-lb --k3s-arg "--no-deploy=local-storage,traefik,servicelb,metrics-server@server:*"
+      - name: Install kubectl
+        run: |
+          version=$(curl --proto =https --tlsv1.3 -fLsSv https://dl.k8s.io/release/stable.txt)
+          curl --proto =https --tlsv1.3 -fLsSvo /usr/local/bin/kubectl "https://dl.k8s.io/release/$version/bin/linux/amd64/kubectl"
+          chmod 755 /usr/local/bin/kubectl
+      - run: k3d cluster create --no-lb --k3s-arg '--no-deploy=local-storage,traefik,servicelb,metrics-server@server:*'
       - run: kubectl version
       - name: Setup RBAC
         run: |
