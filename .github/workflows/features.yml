@@ -22,7 +22,7 @@ jobs:
     timeout-minutes: 15
     runs-on: ubuntu-latest
     container:
-      image: docker://rust:1.58.1
+      image: docker://rust:1.56.1
     steps:
       - name: install cargo-action-fmt
         run: |
