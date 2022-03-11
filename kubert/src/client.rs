@@ -27,7 +27,7 @@ pub struct ClientArgs {
 
     /// Username to impersonate for Kubernetes operations
     #[cfg_attr(feature = "clap", clap(long = "as"))]
-    pub impersonate: Option<String>,
+    pub impersonate_user: Option<String>,
 
     /// Group to impersonate for Kubernetes operations
     #[cfg_attr(feature = "clap", clap(long = "as-group"))]
@@ -60,41 +60,56 @@ impl ClientArgs {
     /// This is basically equivalent to using `kube_client::Client::try_default`, except that it
     /// supports kubeconfig configuration from the command-line.
     pub async fn try_client(self) -> Result<Client, ConfigError> {
-        let c = config::KubeConfigOptions {
-            context: self.context,
-            cluster: self.cluster,
-            user: self.user,
+        let client = match self.load_local_config().await {
+            Ok(client) => client,
+            Err(e) if self.is_customized() => return Err(e),
+            Err(_) => Config::from_cluster_env()?,
         };
 
-        // kubeconfig location tried in this order:
-        // - --kubeconfig flag
-        // - $KUBECONFIG env var
-        // - $HOME/.kube/config
-        let mut kubeconfig = match self.kubeconfig {
+        client.try_into().map_err(Into::into)
+    }
+
+    /// Indicates whether the command-line arguments attempt to customize the Kubernetes
+    /// configuration.
+    fn is_customized(&self) -> bool {
+        self.context.is_some()
+            || self.cluster.is_some()
+            || self.user.is_some()
+            || self.impersonate_user.is_some()
+            || self.impersonate_group.is_some()
+            || self.kubeconfig.is_some()
+    }
+
+    /// Loads a local (i.e. not in-cluster) Kubernetes client configuration
+    ///
+    /// First, the `--kubeconfig` argument is used. If that is not set, the `$KUBECONFIG`
+    /// environment variable is used. If that is not set, the `~/.kube/config` file is used.
+    async fn load_local_config(&self) -> Result<Config, ConfigError> {
+        let options = config::KubeConfigOptions {
+            context: self.context.clone(),
+            cluster: self.cluster.clone(),
+            user: self.user.clone(),
+        };
+
+        let mut kubeconfig = match &self.kubeconfig {
             Some(path) => config::Kubeconfig::read_from(path.as_path())?,
             None => config::Kubeconfig::read()?,
         };
 
-        if let Some(user) = self.impersonate {
+        if let Some(user) = &self.impersonate_user {
             for auth in kubeconfig.auth_infos.iter_mut() {
                 auth.auth_info.impersonate = Some(user.clone());
             }
         }
 
-        if let Some(group) = self.impersonate_group {
+        if let Some(group) = &self.impersonate_group {
             for mut auth in kubeconfig.auth_infos.iter_mut() {
                 auth.auth_info.impersonate_groups = Some(vec![group.clone()]);
             }
         }
 
-        let client = match Config::from_custom_kubeconfig(kubeconfig, &c).await {
-            Ok(client) => client,
-            Err(e) if c.context.is_some() || c.cluster.is_some() || c.user.is_some() => {
-                return Err(e.into())
-            }
-            Err(_) => Config::from_cluster_env()?,
-        };
-
-        client.try_into().map_err(Into::into)
+        Config::from_custom_kubeconfig(kubeconfig, &options)
+            .await
+            .map_err(Into::into)
     }
 }
