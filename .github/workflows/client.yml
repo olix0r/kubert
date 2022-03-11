@@ -16,23 +16,24 @@ env:
   CARGO_NET_RETRY: 10
   K3D_VERSION: v5.3.0
   RUST_BACKTRACE: short
+  RUST_VERSION: 1.56.1
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
   local:
     timeout-minutes: 10
     runs-on: ubuntu-latest
-    container:
-      image: docker://rust:1.56.1
     steps:
+      - name: Install rust
+        run: |
+          rm -rf $HOME/.cargo
+          bin/scurl -v https://sh.rustup.rs | sh -s -- -y --default-toolchain=${RUST_VERSION}
+          source $HOME/.cargo/env
+          echo "PATH=$PATH" >> $GITHUB_ENV
+          cargo version
       # Setup a cluster
       - run: curl --proto =https --tlsv1.3 -fLsSv https://raw.githubusercontent.com/k3d-io/k3d/${K3D_VERSION}/install.sh | bash
       - run: k3d --version
-      - name: Install kubectl
-        run: |
-          version=$(curl --proto =https --tlsv1.3 -fLsSv https://dl.k8s.io/release/stable.txt)
-          curl --proto =https --tlsv1.3 -fLsSvo /usr/local/bin/kubectl "https://dl.k8s.io/release/$version/bin/linux/amd64/kubectl"
-          chmod 755 /usr/local/bin/kubectl
       - run: k3d cluster create --no-lb --k3s-arg '--no-deploy=local-storage,traefik,servicelb,metrics-server@server:*'
       - run: kubectl version
       - name: Setup RBAC
