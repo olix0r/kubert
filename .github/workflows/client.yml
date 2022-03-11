@@ -22,6 +22,8 @@ jobs:
   local:
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    container:
+      image: docker://rust:1.56.1
     steps:
       # Setup a cluster
       - run: curl --proto =https --tlsv1.3 -fLsSv https://raw.githubusercontent.com/k3d-io/k3d/${K3D_VERSION}/install.sh | bash
