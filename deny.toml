@@ -43,6 +43,8 @@ skip = [
     { name = "parking_lot_core", version = "0.8" },
     # Waiting on h2, kube-client
     { name = "tokio-util", version = "0.6.9" },
+    # Waiting on getrandom
+    { name = "wasi", version = "0.10" },
 ]
 
 [sources]
