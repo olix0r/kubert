@@ -18,6 +18,10 @@ pub mod client;
 #[cfg_attr(docsrs, doc(cfg(feature = "errors")))]
 pub mod errors;
 
+#[cfg(feature = "index")]
+#[cfg_attr(docsrs, doc(cfg(feature = "index")))]
+pub mod index;
+
 #[cfg(feature = "initialized")]
 #[cfg_attr(docsrs, doc(cfg(feature = "initialized")))]
 pub mod initialized;

@@ -17,13 +17,14 @@ Rust Kubernetes runtime helpers. Based on [`kube-rs`][krs].
 
 ## Features
 
-* [`clap`](https://docs.rs/clap) command-line interface support
+* [`clap`](https://docs.rs/clap) command-line interface support;
 * A basic admin server with `/ready` and `/live` probe endpoints;
-* A default Kubernetes client
-* Graceful shutdown on `SIGTERM` or `SIGINT` signals
-* An HTTPS server (for admission controllers and API extensions) with certificate reloading
-* A _requeue_ channel that supports deferring/rescheduling updates (i.e. in case a write fails).
-* A [`Runtime`][rt] type that ties it all together!
+* A default Kubernetes client;
+* Graceful shutdown on `SIGTERM` or `SIGINT` signals;
+* An HTTPS server (for admission controllers and API extensions) with certificate reloading;
+* A utility for maintaining an index derived from watching one or more Kubernetes resources types;
+* A _requeue_ channel that supports deferring/rescheduling updates (i.e. in case a write fails);
+* And a [`Runtime`][rt] type that ties it all together!
 
 ### Why not `kube-rs`?
 
