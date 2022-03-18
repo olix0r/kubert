@@ -33,7 +33,7 @@ license-files = [
 
 [bans]
 multiple-versions = "deny"
-wildcards = "deny"
+wildcards = "allow"
 highlight = "all"
 deny = []
 skip-tree = []
