@@ -7,6 +7,12 @@ use kube_runtime::watcher::Event;
 use parking_lot::RwLock;
 use std::{collections::hash_map::Entry, sync::Arc};
 
+/// A set of the names of cluster-level resources that have been removed.
+pub type ClusterRemoved = HashSet<String>;
+
+/// A set ofnames of resources that have been removed grouped by namespace.
+pub type NamespacedRemoved = HashMap<String, HashSet<String>>;
+
 /// Processes updates to `T`-typed cluster-scoped Kubernetes resources.
 pub trait IndexClusterResource<T> {
     /// Processes an update to a Kubernetes resource.
@@ -14,6 +20,19 @@ pub trait IndexClusterResource<T> {
 
     /// Observes the removal of a Kubernetes resource.
     fn delete(&mut self, name: String);
+
+    /// Resets the index with the given set of live resources and the set of keys that were removed.
+    ///
+    /// The default implementation calls `apply` and `delete`.
+    fn reset(&mut self, resources: Vec<T>, removed: ClusterRemoved) {
+        for resource in resources.into_iter() {
+            self.apply(resource);
+        }
+
+        for name in removed.into_iter() {
+            self.delete(name);
+        }
+    }
 }
 
 /// Processes updates to `T`-typed namespaced Kubernetes resources.
@@ -23,6 +42,21 @@ pub trait IndexNamespacedResource<T> {
 
     /// Observes the removal of a Kubernetes resource.
     fn delete(&mut self, namespace: String, name: String);
+
+    /// Resets an index with a set of live resources and a namespaced map of removed
+    ///
+    /// The default implementation calls `apply` and `delete`.
+    fn reset(&mut self, resources: Vec<T>, removed: NamespacedRemoved) {
+        for resource in resources.into_iter() {
+            self.apply(resource);
+        }
+
+        for (ns, names) in removed.into_iter() {
+            for name in names.into_iter() {
+                self.delete(ns.clone(), name);
+            }
+        }
+    }
 }
 
 /// Updates a `T`-typed index from a watch on a `R`-typed namespaced Kubernetes resource.
@@ -44,9 +78,11 @@ pub async fn namespaced<T, R>(
                     .namespace()
                     .expect("resource must have a namespace");
                 let name = resource.name();
+
                 keys.entry(namespace)
                     .or_insert_with(HashSet::new)
                     .insert(name);
+
                 index.write().apply(resource);
             }
 
@@ -55,48 +91,48 @@ pub async fn namespaced<T, R>(
                     .namespace()
                     .expect("resource must have a namespace");
                 let name = resource.name();
+
                 if let Entry::Occupied(mut entry) = keys.entry(namespace.clone()) {
                     entry.get_mut().remove(&name);
                     if entry.get().is_empty() {
                         entry.remove();
                     }
                 }
+
                 index.write().delete(namespace, name);
             }
 
             Event::Restarted(resources) => {
-                let mut idx = index.write();
-
                 // Iterate through all the resources in the restarted event and add/update them in
                 // the index, keeping track of which resources need to be removed from the index.
-                let mut prior_keys = keys.clone();
-                for resource in resources.into_iter() {
+                let mut removed = keys.clone();
+                for resource in resources.iter() {
                     let namespace = resource
                         .namespace()
                         .expect("resource must have a namespace");
                     let name = resource.name();
-                    if let Some(pk) = prior_keys.get_mut(&namespace) {
-                        pk.remove(&name);
+
+                    if let Some(names) = removed.get_mut(&namespace) {
+                        names.remove(&name);
                     }
-                    keys.entry(namespace)
-                        .or_insert_with(HashSet::new)
-                        .insert(name);
-                    idx.apply(resource);
+
+                    keys.entry(namespace).or_default().insert(name);
                 }
 
                 // Remove all resources that were in the index but are no longer in the cluster
                 // following a restart.
-                for (namespace, resources) in prior_keys.into_iter() {
-                    for name in resources.into_iter() {
+                for (namespace, names) in removed.iter() {
+                    for name in names.iter() {
                         if let Entry::Occupied(mut entry) = keys.entry(namespace.clone()) {
-                            entry.get_mut().remove(&name);
+                            entry.get_mut().remove(name);
                             if entry.get().is_empty() {
                                 entry.remove();
                             }
                         }
-                        idx.delete(namespace.clone(), name);
                     }
                 }
+
+                index.write().reset(resources, removed);
             }
         }
     }
@@ -128,24 +164,22 @@ pub async fn cluster<T, R>(
             }
 
             Event::Restarted(resources) => {
-                let mut idx = index.write();
-
                 // Iterate through all the resources in the restarted event and add/update them in
                 // the index, keeping track of which resources need to be removed from the index.
-                let mut prior_keys = keys.clone();
-                for resource in resources.into_iter() {
+                let mut removed = keys.clone();
+                for resource in resources.iter() {
                     let name = resource.name();
-                    prior_keys.remove(&name);
+                    removed.remove(&name);
                     keys.insert(name);
-                    idx.apply(resource);
                 }
 
                 // Remove all resources that were in the index but are no longer in the cluster
                 // following a restart.
-                for name in prior_keys.into_iter() {
-                    keys.remove(&name);
-                    idx.delete(name);
+                for name in removed.iter() {
+                    keys.remove(name);
                 }
+
+                index.write().reset(resources, removed);
             }
         }
     }
