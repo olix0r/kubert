@@ -3,7 +3,7 @@ name: client
 on:
   pull_request:
     paths:
-      - Cargo.lock
+      - '**/Cargo.toml'
       - '**/*.rs'
       - .github/workflows/client.yml
 
