@@ -122,12 +122,12 @@ pub async fn namespaced<T, R>(
                 // Remove all resources that were in the index but are no longer in the cluster
                 // following a restart.
                 for (namespace, names) in removed.iter() {
-                    for name in names.iter() {
-                        if let Entry::Occupied(mut entry) = keys.entry(namespace.clone()) {
+                    if let Entry::Occupied(mut entry) = keys.entry(namespace.clone()) {
+                        for name in names.iter() {
                             entry.get_mut().remove(name);
-                            if entry.get().is_empty() {
-                                entry.remove();
-                            }
+                        }
+                        if entry.get().is_empty() {
+                            entry.remove();
                         }
                     }
                 }
