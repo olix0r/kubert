@@ -109,7 +109,7 @@ optional = true
 default-features = false
 
 [dependencies.kube-client]
-version = "0.70"
+version = "0.71"
 optional = true
 default-features = false
 features = ["client", "config"]
