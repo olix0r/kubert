@@ -32,7 +32,7 @@ jobs:
           source $HOME/.cargo/env
           echo "PATH=$PATH" >> $GITHUB_ENV
           cargo version
-      - uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+      - uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
       - run: cargo build --package=kubert-examples --examples
       # Setup a cluster
       - run: curl --proto =https --tlsv1.3 -fLsSv https://raw.githubusercontent.com/k3d-io/k3d/${K3D_VERSION}/install.sh | bash
@@ -75,7 +75,7 @@ jobs:
           kubectl create clusterrole watch-pods --verb=get,list,watch --resource=pods
           kubectl create clusterrolebinding watch-pods --clusterrole=watch-pods --serviceaccount=kubert-test:watch-pods
       # Build a docker image with the examples
-      - uses: actions/checkout@a12a3943b4bdde767164f792f33f40b04645d846
+      - uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
       - uses: docker/setup-buildx-action@94ab11c41e45d028884a99163086648e898eed25
       - run: docker buildx build . -f examples/Dockerfile --tag kubert-examples:test --load
       - run: k3d image import kubert-examples:test
