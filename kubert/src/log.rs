@@ -4,10 +4,45 @@ use thiserror::Error;
 
 pub use tracing_subscriber::{util::TryInitError as LogInitError, EnvFilter as LogFilter};
 
+#[cfg(feature = "clap")]
+use clap::{Arg, ArgEnum, ArgMatches, Args, Command, FromArgMatches};
+
+/// Configures logging settings.
+#[derive(Debug, Default)]
+#[cfg_attr(docsrs, doc(cfg(feature = "log")))]
+pub struct LogArgs {
+    /// The log format to use.
+    #[cfg_attr(
+        feature = "clap",
+        clap(long, default_value = "plain", possible_values = ["plain", "json"])
+    )]
+    pub log_format: LogFormat,
+
+    /// The filter that determines what tracing spans and events are enabled.
+    #[cfg_attr(feature = "clap", clap(flatten))]
+    pub log_level: LogFilter,
+
+    /// Enables tokio-console support.
+    ///
+    /// If this is set, `kubert` must be compiled with the `tokio-console` cargo
+    /// feature enabled and `RUSTFLAGS="--cfg tokio_unstable"` must be set.
+    #[cfg(all(tokio_unstable, feature = "tokio-console"))]
+    #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "tokio-console"))))]
+    #[cfg_attr(feature = "clap", clap(long, parse = validate_console))]
+    pub tokio_console: bool,
+}
+
+impl LogArgs {
+    /// Returns the log level filter.
+    pub fn log_level(&self) -> LogFilter {
+        self.log_level.0.clone()
+    }
+}
 /// Configures whether logs should be emitted in plaintext (the default) or as JSON-encoded
 /// messages
 #[derive(Clone, Debug)]
 #[cfg_attr(docsrs, doc(cfg(feature = "log")))]
+#[cfg_attr(feature = "clap", derive(ArgEnum))]
 pub enum LogFormat {
     /// The default plaintext format
     Plain,
@@ -77,4 +112,65 @@ impl LogFormat {
 
         Ok(())
     }
+}
+
+// This hand-implements `Args` in order to generate some values based
+// on the command's name.
+
+impl Args for LogArgs {
+    fn augment_args(cmd: Command<'_>) -> Command<'_> {
+        let level = Arg::new("log_level")
+            .long("log_level")
+            .takes_value(true)
+            .env("KUBERT_LOG")
+            .help("Configures the log level filter.")
+            .default_value(default_log_filter(&cmd));
+        let format = Arg::new("log_format")
+            .long("log_format")
+            .takes_value(true)
+            .help("Which log format to use.")
+            .possible_values(LogFormat::value_variants)
+            .default_value("plain");
+
+        cmd.arg(arg).arg(format)
+    }
+    fn augment_args_for_update(cmd: Command<'_>) -> Command<'_> {
+        Self::augment_args(cmd)
+    }
+}
+impl FromArgMatches for LogArgs {
+    fn from_arg_matches(matches: &ArgMatches) -> Result<Self, clap::Error> {
+        use clap::error::{Error, ErrorKind};
+        let filter = matches
+            .value_of("log_level")
+            .expect("arg with default value is always present");
+        LogFilter::try_new(filter)
+            .map_err(|error| Error::raw(ErrorKind::InvalidValue, error))
+            .map(Self)
+    }
+
+    fn update_from_arg_matches(&mut self, matches: &ArgMatches) -> Result<(), clap::Error> {
+        use clap::error::{Error, ErrorKind};
+        if let Some(filter) = matches.value_of("log_level") {
+            self.0 = LogFilter::try_new(filter)
+                .map_err(|error| Error::raw(ErrorKind::InvalidValue, error))?;
+        }
+        Ok(())
+    }
+}
+
+fn default_log_filter(cmd: &Command<'_>) -> &'static str {
+    use once_cell::sync::OnceCell;
+
+    static DEFAULT_FILTER: OnceCell<String> = OnceCell::new();
+    DEFAULT_FILTER
+        .get_or_init(|| match cmd.get_bin_name() {
+            Some(name) => {
+                let mut filter = name.replace('-', "_");
+                filter.push_str("=info,warn");
+                filter
+            }
+            None => String::from("warn"),
+        })
+        .as_str()
 }
