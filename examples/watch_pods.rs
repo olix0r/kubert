@@ -52,7 +52,7 @@ async fn main() -> Result<()> {
     // - an admin server with /live and /ready endpoints
     // - a tracing (logging) subscriber
     let rt = kubert::Runtime::builder()
-        .with_log(log.log_level(), log.log_format)
+        .with_log_args(log)
         .with_admin(admin)
         .with_client(client);
     let mut runtime = match time::timeout_at(deadline, rt.build()).await {

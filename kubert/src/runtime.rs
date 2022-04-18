@@ -7,7 +7,7 @@ use crate::{
     client::{self, Client, ClientArgs},
     errors,
     initialized::{self, Initialized},
-    shutdown, LogFilter, LogFormat, LogInitError,
+    shutdown, LogArgs, LogFilter, LogFormat, LogInitError,
 };
 use futures_core::Stream;
 use kube_core::{params::ListParams, Resource};
@@ -28,7 +28,7 @@ pub struct Builder<S = NoServer> {
     admin: Option<AdminArgs>,
     client: Option<ClientArgs>,
     error_delay: Option<Duration>,
-    log: Option<LogSettings>,
+    log: Option<LogArgs>,
 
     #[cfg(feature = "server")]
     server: S,
@@ -91,12 +91,6 @@ pub enum BuildError {
     Signal(#[from] shutdown::RegisterError),
 }
 
-#[derive(Debug)]
-struct LogSettings {
-    filter: LogFilter,
-    format: LogFormat,
-}
-
 // === impl Builder ===
 
 impl<S> Builder<S> {
@@ -114,9 +108,22 @@ impl<S> Builder<S> {
         self
     }
 
-    /// Configures the runtime to use the given logging configuration
+    /// Configures the runtime to use the given logging configuration.
+    #[deprecated(since = "0.6.1", note = "use `Builder::with_log_args` instead.")]
     pub fn with_log(mut self, filter: LogFilter, format: LogFormat) -> Self {
-        self.log = Some(LogSettings { filter, format });
+        self.log = Some(LogArgs {
+            log_level: filter,
+            log_format: format,
+            #[cfg(feature = "tokio-console")]
+            tokio_console: false,
+            _p: (),
+        });
+        self
+    }
+
+    /// Configures the runtime to use the given logging configuration
+    pub fn with_log_args(mut self, log_args: LogArgs) -> Self {
+        self.log = Some(log_args);
         self
     }
 
@@ -513,22 +520,5 @@ impl Runtime<NoServer> {
         shutdown.signaled().await?;
 
         Ok(())
-    }
-}
-
-// === impl LogSettings ===
-
-impl Default for LogSettings {
-    fn default() -> Self {
-        Self {
-            filter: LogFilter::from_default_env(),
-            format: LogFormat::default(),
-        }
-    }
-}
-
-impl LogSettings {
-    fn try_init(self) -> Result<(), LogInitError> {
-        self.format.try_init(self.filter)
     }
 }
