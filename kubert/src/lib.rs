@@ -63,3 +63,19 @@ pub use self::runtime::Runtime;
 
 #[cfg(all(feature = "server"))]
 pub use self::server::ServerArgs;
+
+#[cfg(all(tokio_unstable, feature = "tokio-console"))]
+pub(crate) fn spawn_named<T>(
+    name: &'static str,
+    f: impl std::future::Future<Output = T> + Send,
+) -> tokio::task::JoinHandle<T> {
+    tokio::task::Builder::new().name(name).spawn(f)
+}
+
+#[cfg(not(all(tokio_unstable, feature = "tokio-console")))]
+pub(crate) fn spawn_named<T>(
+    _: &'static str,
+    f: impl std::future::Future<Output = T> + Send,
+) -> tokio::task::JoinHandle<T> {
+    tokio::spawn(f)
+}

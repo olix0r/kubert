@@ -58,6 +58,13 @@ pub struct Server {
     task: tokio::task::JoinHandle<Result<()>>,
 }
 
+#[derive(Debug)]
+#[cfg(feature = "tokio-console")]
+struct Console {
+    server: console_subscriber::Server,
+    grpc: tonic::server::Grpc<tonic::codec::ProstCodec>,
+}
+
 // === impl AdminArgs ===
 
 impl Default for AdminArgs {
@@ -150,7 +157,8 @@ impl Bound {
                 ))
             }));
 
-        let task = tokio::spawn(
+        let task = crate::spawn_named(
+            "kubert::admin",
             async move {
                 debug!("Serving");
                 server.await

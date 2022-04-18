@@ -507,7 +507,7 @@ impl Runtime<NoServer> {
 
         // Set the admin readiness to succeed once all initilization handles have been released.
         let ready = admin.readiness();
-        tokio::spawn(async move {
+        crate::spawn_named("kubert::ready", async move {
             initialized.initialized().await;
             ready.set(true);
             tracing::debug!("initialized");
