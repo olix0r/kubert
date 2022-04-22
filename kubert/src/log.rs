@@ -6,6 +6,8 @@ pub use tracing_subscriber::{util::TryInitError as LogInitError, EnvFilter as Lo
 
 #[cfg(feature = "clap")]
 use clap::{Arg, ArgEnum, ArgMatches, Args, Command, FromArgMatches};
+#[cfg(feature = "clap")]
+use once_cell::sync::OnceCell;
 
 /// Configures logging settings.
 ///
@@ -328,8 +330,6 @@ impl Default for LogArgs {
 static DEFAULT_FILTER: OnceCell<String> = OnceCell::new();
 
 fn default_log_filter(cmd: &Command<'_>) -> &'static str {
-    use once_cell::sync::OnceCell;
-
     DEFAULT_FILTER.get_or_init(|| {
         let name = cmd.get_bin_name().unwrap_or_else(|| cmd.get_name());
         let mut filter = name.replace('-', "_");
