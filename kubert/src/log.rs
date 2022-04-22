@@ -70,11 +70,9 @@ use once_cell::sync::OnceCell;
 ///
 ///      // Construct a `LogArgs` from the values we parsed using our
 ///      // custom configuration:
-///     let log_args = kubert::LogArgs {
-///         log_level: args.log_filter,
-///         log_format: args.log_format,
-///         ..Default::default()
-///     };
+///     let log_args = kubert::LogArgs::default()
+///         .with_log_format(args.log_format)
+///         .with_log_level(args.log_filter);
 ///
 ///     let rt = kubert::Runtime::builder()
 ///         .with_log_args(log_args)
@@ -166,6 +164,14 @@ impl LogFormat {
 // === impl LogArgs ===
 
 impl LogArgs {
+    pub fn with_log_format(self, log_format: LogFormat) -> Self {
+        Self { log_format, ..self }
+    }
+
+    pub fn with_log_level(self, log_level: LogFilter) -> Self {
+        Self { log_level, ..self }
+    }
+
     /// Attempts to configure the global default `tracing` subscriber in the current scope, returning
     /// an error if one is already set
     ///
