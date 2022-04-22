@@ -39,9 +39,7 @@ use once_cell::sync::OnceCell;
 ///     let rt = kubert::Runtime::builder()
 ///         .with_log_args(args.log)
 ///         // ...
-///         .build()
-///         .await
-///         .unwrap();
+///         .build();
 ///     # drop(rt);
 /// }
 /// ```
@@ -77,14 +75,13 @@ use once_cell::sync::OnceCell;
 ///     let rt = kubert::Runtime::builder()
 ///         .with_log_args(log_args)
 ///         // ...
-///         .build()
-///         .await
-///         .unwrap();
+///         .build();
 ///     # drop(rt);
 /// }
 /// ```
 #[derive(Debug)]
 #[cfg_attr(docsrs, doc(cfg(feature = "log")))]
+#[must_use]
 pub struct LogArgs {
     /// The log format to use.
     pub log_format: LogFormat,
@@ -166,10 +163,40 @@ impl LogFormat {
 // === impl LogArgs ===
 
 impl LogArgs {
+    /// Sets the [`LogFormat`] used by this `LogArgs`.
+    ///
+    /// This can be used for "builder-style" configuration of `LogArgs`, or to
+    /// override values parsed from the command line using `clap`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let log_format = // ...
+    /// # Default::default();
+    ///
+    /// let log_args = kubert::LogArgs::default()
+    ///     .with_log_format(log_format);
+    /// # drop(log_args);
+    /// ```
     pub fn with_log_format(self, log_format: LogFormat) -> Self {
         Self { log_format, ..self }
     }
 
+    /// Sets the [`LogLevel`] used by this `LogArgs`.
+    ///
+    /// This can be used for "builder-style" configuration of `LogArgs`, or to
+    /// override values parsed from the command line using `clap`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let filter = // ...
+    /// # Default::default();
+    ///
+    /// let log_args = kubert::LogArgs::default()
+    ///     .with_log_level(filter);
+    /// # drop(log_args);
+    /// ```
     pub fn with_log_level(self, log_level: LogFilter) -> Self {
         Self { log_level, ..self }
     }
