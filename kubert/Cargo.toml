@@ -102,7 +102,7 @@ once_cell = { version = "1.10", optional = true }
 version = "3.1.0"
 optional = true
 default-features = false
-features = ["derive", "std"]
+features = ["derive", "std", "env"]
 
 # Not used directly, but required to ensure that the k8s-openapi dependency is considered part of
 # the "deps" graph rather than just the "dev-deps" graph
@@ -149,4 +149,4 @@ tracing-subscriber = { version = "0.3", features = ["ansi"] }
 [dev-dependencies.tokio]
 version = "1.17"
 default-features = false
-features = ["macros", "test-util"]
+features = ["macros", "test-util", "rt-multi-thread"]

@@ -32,7 +32,8 @@ use once_cell::sync::OnceCell;
 ///     // ...
 /// }
 ///
-/// fn main() {
+/// #[tokio::main]
+/// async fn main() {
 ///     let args = MyAppArgs::parse();
 ///
 ///     let rt = kubert::Runtime::builder()
@@ -63,13 +64,14 @@ use once_cell::sync::OnceCell;
 ///     
 /// }
 ///
-/// fn main() {
+/// #[tokio::main]
+/// async fn main() {
 ///     let args = MyAppArgs::parse();
 ///
 ///      // Construct a `LogArgs` from the values we parsed using our
 ///      // custom configuration:
 ///     let log_args = kubert::LogArgs {
-///         log_filter: args.log_filter,
+///         log_level: args.log_filter,
 ///         log_format: args.log_format,
 ///         ..Default::default()
 ///     };
@@ -176,7 +178,7 @@ impl LogArgs {
 
         // TODO(eliza): can we serve the tokio console server on the Admin server?
         #[cfg(feature = "tokio-console")]
-        let registry = registry.with(self.tokio_console.and_then(console_subscriber::spawn()));
+        let registry = registry.with(self.tokio_console.then(console_subscriber::spawn));
 
         match self.log_format {
             LogFormat::Plain => registry
@@ -315,10 +317,10 @@ impl Default for LogArgs {
             log_format: LogFormat::Plain,
             log_level: DEFAULT_FILTER
                 .get()
-                .map(LogFormat::try_new)
+                .and_then(|default| default.parse().ok())
                 .unwrap_or_else(|| {
                     LogFilter::default()
-                        .add_directive(tracing_subscriber::filter::LevelFilter::WARN)
+                        .add_directive(tracing_subscriber::filter::LevelFilter::WARN.into())
                 }),
             #[cfg(feature = "tokio-console")]
             tokio_console: false,
