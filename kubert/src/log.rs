@@ -8,6 +8,79 @@ pub use tracing_subscriber::{util::TryInitError as LogInitError, EnvFilter as Lo
 use clap::{Arg, ArgEnum, ArgMatches, Args, Command, FromArgMatches};
 
 /// Configures logging settings.
+///
+/// This type may be parsed from the command line using `clap`, or configured
+/// manually. In some cases, it may be preferable to not use the default `clap`
+/// implementation for `LogArgs`, so that environment variables, default log
+/// targets, etc, may be overridden.
+///
+/// # Examples
+///
+/// If the default environment variable (`KUBERT_LOG`) and default value for the
+/// log filter (`<BINARY_NAME>=info,warn`) are desired, the
+/// `clap::FromArgMatches` impl for this type can be used directly:
+///
+/// ```rust
+/// use clap::Parser;
+///
+/// #[derive(Parser)]
+/// struct MyAppArgs {
+///     #[clap(flatten)]
+///     log: kubert::LogArgs,
+///     // ...
+/// }
+///
+/// fn main() {
+///     let args = MyAppArgs::parse();
+///
+///     let rt = kubert::Runtime::builder()
+///         .with_log_args(args.log)
+///         // ...
+///         .build()
+///         .await
+///         .unwrap();
+///     # drop(rt);
+/// }
+/// ```
+///
+/// Alternatively, a `LogArgs` instance may be constructed from user-defined values:
+///
+/// ```rust
+/// use clap::Parser;
+/// use kubert::log::{LogFilter, LogFormat};
+///
+/// #[derive(Parser)]
+/// struct MyAppArgs {
+///     // Use a different environment variable and default value than
+///     // those provided by the `FromArgMatches` impl for `LogArgs`
+///     #[clap(long, env = "MY_APP_LOG", default_value = "trace")]
+///     log_filter: LogFilter,
+///
+///     #[clap(long, env = "MY_APP_LOG_FORMAT", default_value = "json")]
+///     log_format: LogFormat,
+///     
+/// }
+///
+/// fn main() {
+///     let args = MyAppArgs::parse();
+///
+///      // Construct a `LogArgs` from the values we parsed using our
+///      // custom configuration:
+///     let log_args = kubert::LogArgs {
+///         log_filter: args.log_filter,
+///         log_format: args.log_format,
+///         ..Default::default()
+///     };
+///
+///     let rt = kubert::Runtime::builder()
+///         .with_log_args(log_args)
+///         // ...
+///         .build()
+///         .await
+///         .unwrap();
+///     # drop(rt);
+/// }
+/// ```
 #[derive(Debug)]
 #[cfg_attr(docsrs, doc(cfg(feature = "log")))]
 pub struct LogArgs {
