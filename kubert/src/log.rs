@@ -96,7 +96,7 @@ pub struct LogArgs {
     ///
     /// If this is set, `kubert` must be compiled with the `tokio-console` cargo
     /// feature enabled and `RUSTFLAGS="--cfg tokio_unstable"` must be set.
-    #[cfg(feature = "tokio-console")]
+    #[cfg(all(tokio_unstable, feature = "tokio-console"))]
     pub tokio_console: bool,
 
     pub(crate) _p: (),
@@ -154,6 +154,8 @@ impl LogFormat {
         LogArgs {
             log_format: self,
             log_level: filter,
+
+            #[cfg(all(tokio_unstable, feature = "tokio-console"))]
             tokio_console: false,
             _p: (),
         }
@@ -183,7 +185,7 @@ impl LogArgs {
         let registry = tracing_subscriber::registry();
 
         // TODO(eliza): can we serve the tokio console server on the Admin server?
-        #[cfg(feature = "tokio-console")]
+        #[cfg(all(tokio_unstable, feature = "tokio-console"))]
         let registry = registry.with(self.tokio_console.then(console_subscriber::spawn));
 
         match self.log_format {
@@ -243,7 +245,7 @@ impl Args for LogArgs {
             .default_value("plain");
 
         let cmd = cmd.arg(level).arg(format);
-        #[cfg(feature = "tokio-console")]
+        #[cfg(all(tokio_unstable, feature = "tokio-console"))]
         let cmd = cmd.arg(
             Arg::new("tokio-console")
                 .long("tokio-console")
@@ -270,25 +272,14 @@ impl FromArgMatches for LogArgs {
         let log_level = matches.value_of_t::<LogFilter>("log-level")?;
         let log_format = matches.value_of_t::<LogFormat>("log-format")?;
 
-        #[cfg(feature = "tokio-console")]
-        let tokio_console = {
-            use clap::error::{Error, ErrorKind};
-
-            let enabled = matches.is_present("tokio-console");
-            if !cfg!(tokio_unstable) {
-                return Err(Error::raw(
-                    ErrorKind::InvalidValue,
-                    "The `--tokio-console` flag requires that `kubert` be \
-                    compiled with RUSTFLAGS=\"--cfg tokio_unstable\".",
-                ));
-            }
-            enabled
-        };
+        #[cfg(all(tokio_unstable, feature = "tokio-console"))]
+        let tokio_console = matches.is_present("tokio-console");
 
         Ok(Self {
             log_level,
             log_format,
-            #[cfg(feature = "tokio-console")]
+
+            #[cfg(all(tokio_unstable, feature = "tokio-console"))]
             tokio_console,
             _p: (),
         })
@@ -298,19 +289,9 @@ impl FromArgMatches for LogArgs {
         self.log_level = matches.value_of_t::<LogFilter>("log-level")?;
         self.log_format = matches.value_of_t::<LogFormat>("log-format")?;
 
-        #[cfg(feature = "tokio-console")]
+        #[cfg(all(tokio_unstable, feature = "tokio-console"))]
         {
-            use clap::error::{Error, ErrorKind};
-
-            let enabled = matches.is_present("tokio-console");
-            if !cfg!(tokio_unstable) {
-                return Err(Error::raw(
-                    ErrorKind::InvalidValue,
-                    "The `--tokio-console` flag requires that `kubert` be \
-                    compiled with RUSTFLAGS=\"--cfg tokio_unstable\".",
-                ));
-            }
-            self.tokio_console = enabled;
+            self.tokio_console = matches.is_present("tokio-console");
         }
 
         Ok(())
@@ -328,7 +309,8 @@ impl Default for LogArgs {
                     LogFilter::default()
                         .add_directive(tracing_subscriber::filter::LevelFilter::WARN.into())
                 }),
-            #[cfg(feature = "tokio-console")]
+
+            #[cfg(all(tokio_unstable, feature = "tokio-console"))]
             tokio_console: false,
             _p: (),
         }

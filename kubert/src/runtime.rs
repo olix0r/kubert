@@ -114,7 +114,8 @@ impl<S> Builder<S> {
         self.log = Some(LogArgs {
             log_level: filter,
             log_format: format,
-            #[cfg(feature = "tokio-console")]
+
+            #[cfg(all(tokio_unstable, feature = "tokio-console"))]
             tokio_console: false,
             _p: (),
         });
