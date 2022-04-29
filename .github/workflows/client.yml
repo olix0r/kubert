@@ -76,7 +76,7 @@ jobs:
           kubectl create clusterrolebinding watch-pods --clusterrole=watch-pods --serviceaccount=kubert-test:watch-pods
       # Build a docker image with the examples
       - uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
-      - uses: docker/setup-buildx-action@94ab11c41e45d028884a99163086648e898eed25
+      - uses: docker/setup-buildx-action@f211e3e9ded2d9377c8cadc4489a4e38014bc4c9
       - run: docker buildx build . -f examples/Dockerfile --tag kubert-examples:test --load
       - run: k3d image import kubert-examples:test
       # Run the example in-cluster
