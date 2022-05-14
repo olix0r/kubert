@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+  push:
+    tags:
+      - 'release/*'
+
+env:
+  CARGO_ACTION_FMT_VERSION: v0.1.3
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUST_BACKTRACE: short
+  RUSTUP_MAX_RETRIES: 10
+
+permissions:
+  contents: read
+
+jobs:
+  meta:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    container:
+      image: docker://rust:1.60-bullseye
+    steps:
+      - id: meta
+        shell: bash
+        run: |
+          ref="${{ github.ref }}"
+          if [[ "$ref" == refs/tags/release/* ]]; then
+            echo ::set-output name=version::"${ref##refs/tags/release/}"
+            echo ::set-output name=mode::release
+          else
+            sha="${{ github.sha }}"
+            echo ::set-output name=version::"test-${sha:0:7}"
+            echo ::set-output name=mode::test
+          fi
+      - if: steps.meta.outputs.mode == 'release'
+        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
+      - if: steps.meta.outputs.mode == 'release'
+        shell: bash
+        run: |
+          curl --proto '=https' --tlsv1.3 -fsSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o $HOME/jq
+          chmod 755 $HOME/jq
+          version=$(cargo metadata --format-version=1 | $HOME/jq -r '.packages[] | select(.name == "kubert") | .version')
+          if [[ "v${version}" != "${{ steps.meta.outputs.version }}" ]]; then
+            echo "::error ::Crate version v${version} does not match tag ${{ steps.meta.outputs.version }}"
+            exit 1
+          fi
+    outputs:
+      mode: ${{ steps.meta.outputs.mode }}
+      version: ${{ steps.meta.outputs.version }}
+
+  # Publish a GitHub release with platform-specific static binaries.
+  release:
+    needs: [meta]
+    permissions:
+      contents: write
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - if: needs.meta.outputs.mode == 'release'
+        uses: softprops/action-gh-release@1e07f4398721186383de40550babbdf2b84acfc5
+        with:
+          name: ${{ needs.meta.outputs.version }}
+          generate_release_notes: true
+
+  crate:
+    # Only publish the crate after the rest of the release succeeds.
+    needs: [release]
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    container:
+      image: docker://rust:1.60.0-bullseye
+    steps:
+      - uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
+      - run: cargo publish --dry-run
+      - if: steps.meta.outputs.mode == 'release'
+        run: cargo publish --token=${{ secrets.CRATESIO_TOKEN }}
