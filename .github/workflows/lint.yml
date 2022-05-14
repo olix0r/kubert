@@ -54,5 +54,3 @@ jobs:
       - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
       - run: cargo fetch
       - run: cargo doc --all-features --workspace --no-deps --message-format=json | cargo-action-fmt
-
-
