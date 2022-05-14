@@ -19,7 +19,7 @@ thiserror = "1"
 tracing = "0.1"
 
 [dev-dependencies.kube]
-version = "0.71"
+version = "0.72"
 default-features = false
 features = [
     "client",
