@@ -13,9 +13,9 @@ permissions:
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
-  K3D_VERSION: v5.3.0
+  K3D_VERSION: v5.4.1
   RUST_BACKTRACE: short
-  RUST_VERSION: 1.56.1
+  RUST_VERSION: 1.60.0
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
@@ -27,12 +27,13 @@ jobs:
       - name: Install rust
         run: |
           rm -rf $HOME/.cargo
-          curl --proto =https --tlsv1.3 -fLsSv https://sh.rustup.rs | sh -s -- -y --default-toolchain=${RUST_VERSION}
+          curl --proto =https --tlsv1.3 -fLsSv https://sh.rustup.rs | sh -s -- -y --default-toolchain "${RUST_VERSION}"
           source $HOME/.cargo/env
           echo "PATH=$PATH" >> $GITHUB_ENV
           cargo version
       - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
-      - run: cargo build --package=kubert-examples --examples
+      - run: cargo fetch
+      - run: cargo build --frozen --package=kubert-examples --example=watch-pods
       # Setup a cluster
       - run: curl --proto =https --tlsv1.3 -fLsSv https://raw.githubusercontent.com/k3d-io/k3d/${K3D_VERSION}/install.sh | bash
       - run: k3d --version

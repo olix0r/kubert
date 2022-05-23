@@ -4,7 +4,7 @@ version = "0.1.0"
 publish = false
 edition = "2021"
 license = "Apache-2.0"
-rust-version = "1.56.1"
+rust-version = "1.60"
 
 [package.metadata.release]
 release = false
@@ -13,13 +13,13 @@ release = false
 anyhow = "1"
 clap = { version = "3", default-features = false, features = ["derive", "env", "std"] }
 futures = { version = "0.3", default-features = false }
-k8s-openapi = { version = "0.14", default-features = false, features = ["v1_23"] }
+k8s-openapi = { version = "0.15", default-features = false, features = ["v1_23"] }
 regex = "1"
 thiserror = "1"
 tracing = "0.1"
 
 [dev-dependencies.kube]
-version = "0.72"
+version = "0.73"
 default-features = false
 features = [
     "client",
