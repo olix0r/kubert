@@ -1,6 +1,7 @@
 [workspace]
-default-members = ["kubert"]
+default-members = ["k8s-gateway-api", "kubert"]
 members = [
+    "k8s-gateway-api",
     "kubert",
     "examples",
 ]

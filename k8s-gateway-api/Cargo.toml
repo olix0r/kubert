@@ -1,0 +1,20 @@
+[package]
+name = "k8s-gateway-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kube = { version = "0.73", default-features = false, features = ["derive"] }
+k8s-openapi = { version = "0.15", features = ["schemars"] }
+schemars = { version = "0.8", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+k8s-openapi = { version = "0.15", features = ["v1_23"] }
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docsrs"]
+features = [
+    "k8s-openapi/v1_23",
+]
