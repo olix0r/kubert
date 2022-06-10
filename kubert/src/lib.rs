@@ -56,10 +56,34 @@ pub use self::client::ClientArgs;
 pub use self::initialized::Initialized;
 
 #[cfg(all(feature = "log"))]
-pub use self::log::{LogFilter, LogFormat, LogInitError};
+pub use self::log::{LogArgs, LogFilter, LogFormat, LogInitError};
 
 #[cfg(all(feature = "runtime"))]
 pub use self::runtime::Runtime;
 
 #[cfg(all(feature = "server"))]
 pub use self::server::ServerArgs;
+
+#[cfg(all(tokio_unstable, feature = "tokio-console"))]
+#[track_caller]
+pub(crate) fn spawn_named<T>(
+    name: &'static str,
+    f: impl std::future::Future<Output = T> + Send + 'static,
+) -> tokio::task::JoinHandle<T>
+where
+    T: Send + 'static,
+{
+    tokio::task::Builder::new().name(name).spawn(f)
+}
+
+#[cfg(not(all(tokio_unstable, feature = "tokio-console")))]
+#[track_caller]
+pub(crate) fn spawn_named<T>(
+    _: &'static str,
+    f: impl std::future::Future<Output = T> + Send + 'static,
+) -> tokio::task::JoinHandle<T>
+where
+    T: Send + 'static,
+{
+    tokio::spawn(f)
+}

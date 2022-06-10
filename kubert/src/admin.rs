@@ -150,7 +150,8 @@ impl Bound {
                 ))
             }));
 
-        let task = tokio::spawn(
+        let task = crate::spawn_named(
+            "kubert::admin",
             async move {
                 debug!("Serving");
                 server.await
