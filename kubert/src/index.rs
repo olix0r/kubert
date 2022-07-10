@@ -77,7 +77,7 @@ pub async fn namespaced<T, R>(
                 let namespace = resource
                     .namespace()
                     .expect("resource must have a namespace");
-                let name = resource.name();
+                let name = resource.name_unchecked();
 
                 keys.entry(namespace)
                     .or_insert_with(HashSet::new)
@@ -90,7 +90,7 @@ pub async fn namespaced<T, R>(
                 let namespace = resource
                     .namespace()
                     .expect("resource must have a namespace");
-                let name = resource.name();
+                let name = resource.name_unchecked();
 
                 if let Entry::Occupied(mut entry) = keys.entry(namespace.clone()) {
                     entry.get_mut().remove(&name);
@@ -110,7 +110,7 @@ pub async fn namespaced<T, R>(
                     let namespace = resource
                         .namespace()
                         .expect("resource must have a namespace");
-                    let name = resource.name();
+                    let name = resource.name_unchecked();
 
                     if let Some(names) = removed.get_mut(&namespace) {
                         names.remove(&name);
@@ -153,12 +153,12 @@ pub async fn cluster<T, R>(
         tracing::trace!(?event);
         match event {
             Event::Applied(resource) => {
-                keys.insert(resource.name());
+                keys.insert(resource.name_unchecked());
                 index.write().apply(resource);
             }
 
             Event::Deleted(resource) => {
-                let name = resource.name();
+                let name = resource.name_unchecked();
                 keys.remove(&name);
                 index.write().delete(name);
             }
@@ -168,7 +168,7 @@ pub async fn cluster<T, R>(
                 // the index, keeping track of which resources need to be removed from the index.
                 let mut removed = keys.clone();
                 for resource in resources.iter() {
-                    let name = resource.name();
+                    let name = resource.name_unchecked();
                     removed.remove(&name);
                     keys.insert(name);
                 }
@@ -308,7 +308,7 @@ mod tests {
 
     impl<T: Resource> IndexClusterResource<T> for ClusterCache {
         fn apply(&mut self, resource: T) {
-            self.0.insert(resource.name());
+            self.0.insert(resource.name_unchecked());
         }
 
         fn delete(&mut self, name: String) {
@@ -321,7 +321,7 @@ mod tests {
             let namespace = resource
                 .namespace()
                 .expect("resource must have a namespace");
-            let name = resource.name();
+            let name = resource.name_unchecked();
             self.0
                 .entry(namespace)
                 .or_insert_with(HashSet::new)

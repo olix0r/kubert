@@ -95,7 +95,7 @@ async fn main() -> Result<()> {
                         let mut new = std::collections::HashSet::new();
                         for pod in pods.into_iter() {
                             let namespace = pod.namespace().unwrap();
-                            let name = pod.name();
+                            let name = pod.name_unchecked();
                             let k = (namespace.clone(), name.clone());
                             if !known.contains(&k) {
                                 tracing::info!(%namespace, %name, "added")
@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
 
                     Event::Applied(pod) => {
                         let namespace = pod.namespace().unwrap();
-                        let name = pod.name();
+                        let name = pod.name_unchecked();
                         if known.insert((namespace.clone(), name.clone())) {
                             tracing::info!(%namespace, %name, "added");
                         } else {
@@ -124,7 +124,7 @@ async fn main() -> Result<()> {
 
                     Event::Deleted(pod) => {
                         let namespace = pod.namespace().unwrap();
-                        let name = pod.name();
+                        let name = pod.name_unchecked();
                         tracing::info!(%namespace, %name, "deleted");
                         known.remove(&(namespace, name));
                     }
