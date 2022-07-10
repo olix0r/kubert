@@ -1,2 +1,7 @@
+*.md
+.dockerignore
+.github
 .git
+Dockerfile
+justfile
 target

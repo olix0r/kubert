@@ -2,8 +2,8 @@
 	"name": "kubert.dev",
 	"image": "ghcr.io/linkerd/dev-proxy:v11",
 	"extensions": [
-		"matklad.rust-analyzer",
 		"NathanRidley.autotrim",
+		"rust-lang.rust-analyzer",
 		"samverschueren.final-newline",
 		"tamasfe.even-better-toml",
 	],

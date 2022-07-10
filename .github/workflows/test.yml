@@ -5,6 +5,7 @@ on:
     paths:
       - '**/Cargo.toml'
       - '**/*.rs'
+      - justfile
       - .github/workflows/test.yml
 
 permissions:
@@ -13,7 +14,6 @@ permissions:
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
-  RUST_BACKTRACE: short
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
@@ -21,12 +21,13 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     container:
-      image: docker://rust:1.60
+      image: docker://rust:1.62
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: olix0r/cargo-action-fmt@ee1ef42932e44794821dab57ef1bf7a73df8b21f
+      - uses: extractions/setup-just@aa5d15c144db4585980a44ebfdd2cf337c4f14cb
       - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
       - run: cargo fetch
-      - name: cargo test --no-run
-        run: cargo test --frozen --workspace --all-targets --all-features --no-run --message-format=json | cargo-action-fmt
-      - name: cargo test
-        run: cargo test --frozen --workspace --all-targets --all-features
+      - run: just build-test
+      - run: just test
