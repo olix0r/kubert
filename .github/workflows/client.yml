@@ -5,6 +5,7 @@ on:
     paths:
       - '**/Cargo.toml'
       - '**/*.rs'
+      - justfile
       - .github/workflows/client.yml
 
 permissions:
@@ -13,15 +14,22 @@ permissions:
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
-  K3D_VERSION: v5.4.1
-  RUST_BACKTRACE: short
-  RUST_VERSION: 1.60.0
+  K3D_VERSION: v5.4.3
+  RUST_VERSION: 1.62.0
   RUSTUP_MAX_RETRIES: 10
+  KUBERT_TEST_NS: kubert-test
 
 jobs:
   local:
+    strategy:
+      matrix:
+        k8s:
+          - v1.21
+          - v1.24
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       # Build the examples
       - name: Install rust
@@ -31,68 +39,41 @@ jobs:
           source $HOME/.cargo/env
           echo "PATH=$PATH" >> $GITHUB_ENV
           cargo version
+      - uses: extractions/setup-just@aa5d15c144db4585980a44ebfdd2cf337c4f14cb
       - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
-      - run: cargo fetch
-      - run: cargo build --frozen --package=kubert-examples --example=watch-pods
-      # Setup a cluster
       - run: curl --proto =https --tlsv1.3 -fLsSv https://raw.githubusercontent.com/k3d-io/k3d/${K3D_VERSION}/install.sh | bash
-      - run: k3d --version
-      - run: k3d cluster create --no-lb --k3s-arg '--no-deploy=local-storage,traefik,servicelb,metrics-server@server:*'
-      - run: kubectl version
-      # Run the example locally
-      - name: Run watch-pods
+      - name: Set kubert test server version to ${{ matrix.k8s }}
+        run: echo "KUBERT_TEST_CLUSTER_VERSION=${{ matrix.k8s }}" >> $GITHUB_ENV
+      - run: just fetch
+      - run: just build-examples
+      - run: just test-cluster-create
+      - run: just test-cluster-run-watch-pods --log-level=debug
+      - run: just test-cluster-create-ns
+      - name: Run test-cluster-run-watch-pods with impersonation
         run: |
-          cargo run --package=kubert-examples --example=watch-pods -- \
-              --exit \
-              --log-level=debug
-      - name: Setup RBAC
-        run: |
-          kubectl create namespace kubert-test
-          kubectl create serviceaccount --namespace=kubert-test watch-pods
-          kubectl create clusterrole watch-pods --verb=get,list,watch --resource=pods
-          kubectl create clusterrolebinding watch-pods --clusterrole=watch-pods --serviceaccount=kubert-test:watch-pods
-      - name: Run watch-pods with impersonation
-        run: |
-          cargo run --package=kubert-examples --example=watch-pods -- \
-              --exit \
-              --log-level=debug \
-              --as=system:serviceaccount:kubert-test:watch-pods \
-              --kubeconfig=$HOME/.kube/config
+          just test-cluster-run-watch-pods --log-level=debug \
+            --as=system:serviceaccount:${KUBERT_TEST_NS}:watch-pods \
+            --kubeconfig=$HOME/.kube/config
 
   in-cluster:
+    strategy:
+      matrix:
+        k8s:
+          - v1.21
+          - v1.24
     timeout-minutes: 10
     runs-on: ubuntu-latest
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      # Setup a cluster
-      - run: curl --proto =https --tlsv1.3 -fLsSv https://raw.githubusercontent.com/k3d-io/k3d/${K3D_VERSION}/install.sh | bash
-      - run: k3d --version
-      - run: k3d cluster create --no-lb --k3s-arg "--no-deploy=local-storage,traefik,servicelb,metrics-server@server:*"
-      - run: kubectl version
-      - name: Setup RBAC
-        run: |
-          kubectl create namespace kubert-test
-          kubectl create serviceaccount --namespace=kubert-test watch-pods
-          kubectl create clusterrole watch-pods --verb=get,list,watch --resource=pods
-          kubectl create clusterrolebinding watch-pods --clusterrole=watch-pods --serviceaccount=kubert-test:watch-pods
-      # Build a docker image with the examples
+      - uses: extractions/setup-just@aa5d15c144db4585980a44ebfdd2cf337c4f14cb
       - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
       - uses: docker/setup-buildx-action@dc7b9719a96d48369863986a06765841d7ea23f6
-      - run: docker buildx build . -f examples/Dockerfile --tag kubert-examples:test --load
-      - run: k3d image import kubert-examples:test
-      # Run the example in-cluster
-      - name: Run kubectl run watch-pods
-        run: |
-          kubectl run watch-pods \
-              --attach \
-              --command \
-              --image=kubert-examples:test \
-              --image-pull-policy=Never \
-              --labels=olix0r.net/kubert-test=watch-pods \
-              --namespace=kubert-test \
-              --overrides='{"spec": {"serviceAccount": "watch-pods"}}' \
-              --quiet \
-              --restart=Never \
-              --rm \
-              -- \
-            watch-pods --exit --log-level=debug --selector=olix0r.net/kubert-test=watch-pods
-
+      - run: curl --proto =https --tlsv1.3 -fLsSv https://raw.githubusercontent.com/k3d-io/k3d/${K3D_VERSION}/install.sh | bash
+      - name: Set kubert test server version to ${{ matrix.k8s }}
+        run: echo "KUBERT_TEST_CLUSTER_VERSION=${{ matrix.k8s }}" >> $GITHUB_ENV
+      - run: just build-examples-image
+      - run: just test-cluster-create
+      - run: just test-cluster-import-examples
+      - run: just test-cluster-create-ns
+      - run: just test-cluster-deploy-watch-pods --log-level=debug

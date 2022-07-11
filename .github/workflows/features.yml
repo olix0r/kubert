@@ -5,6 +5,7 @@ on:
     paths:
       - '**/Cargo.toml'
       - '**/*.rs'
+      - justfile
       - .github/workflows/features.yml
 
 permissions:
@@ -13,10 +14,26 @@ permissions:
 env:
   CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
-  RUST_BACKTRACE: short
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
+  all-check:
+    strategy:
+      matrix:
+        rust:
+          - "1.60"
+          - "1.62"
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    container:
+      image: docker://rust:${{ matrix.rust }}
+    steps:
+      - uses: olix0r/cargo-action-fmt@ee1ef42932e44794821dab57ef1bf7a73df8b21f
+      - uses: extractions/setup-just@aa5d15c144db4585980a44ebfdd2cf337c4f14cb
+      - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
+      - run: just fetch
+      - run: just features=all clippy
+
   feature-check:
     strategy:
       matrix:
@@ -34,20 +51,10 @@ jobs:
     timeout-minutes: 5
     runs-on: ubuntu-latest
     container:
-      image: docker://rust:1.60
+      image: docker://rust:1.62
     steps:
       - uses: olix0r/cargo-action-fmt@ee1ef42932e44794821dab57ef1bf7a73df8b21f
+      - uses: extractions/setup-just@aa5d15c144db4585980a44ebfdd2cf337c4f14cb
       - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
-      - run: cargo fetch
-      - run: cargo clippy --frozen --features=${{ matrix.feature }} --all-targets --message-format=json | cargo-action-fmt
-
-  all-features-check:
-    timeout-minutes: 5
-    runs-on: ubuntu-latest
-    container:
-      image: docker://rust:1.60
-    steps:
-      - uses: olix0r/cargo-action-fmt@ee1ef42932e44794821dab57ef1bf7a73df8b21f
-      - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
-      - run: cargo fetch
-      - run: cargo clippy --frozen --all-features --all-targets --message-format=json | cargo-action-fmt
+      - run: just fetch
+      - run: just "features=${{ matrix.features }}" clippy
