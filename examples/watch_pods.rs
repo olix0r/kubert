@@ -12,17 +12,8 @@ use tracing::Instrument;
 #[derive(Parser)]
 #[clap(version)]
 struct Args {
-    /// The tracing filter used for logs
-    #[clap(
-        long,
-        env = "KUBERT_EXAMPLE_LOG",
-        default_value = "watch_pods=info,warn"
-    )]
-    log_level: kubert::LogFilter,
-
-    /// The logging format
-    #[clap(long, default_value = "plain")]
-    log_format: kubert::LogFormat,
+    #[clap(flatten)]
+    log: kubert::LogArgs,
 
     #[clap(flatten)]
     client: kubert::ClientArgs,
@@ -46,8 +37,7 @@ struct Args {
 #[tokio::main]
 async fn main() -> Result<()> {
     let Args {
-        log_level,
-        log_format,
+        log,
         client,
         admin,
         exit,
@@ -62,7 +52,7 @@ async fn main() -> Result<()> {
     // - an admin server with /live and /ready endpoints
     // - a tracing (logging) subscriber
     let rt = kubert::Runtime::builder()
-        .with_log(log_level, log_format)
+        .with_log_args(log)
         .with_admin(admin)
         .with_client(client);
     let mut runtime = match time::timeout_at(deadline, rt.build()).await {

@@ -23,7 +23,8 @@ index = [
     "tracing",
 ]
 initialized = ["futures-core", "futures-util", "pin-project-lite", "tokio/sync"]
-log = ["thiserror", "tracing", "tracing-subscriber"]
+log = ["thiserror", "tracing", "tracing-subscriber", "once_cell"]
+tokio-console = ["tracing-subscriber", "console-subscriber"]
 requeue = ["futures-core", "tokio/macros", "tokio/sync", "tokio-util/time", "tracing"]
 runtime = [
     "admin",
@@ -80,6 +81,7 @@ features = [
 
 [dependencies]
 ahash = { version = "0.7", optional = true }
+console-subscriber = { version = "0.1", optional = true }
 drain = { version = "0.1.1", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
@@ -94,12 +96,13 @@ tokio-util = { version = "0.7", optional = true, default-features = false }
 tokio-rustls = { version = "0.23.2", optional = true, default-features = false }
 tower-service = { version = "0.3.1", optional = true }
 tracing = { version = "0.1.31", optional = true }
+once_cell = { version = "1.10", optional = true }
 
 [dependencies.clap]
 version = "3.1.0"
 optional = true
 default-features = false
-features = ["derive", "std"]
+features = ["derive", "std", "env"]
 
 # Not used directly, but required to ensure that the k8s-openapi dependency is considered part of
 # the "deps" graph rather than just the "dev-deps" graph
@@ -125,7 +128,7 @@ optional = true
 default-features = false
 
 [dependencies.tracing-subscriber]
-version = "0.3.9"
+version = "0.3.11"
 optional = true
 default-features = false
 features = [
@@ -146,4 +149,4 @@ tracing-subscriber = { version = "0.3", features = ["ansi"] }
 [dev-dependencies.tokio]
 version = "1.18"
 default-features = false
-features = ["macros", "test-util"]
+features = ["macros", "test-util", "rt-multi-thread"]

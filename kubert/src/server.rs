@@ -148,7 +148,8 @@ impl Bound {
             tls_certs,
         } = self;
 
-        let task = tokio::spawn(
+        let task = crate::spawn_named(
+            "kubert::server",
             accept_loop(tcp, drain, service, tls_key, tls_certs)
                 .instrument(info_span!("server", port = %local_addr.port())),
         );
@@ -219,7 +220,8 @@ async fn accept_loop<S, B>(
             }
         };
 
-        tokio::spawn(
+        crate::spawn_named(
+            "kubert::conn",
             serve_conn(
                 socket,
                 drain.clone(),
