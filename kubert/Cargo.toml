@@ -79,7 +79,7 @@ features = [
 ]
 
 [dependencies]
-ahash = { version = "0.7", optional = true }
+ahash = { version = "0.8", optional = true }
 drain = { version = "0.1.1", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
