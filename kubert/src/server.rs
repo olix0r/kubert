@@ -274,7 +274,10 @@ async fn serve_conn<S, B>(
     // Serve the HTTP connection and wait for the drain signal. If a drain is
     // signaled, tell the HTTP connection to terminate gracefully when in-flight
     // requests have completed.
-    let mut conn = hyper::server::conn::Http::new().serve_connection(socket, service);
+    let mut conn = hyper::server::conn::Http::new()
+        // Prevent port scanners, etc, from holding connections open.
+        .http1_header_read_timeout(std::time::Duration::from_secs(2))
+        .serve_connection(socket, service);
     let res = tokio::select! {
         biased;
         res = &mut conn => res,
