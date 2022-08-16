@@ -105,7 +105,7 @@ impl Builder {
         let server = hyper::server::Server::try_bind(&addr)?
             // Allow weird clients (like netcat).
             .http1_half_close(true)
-            // Prevent port scanners, etc, from holding connections ope.n
+            // Prevent port scanners, etc, from holding connections open.
             .http1_header_read_timeout(Duration::from_secs(2))
             // Use a small buffer, since we don't really transfer much data.
             .http1_max_buf_size(8 * 1024);
@@ -141,7 +141,7 @@ impl Bound {
                         "/live" => future::ok(handle_live(req)),
                         "/ready" => future::ok(handle_ready(&ready, req)),
                         _ => future::ok::<_, hyper::Error>(
-                            hyper::Response::builder()
+                            Response::builder()
                                 .status(hyper::StatusCode::NOT_FOUND)
                                 .body(hyper::Body::default())
                                 .unwrap(),
