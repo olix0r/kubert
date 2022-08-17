@@ -1,6 +1,6 @@
 {
 	"name": "kubert",
-	"image": "ghcr.io/linkerd/dev:v27",
+	"image": "ghcr.io/linkerd/dev:v29",
 	"extensions": [
 		"NathanRidley.autotrim",
 		"rust-lang.rust-analyzer",
