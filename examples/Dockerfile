@@ -1,4 +1,4 @@
-ARG RUST_VERSION=1.62
+ARG RUST_VERSION=1.63
 
 FROM docker.io/library/rust:${RUST_VERSION}-bullseye as build
 WORKDIR /kubert

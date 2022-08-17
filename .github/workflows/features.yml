@@ -22,7 +22,7 @@ jobs:
       matrix:
         rust:
           - "1.60"
-          - "1.62"
+          - "1.63"
     timeout-minutes: 5
     runs-on: ubuntu-latest
     container:
@@ -51,7 +51,7 @@ jobs:
     timeout-minutes: 5
     runs-on: ubuntu-latest
     container:
-      image: docker://rust:1.62
+      image: docker://rust:1.63
     steps:
       - uses: olix0r/cargo-action-fmt@ed3530f0739c46ffa0dd983f8746b8c4a3d0a01c
       - uses: extractions/setup-just@aa5d15c144db4585980a44ebfdd2cf337c4f14cb
