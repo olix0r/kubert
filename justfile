@@ -29,7 +29,6 @@ _fmt := if env_var_or_default("GITHUB_ACTIONS", "") != "true" { "" } else {
     ```
 }
 
-
 # Use nextest if it's available.
 _test := ```
         if command -v cargo-nextest >/dev/null 2>&1; then
@@ -44,7 +43,12 @@ _test := ```
 #
 
 # Run all tests and build the proxy
-default: fetch check-fmt clippy doc test build
+default: fetch test build
+
+lint: md-lint check-fmt clippy doc
+
+md-lint:
+    markdownlint-cli2 '**/*.md' '!**/target'
 
 # Fetch dependencies
 fetch:
