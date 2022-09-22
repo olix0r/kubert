@@ -150,7 +150,7 @@ default-features = false
 features = ["env-filter", "fmt", "json", "smallvec", "tracing-log"]
 
 [dev-dependencies]
-kube = { version = "0.74", default-features = false, features = ["runtime"] }
+kube = { version = "0.75", default-features = false, features = ["runtime"] }
 k8s-openapi = { version = "0.15", default-features = false, features = [
     "v1_23",
 ] }
