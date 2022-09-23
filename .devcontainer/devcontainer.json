@@ -1,7 +1,8 @@
 {
 	"name": "kubert",
-	"image": "ghcr.io/linkerd/dev:v30",
+	"image": "ghcr.io/linkerd/dev:v31",
 	"extensions": [
+		"kokakiwi.vscode-just",
 		"NathanRidley.autotrim",
 		"rust-lang.rust-analyzer",
 		"ms-kubernetes-tools.vscode-kubernetes-tools",

@@ -10,7 +10,7 @@ use crate::{
     shutdown, LogFilter, LogFormat, LogInitError,
 };
 use futures_core::Stream;
-use kube_core::{params::ListParams, Resource};
+use kube_core::{params::ListParams, NamespaceResourceScope, Resource};
 use kube_runtime::{reflector, watcher};
 use serde::de::DeserializeOwned;
 use std::{fmt::Debug, hash::Hash, time::Duration};
@@ -324,7 +324,8 @@ impl<S> Runtime<S> {
         params: ListParams,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
+        T: Resource<Scope = NamespaceResourceScope>,
+        T: DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
         let api = Api::namespaced(self.client(), ns.as_ref());
@@ -386,7 +387,8 @@ impl<S> Runtime<S> {
         params: ListParams,
     ) -> (Store<T>, impl Stream<Item = watcher::Event<T>>)
     where
-        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
+        T: Resource<Scope = NamespaceResourceScope>,
+        T: DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Clone + Default + Eq + Hash + Clone,
     {
         let api = Api::namespaced(self.client(), ns.as_ref());

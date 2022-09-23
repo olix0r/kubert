@@ -109,7 +109,7 @@ _ctx := "--context=k3d-" + test-cluster-name
 test-cluster-create:
     k3d cluster create {{ test-cluster-name }} \
         --image=+{{ test-cluster-version }} \
-        --no-lb --k3s-arg "--no-deploy=local-storage,traefik,servicelb,metrics-server@server:*"
+        --no-lb --k3s-arg "--disable=local-storage,traefik,servicelb,metrics-server@server:*"
     while [ $(kubectl {{ _ctx }} get po -n kube-system -l k8s-app=kube-dns -o json |jq '.items | length') = "0" ]; do sleep 1 ; done
     kubectl {{ _ctx }} wait -n kube-system po -l k8s-app=kube-dns  --for=condition=ready
 

@@ -63,7 +63,7 @@ impl ClientArgs {
         let client = match self.load_local_config().await {
             Ok(client) => client,
             Err(e) if self.is_customized() => return Err(e),
-            Err(_) => Config::from_cluster_env()?,
+            Err(_) => Config::incluster()?,
         };
 
         client.try_into().map_err(Into::into)
