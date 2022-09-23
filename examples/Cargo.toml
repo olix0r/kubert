@@ -11,30 +11,30 @@ release = false
 
 [dev-dependencies]
 anyhow = "1"
-clap = { version = "3", default-features = false, features = ["derive", "env", "std"] }
 futures = { version = "0.3", default-features = false }
-k8s-openapi = { version = "0.15", default-features = false, features = ["v1_23"] }
 regex = "1"
 thiserror = "1"
 tracing = "0.1"
 
-[dev-dependencies.kube]
-version = "0.74"
+[dev-dependencies.clap]
+version = "3"
 default-features = false
-features = [
-    "client",
-    "derive",
-    "native-tls",
-    "runtime",
-]
+features = ["derive", "env", "std"]
+
+[dev-dependencies.k8s-openapi]
+version = "0.16"
+default-features = false
+features = ["v1_25"]
+
+[dev-dependencies.kube]
+version = "0.75"
+default-features = false
+features = ["client", "derive", "native-tls", "runtime"]
 
 [dev-dependencies.kubert]
 path = "../kubert"
 default-features = false
-features = [
-    "clap",
-    "runtime",
-]
+features = ["clap", "runtime"]
 
 [dev-dependencies.tokio]
 version = "1"
