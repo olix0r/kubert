@@ -36,7 +36,7 @@ jobs:
             echo ::set-output name=mode::test
           fi
       - if: steps.meta.outputs.mode == 'release'
-        uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
       - if: steps.meta.outputs.mode == 'release'
         shell: bash
         run: |
@@ -73,7 +73,7 @@ jobs:
     container:
       image: docker://rust:1.63.0-bullseye
     steps:
-      - uses: actions/checkout@dcd71f646680f2efd8db4afa5ad64fdcba30e748
+      - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
       - run: cargo publish --package=kubert --dry-run
       - if: needs.meta.outputs.mode == 'release'
         run: cargo publish --package=kubert --token=${{ secrets.CRATESIO_TOKEN }}
