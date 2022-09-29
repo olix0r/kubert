@@ -84,16 +84,8 @@ shutdown = [
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
+all-features = true
 features = [
-    "admin",
-    "client",
-    "errors",
-    "initialized",
-    "log",
-    "requeue",
-    "runtime",
-    "server",
-    "shutdown",
     "k8s-openapi/v1_25",
 ]
 
