@@ -57,7 +57,7 @@ impl std::str::FromStr for LogFilter {
     type Err = ParseError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let filter = s.parse::<EnvFilter>()?;
+        let filter = EnvFilter::builder().with_regex(false).parse(s)?;
         Ok(Self(filter.into()))
     }
 }
@@ -143,6 +143,12 @@ impl<S> Filter<S> for LogFilter {
     #[inline]
     fn on_close(&self, id: span::Id, ctx: Context<'_, S>) {
         self.0.on_close(id, ctx);
+    }
+}
+
+impl std::fmt::Display for LogFilter {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
     }
 }
 
