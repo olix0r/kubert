@@ -9,7 +9,7 @@ use kube::{api::ListParams, runtime::watcher::Event, ResourceExt};
 use tokio::time;
 use tracing::Instrument;
 
-#[derive(Parser)]
+#[derive(Clone, Parser)]
 #[clap(version)]
 struct Args {
     /// The tracing filter used for logs
