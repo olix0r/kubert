@@ -43,6 +43,7 @@ jobs:
           - errors
           - index
           - initialized
+          - lease
           - log
           - requeue
           - runtime

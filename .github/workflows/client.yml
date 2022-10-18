@@ -49,11 +49,13 @@ jobs:
       - run: just test-cluster-create
       - run: just test-cluster-run-watch-pods --log-level=debug
       - run: just test-cluster-create-ns
-      - name: Run test-cluster-run-watch-pods with impersonation
+      - name: Run just test-cluster-run-watch-pods with impersonation
         run: |
           just test-cluster-run-watch-pods --log-level=debug \
             --as=system:serviceaccount:${KUBERT_TEST_NS}:watch-pods \
             --kubeconfig=$HOME/.kube/config
+      - run: just build-test-lease
+      - run: just test-lease
 
   in-cluster:
     strategy:
