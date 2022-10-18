@@ -36,6 +36,17 @@ index = [
     "tracing",
 ]
 initialized = ["futures-core", "futures-util", "pin-project-lite", "tokio/sync"]
+leader = [
+    "chrono",
+    "hyper",
+    "k8s-openapi",
+    "kube-client",
+    "kube-core",
+    "serde_json",
+    "thiserror",
+    "tokio/sync",
+    "tracing",
+]
 log = ["thiserror", "tracing", "tracing-subscriber"]
 requeue = [
     "futures-core",
@@ -85,13 +96,12 @@ shutdown = [
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
 all-features = true
-features = [
-    "k8s-openapi/v1_25",
-]
+features = ["k8s-openapi/v1_25"]
 
 [dependencies]
 ahash = { version = "0.8", optional = true }
 drain = { version = "0.1.1", optional = true, default-features = false }
+chrono = { version = "0.4", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
 hyper = { version = "0.14.17", optional = true, default-features = false }
@@ -100,6 +110,7 @@ pin-project-lite = { version = "0.2", optional = true }
 rustls-pemfile = { version = "1", optional = true }
 thiserror = { version = "1.0.30", optional = true }
 serde = { version = "1", optional = true }
+serde_json = { version = "1", optional = true }
 tokio = { version = "1.17.0", optional = false, default-features = false }
 tokio-util = { version = "0.7", optional = true, default-features = false }
 tokio-rustls = { version = "0.23.2", optional = true, default-features = false }

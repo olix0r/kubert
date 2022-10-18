@@ -26,6 +26,10 @@ pub mod index;
 #[cfg_attr(docsrs, doc(cfg(feature = "initialized")))]
 pub mod initialized;
 
+#[cfg(feature = "leader")]
+#[cfg_attr(docsrs, doc(cfg(feature = "leader")))]
+pub mod leader;
+
 #[cfg(feature = "log")]
 #[cfg_attr(docsrs, doc(cfg(feature = "log")))]
 pub mod log;
