@@ -68,7 +68,7 @@ jobs:
     steps:
       - uses: extractions/setup-just@aa5d15c144db4585980a44ebfdd2cf337c4f14cb
       - uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b
-      - uses: docker/setup-buildx-action@dc7b9719a96d48369863986a06765841d7ea23f6
+      - uses: docker/setup-buildx-action@c74574e6c82eeedc46366be1b0d287eff9085eb6
       - run: curl --proto =https --tlsv1.3 -fLsSv https://raw.githubusercontent.com/k3d-io/k3d/${K3D_VERSION}/install.sh | bash
       - name: Set kubert test server version to ${{ matrix.k8s }}
         run: echo "KUBERT_TEST_CLUSTER_VERSION=${{ matrix.k8s }}" >> $GITHUB_ENV
