@@ -68,7 +68,7 @@ enum Command {
     },
 
     /// Release a lease if it is currently held by the given identity
-    Release {
+    Abdicate {
         #[arg(short, long, env = "LOGNAME", default_value = "default")]
         identity: String,
 
@@ -156,7 +156,7 @@ async fn main() -> Result<()> {
             Ok::<_, kubert::lease::Error>(())
         }),
 
-        Command::Release {
+        Command::Abdicate {
             identity,
             namespace,
             name,
@@ -167,9 +167,9 @@ async fn main() -> Result<()> {
                 .release(&*identity)
                 .await?;
             if released {
-                println!("Released");
+                println!("Abdicated");
             } else {
-                println!("Not released");
+                println!("Not abdicated");
             }
 
             Ok::<_, kubert::lease::Error>(())

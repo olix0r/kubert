@@ -172,7 +172,7 @@ impl Lease {
         }
     }
 
-    pub async fn release(&self, identity: &str) -> Result<bool, Error> {
+    pub async fn abdicate(&self, identity: &str) -> Result<bool, Error> {
         let mut state = self.state.lock().await;
         if let Some(claim) = state.claim.take() {
             if claim.is_currently_held_by(identity) {
