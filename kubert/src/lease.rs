@@ -93,13 +93,26 @@ impl Lease {
         field_manager: impl ToString,
     ) -> Result<Self, Error> {
         let name = name.to_string();
-        let state = Self::sync(api.clone(), &*name).await?;
+        let state = Self::get(api.clone(), &*name).await?;
         Ok(Self {
             api,
             name,
             field_manager: field_manager.to_string(),
             state: tokio::sync::Mutex::new(state),
         })
+    }
+
+    pub async fn sync(&self) -> Result<Option<Claim>, Error> {
+        let mut state = self.state.lock().await;
+
+        if let Some(claim) = state.claim.as_ref() {
+            if chrono::Utc::now() < claim.expiry {
+                return Ok(Some(claim.clone()));
+            }
+        }
+
+        *state = Self::get(self.api.clone(), &self.name).await?;
+        Ok(state.claim.clone())
     }
 
     /// Ensures that the lease, if it exists, is claimed.
@@ -130,7 +143,7 @@ impl Lease {
                             return Ok(claim);
                         }
                         Err(e) if Self::is_conflict(&e) => {
-                            *state = Self::sync(self.api.clone(), &*self.name).await?;
+                            *state = Self::get(self.api.clone(), &*self.name).await?;
                             continue;
                         }
                         Err(e) => return Err(e),
@@ -152,11 +165,36 @@ impl Lease {
                     return Ok(claim);
                 }
                 Err(e) if Self::is_conflict(&e) => {
-                    *state = Self::sync(self.api.clone(), &*self.name).await?;
+                    *state = Self::get(self.api.clone(), &*self.name).await?;
                 }
                 Err(e) => return Err(e),
             }
         }
+    }
+
+    pub async fn release(&self, params: &ClaimParams) -> Result<bool, Error> {
+        let mut state = self.state.lock().await;
+        if let Some(claim) = state.claim.take() {
+            if claim.is_currently_held_by(&params.identity) {
+                self.patch(serde_json::json!({
+                    "apiversion": "coordination.k8s.io/v1",
+                    "kind": "lease",
+                    "metadata": {
+                        "resourceversion": state.meta.version,
+                    },
+                    "spec": {
+                        "acquireTime": Option::<()>::None,
+                        "renewTime": Option::<()>::None,
+                        "holderIdentity": Option::<()>::None,
+                        "leaseDurationSeconds": Option::<()>::None,
+                    },
+                }))
+                .await?;
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
     }
 
     async fn acquire(&self, meta: &Meta, params: &ClaimParams) -> Result<(Claim, Meta), Error> {
@@ -165,10 +203,10 @@ impl Lease {
         let now = chrono::Utc::now();
         let lease = self
             .patch(serde_json::json!({
-                "apiVersion": "coordination.k8s.io/v1",
-                "kind": "Lease",
+                "apiversion": "coordination.k8s.io/v1",
+                "kind": "lease",
                 "metadata": {
-                    "resourceVersion": meta.version,
+                    "resourceversion": meta.version,
                 },
                 "spec": {
                     "acquireTime": MicroTime(now),
@@ -244,7 +282,7 @@ impl Lease {
             .await
     }
 
-    async fn sync(api: Api, name: &str) -> Result<State, Error> {
+    async fn get(api: Api, name: &str) -> Result<State, Error> {
         let lease = api.get(name).await?;
 
         let spec = match lease.spec {
