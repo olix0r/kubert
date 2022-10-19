@@ -172,10 +172,10 @@ impl Lease {
         }
     }
 
-    pub async fn release(&self, params: &ClaimParams) -> Result<bool, Error> {
+    pub async fn release(&self, identity: &str) -> Result<bool, Error> {
         let mut state = self.state.lock().await;
         if let Some(claim) = state.claim.take() {
-            if claim.is_currently_held_by(&params.identity) {
+            if claim.is_currently_held_by(identity) {
                 self.patch(serde_json::json!({
                     "apiversion": "coordination.k8s.io/v1",
                     "kind": "lease",

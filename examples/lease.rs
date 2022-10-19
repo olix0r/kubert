@@ -34,6 +34,7 @@ struct Args {
 
 #[derive(Clone, clap::Parser)]
 enum Command {
+    /// Create a Lease
     Create {
         #[arg(short, long, default_value = "default")]
         namespace: String,
@@ -41,6 +42,7 @@ enum Command {
         name: String,
     },
 
+    /// Try to claim a Lease
     Claim {
         #[arg(long, default_value = "30s")]
         duration: Timeout,
@@ -57,7 +59,19 @@ enum Command {
         name: String,
     },
 
+    /// Get the status of a Lease
     Get {
+        #[arg(short, long, default_value = "default")]
+        namespace: String,
+
+        name: String,
+    },
+
+    /// Release a lease if it is currently held by the given identity
+    Release {
+        #[arg(short, long, env = "LOGNAME", default_value = "default")]
+        identity: String,
+
         #[arg(short, long, default_value = "default")]
         namespace: String,
 
@@ -109,6 +123,18 @@ async fn main() -> Result<()> {
             Ok::<_, kubert::lease::Error>(())
         }),
 
+        Command::Get { namespace, name } => tokio::spawn(async move {
+            let api = kube::Api::namespaced(client, &namespace);
+            let lease = kubert::Lease::init(api, name, field_manager).await?;
+            match lease.sync().await? {
+                Some(kubert::lease::Claim { holder, expiry }) => {
+                    println!("Claimed by {holder} until {expiry}");
+                }
+                None => println!("Unclaimed"),
+            }
+            Ok::<_, kubert::lease::Error>(())
+        }),
+
         Command::Claim {
             duration: Timeout(duration),
             renew_grace_period,
@@ -130,15 +156,22 @@ async fn main() -> Result<()> {
             Ok::<_, kubert::lease::Error>(())
         }),
 
-        Command::Get { namespace, name } => tokio::spawn(async move {
+        Command::Release {
+            identity,
+            namespace,
+            name,
+        } => tokio::spawn(async move {
             let api = kube::Api::namespaced(client, &namespace);
-            let lease = kubert::Lease::init(api, name, field_manager).await?;
-            match lease.sync().await? {
-                Some(kubert::lease::Claim { holder, expiry }) => {
-                    println!("Claimed by {holder} until {expiry}");
-                }
-                None => println!("Unclaimed"),
+            let released = kubert::Lease::init(api, name, field_manager)
+                .await?
+                .release(&*identity)
+                .await?;
+            if released {
+                println!("Released");
+            } else {
+                println!("Not released");
             }
+
             Ok::<_, kubert::lease::Error>(())
         }),
     };
