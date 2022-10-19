@@ -6,13 +6,13 @@ use k8s_openapi::{api::coordination::v1 as coordv1, apimachinery::pkg::apis::met
 use tokio::time::Duration;
 
 pub struct Lease {
-    api: kube_client::Api<coordv1::Lease>,
+    api: Api,
     name: String,
     field_manager: String,
     state: tokio::sync::Mutex<State>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClaimParams {
     /// The unique identity of the claimant
     pub identity: String,
@@ -25,7 +25,7 @@ pub struct ClaimParams {
     pub renew_grace_period: Option<Duration>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Claim {
     pub holder: String,
 
@@ -61,6 +61,8 @@ struct Meta {
     transitions: u16,
 }
 
+type Api = kube_client::Api<coordv1::Lease>;
+
 // === impl Claim ===
 
 impl Claim {
@@ -86,19 +88,25 @@ impl Claim {
 
 impl Lease {
     pub async fn init(
-        api: kube_client::Api<coordv1::Lease>,
-        name: String,
-        field_manager: String,
+        api: Api,
+        name: impl ToString,
+        field_manager: impl ToString,
     ) -> Result<Self, Error> {
+        let name = name.to_string();
         let state = Self::sync(api.clone(), &*name).await?;
         Ok(Self {
             api,
             name,
-            field_manager,
+            field_manager: field_manager.to_string(),
             state: tokio::sync::Mutex::new(state),
         })
     }
 
+    /// Ensures that the lease, if it exists, is claimed.
+    ///
+    /// If these is not currently held, it is claimed by the provided identity.
+    /// If it is currently held by the provided identity, it is renewed if it is
+    /// within the renew grace period.
     pub async fn claim(&self, params: &ClaimParams) -> Result<Claim, Error> {
         let mut state = self.state.lock().await;
         loop {
@@ -157,6 +165,8 @@ impl Lease {
         let now = chrono::Utc::now();
         let lease = self
             .patch(serde_json::json!({
+                "apiVersion": "coordination.k8s.io/v1",
+                "kind": "Lease",
                 "metadata": {
                     "resourceVersion": meta.version,
                 },
@@ -190,6 +200,8 @@ impl Lease {
         let now = chrono::Utc::now();
         let lease = self
             .patch(serde_json::json!({
+                "apiVersion": "coordination.k8s.io/v1",
+                "kind": "Lease",
                 "metadata": {
                     "resourceVersion": meta.version,
                 },
@@ -224,11 +236,15 @@ impl Lease {
             ..Default::default()
         };
         self.api
-            .patch(&*self.name, &params, &kube_client::api::Patch::Apply(patch))
+            .patch(
+                &*self.name,
+                &params,
+                &kube_client::api::Patch::Strategic(patch),
+            )
             .await
     }
 
-    async fn sync(api: kube_client::Api<coordv1::Lease>, name: &str) -> Result<State, Error> {
+    async fn sync(api: Api, name: &str) -> Result<State, Error> {
         let lease = api.get(name).await?;
 
         let spec = match lease.spec {
