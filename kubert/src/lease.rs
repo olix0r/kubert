@@ -176,11 +176,11 @@ impl Lease {
         let mut state = self.state.lock().await;
         if let Some(claim) = state.claim.take() {
             if claim.is_currently_held_by(identity) {
-                self.patch(serde_json::json!({
-                    "apiversion": "coordination.k8s.io/v1",
-                    "kind": "lease",
+                self.patch(&kube_client::api::Patch::Strategic(serde_json::json!({
+                    "apiVersion": "coordination.k8s.io/v1",
+                    "kind": "Lease",
                     "metadata": {
-                        "resourceversion": state.meta.version,
+                        "resourceVersion": state.meta.version,
                     },
                     "spec": {
                         "acquireTime": Option::<()>::None,
@@ -188,7 +188,7 @@ impl Lease {
                         "holderIdentity": Option::<()>::None,
                         "leaseDurationSeconds": Option::<()>::None,
                     },
-                }))
+                })))
                 .await?;
                 return Ok(true);
             }
@@ -202,11 +202,11 @@ impl Lease {
             .unwrap_or_else(|_| chrono::Duration::max_value());
         let now = chrono::Utc::now();
         let lease = self
-            .patch(serde_json::json!({
-                "apiversion": "coordination.k8s.io/v1",
-                "kind": "lease",
+            .patch(&kube_client::api::Patch::Apply(serde_json::json!({
+                "apiVersion": "coordination.k8s.io/v1",
+                "kind": "Lease",
                 "metadata": {
-                    "resourceversion": meta.version,
+                    "resourceVersion": meta.version,
                 },
                 "spec": {
                     "acquireTime": MicroTime(now),
@@ -215,7 +215,7 @@ impl Lease {
                     "leaseDurationSeconds": lease_duration.num_seconds(),
                     "leaseTransitions": meta.transitions + 1,
                 },
-            }))
+            })))
             .await?;
 
         let claim = Claim {
@@ -237,7 +237,7 @@ impl Lease {
             .unwrap_or_else(|_| chrono::Duration::max_value());
         let now = chrono::Utc::now();
         let lease = self
-            .patch(serde_json::json!({
+            .patch(&kube_client::api::Patch::Strategic(serde_json::json!({
                 "apiVersion": "coordination.k8s.io/v1",
                 "kind": "Lease",
                 "metadata": {
@@ -247,7 +247,7 @@ impl Lease {
                     "renewTime": MicroTime(now),
                     "leaseDurationSeconds": lease_duration.num_seconds(),
                 },
-            }))
+            })))
             .await?;
 
         let claim = Claim {
@@ -264,22 +264,20 @@ impl Lease {
         Ok((claim, meta))
     }
 
-    async fn patch<P>(&self, patch: P) -> Result<coordv1::Lease, kube_client::Error>
+    async fn patch<P>(
+        &self,
+        patch: &kube_client::api::Patch<P>,
+    ) -> Result<coordv1::Lease, kube_client::Error>
     where
         P: serde::Serialize + std::fmt::Debug,
     {
-        tracing::debug!(?patch, "acquiring lease");
+        tracing::debug!(?patch);
         let params = kube_client::api::PatchParams {
             field_manager: Some(self.field_manager.clone()),
+            force: matches!(patch, kube_client::api::Patch::Apply(_)),
             ..Default::default()
         };
-        self.api
-            .patch(
-                &*self.name,
-                &params,
-                &kube_client::api::Patch::Strategic(patch),
-            )
-            .await
+        self.api.patch(&*self.name, &params, patch).await
     }
 
     async fn get(api: Api, name: &str) -> Result<State, Error> {

@@ -11,6 +11,7 @@ release = false
 
 [dev-dependencies]
 anyhow = "1"
+chrono = { version = "0.4", default-features = false }
 futures = { version = "0.3", default-features = false }
 regex = "1"
 thiserror = "1"

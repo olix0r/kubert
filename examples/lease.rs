@@ -77,6 +77,22 @@ enum Command {
 
         name: String,
     },
+
+    Run {
+        #[arg(long, default_value = "30s")]
+        duration: Timeout,
+
+        #[arg(long)]
+        renew_grace_period: Option<Timeout>,
+
+        #[arg(short, long, env = "LOGNAME", default_value = "default")]
+        identity: String,
+
+        #[arg(short, long, default_value = "default")]
+        namespace: String,
+
+        name: String,
+    },
 }
 
 #[tokio::main]
@@ -104,6 +120,7 @@ async fn main() -> Result<()> {
         .await?;
 
     let client = rt.client();
+    let shutdown = rt.shutdown_handle();
     let task = match command {
         Command::Create { namespace, name } => tokio::spawn(async move {
             let lease = kube::Api::namespaced(client, &namespace)
@@ -164,7 +181,7 @@ async fn main() -> Result<()> {
             let api = kube::Api::namespaced(client, &namespace);
             let released = kubert::Lease::init(api, name, field_manager)
                 .await?
-                .release(&*identity)
+                .abdicate(&*identity)
                 .await?;
             if released {
                 println!("Abdicated");
@@ -173,6 +190,53 @@ async fn main() -> Result<()> {
             }
 
             Ok::<_, kubert::lease::Error>(())
+        }),
+
+        Command::Run {
+            duration: Timeout(duration),
+            renew_grace_period,
+            identity,
+            namespace,
+            name,
+        } => tokio::spawn(async move {
+            let params = kubert::lease::ClaimParams {
+                identity,
+                lease_duration: duration,
+                renew_grace_period: renew_grace_period.map(|Timeout(d)| d),
+            };
+
+            let api = kube::Api::namespaced(client, &namespace);
+            let lease = kubert::Lease::init(api, name, field_manager).await?;
+            loop {
+                let claim = lease.claim(&params).await?;
+                if claim.is_currently_held_by(&params.identity) {
+                    println!(
+                        "+ Claimed by {} until {}",
+                        claim.holder,
+                        claim
+                            .expiry
+                            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+                    );
+                    let grace = params.renew_grace_period.unwrap_or(time::Duration::ZERO);
+                    let shutdown = shutdown.clone();
+                    tokio::select! {
+                        _ = claim.sleep_until_before_expiry(grace) => {}
+                        handle = shutdown.signaled() => {
+                            lease.abdicate(&params.identity).await?;
+                            return Ok::<_, kubert::lease::Error>(());
+                        }
+                    }
+                } else {
+                    println!(
+                        "- Claimed by {} until {}",
+                        claim.holder,
+                        claim
+                            .expiry
+                            .to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
+                    );
+                    claim.sleep_until_expiry().await;
+                };
+            }
         }),
     };
 
