@@ -8,6 +8,7 @@
 //! claimant owns the lease.
 
 use k8s_openapi::{api::coordination::v1 as coordv1, apimachinery::pkg::apis::meta::v1::MicroTime};
+use std::sync::Arc;
 use tokio::time::Duration;
 
 /// A Kubernetes `Lease`
@@ -62,7 +63,7 @@ pub enum Error {
 #[derive(Clone, Debug)]
 struct State {
     meta: Meta,
-    claim: Option<Claim>,
+    claim: Option<Arc<Claim>>,
 }
 
 #[derive(Clone, Debug)]
@@ -73,7 +74,7 @@ struct Meta {
 
 type Api = kube_client::Api<coordv1::Lease>;
 
-// === impl ClaimpParams ===
+// === impl ClaimParams ===
 
 impl Default for ClaimParams {
     fn default() -> Self {
@@ -138,12 +139,12 @@ impl Lease {
     }
 
     /// Return the state of the claim without updating it from the API.
-    pub async fn claimed(&self) -> Option<Claim> {
+    pub async fn claimed(&self) -> Option<Arc<Claim>> {
         self.state.lock().await.claim.clone()
     }
 
     /// Update the state of the claim from the API.
-    pub async fn sync(&self) -> Result<Option<Claim>, Error> {
+    pub async fn sync(&self) -> Result<Option<Arc<Claim>>, Error> {
         let mut state = self.state.lock().await;
         *state = Self::get(self.api.clone(), &self.name).await?;
         Ok(state.claim.clone())
@@ -158,7 +159,7 @@ impl Lease {
         &self,
         claimant: &str,
         params: &ClaimParams,
-    ) -> Result<Claim, Error> {
+    ) -> Result<Arc<Claim>, Error> {
         let mut state = self.state.lock().await;
         loop {
             if let Some(claim) = state.claim.as_ref() {
@@ -218,26 +219,30 @@ impl Lease {
     ///
     /// This is typically used during process shutdown so that another process
     /// can potentially claim the lease before the prior lease duration expires.
-    pub async fn abdicate(&self, identity: &str) -> Result<bool, Error> {
+    pub async fn abdicate(&self, claimant: &str) -> Result<bool, Error> {
         let mut state = self.state.lock().await;
         if let Some(claim) = state.claim.take() {
-            if claim.is_current_for(identity) {
-                self.patch(&kube_client::api::Patch::Strategic(serde_json::json!({
-                    "apiVersion": "coordination.k8s.io/v1",
-                    "kind": "Lease",
-                    "metadata": {
-                        "resourceVersion": state.meta.version,
-                    },
-                    "spec": {
-                        "acquireTime": Option::<()>::None,
-                        "renewTime": Option::<()>::None,
-                        "holderIdentity": Option::<()>::None,
-                        "leaseDurationSeconds": Option::<()>::None,
-                        // leaseTransitions is preserved by strategic patch
-                    },
-                })))
-                .await?;
-                return Ok(true);
+            if claim.is_current() {
+                if claim.holder == claimant {
+                    self.patch(&kube_client::api::Patch::Strategic(serde_json::json!({
+                        "apiVersion": "coordination.k8s.io/v1",
+                        "kind": "Lease",
+                        "metadata": {
+                            "resourceVersion": state.meta.version,
+                        },
+                        "spec": {
+                            "acquireTime": Option::<()>::None,
+                            "renewTime": Option::<()>::None,
+                            "holderIdentity": Option::<()>::None,
+                            "leaseDurationSeconds": Option::<()>::None,
+                            // leaseTransitions is preserved by strategic patch
+                        },
+                    })))
+                    .await?;
+                    return Ok(true);
+                } else {
+                    state.claim = Some(claim);
+                }
             }
         }
 
@@ -260,7 +265,7 @@ impl Lease {
         params: ClaimParams,
     ) -> Result<
         (
-            tokio::sync::watch::Receiver<Claim>,
+            tokio::sync::watch::Receiver<Arc<Claim>>,
             tokio::task::JoinHandle<Result<(), Error>>,
         ),
         Error,
@@ -312,7 +317,7 @@ impl Lease {
         meta: &Meta,
         claimant: &str,
         params: &ClaimParams,
-    ) -> Result<(Claim, Meta), Error> {
+    ) -> Result<(Arc<Claim>, Meta), Error> {
         let lease_duration = chrono::Duration::from_std(params.lease_duration)
             .unwrap_or_else(|_| chrono::Duration::max_value());
         let now = chrono::Utc::now();
@@ -344,7 +349,7 @@ impl Lease {
                 .ok_or(Error::MissingResourceVersion)?,
             transitions: meta.transitions + 1,
         };
-        Ok((claim, meta))
+        Ok((claim.into(), meta))
     }
 
     /// Renew the lease (i.e. assuming the claimant IS the current holder of the
@@ -358,7 +363,7 @@ impl Lease {
         meta: &Meta,
         claimant: &str,
         params: &ClaimParams,
-    ) -> Result<(Claim, Meta), Error> {
+    ) -> Result<(Arc<Claim>, Meta), Error> {
         let lease_duration = chrono::Duration::from_std(params.lease_duration)
             .unwrap_or_else(|_| chrono::Duration::max_value());
         let now = chrono::Utc::now();
@@ -387,7 +392,7 @@ impl Lease {
                 .ok_or(Error::MissingResourceVersion)?,
             transitions: meta.transitions,
         };
-        Ok((claim, meta))
+        Ok((claim.into(), meta))
     }
 
     async fn patch<P>(
@@ -450,7 +455,7 @@ impl Lease {
 
         Ok(State {
             meta,
-            claim: Some(Claim { holder, expiry }),
+            claim: Some(Arc::new(Claim { holder, expiry })),
         })
     }
 
