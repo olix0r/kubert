@@ -242,8 +242,8 @@ async fn vacates() {
         lease_duration: time::Duration::from_secs(3),
         ..Default::default()
     };
-    let claim0 = lease.ensure_claimed("id", &params).await.expect("claim");
-    assert!(claim0.is_current_for("id"));
+    let claim = lease.ensure_claimed("id", &params).await.expect("claim");
+    assert!(claim.is_current_for("id"));
     let released = lease.vacate("id").await.expect("release");
     assert!(released);
 
@@ -253,6 +253,44 @@ async fn vacates() {
     assert_eq!(rsrc.renew_time, None,);
     assert_eq!(rsrc.acquire_time, None);
     assert_eq!(rsrc.lease_duration_seconds, None);
+    assert_eq!(rsrc.lease_transitions, Some(1));
+
+    handle.delete().await;
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn vacate_expired_noop() {
+    let handle = Handle::setup().await;
+
+    let lease = handle.init_new().await;
+    let params = kubert::lease::ClaimParams {
+        lease_duration: time::Duration::from_secs(3),
+        ..Default::default()
+    };
+    let claim = lease.ensure_claimed("id", &params).await.expect("claim");
+    assert!(claim.is_current_for("id"));
+    claim.expire().await;
+    let released = lease.vacate("id").await.expect("release");
+    assert!(!released);
+
+    // Inspect the lease resource to verify that it has all expected fields.
+    let rsrc = handle.get().await;
+    assert_eq!(rsrc.holder_identity.as_deref(), Some("id"));
+    assert_time_eq!(
+        rsrc.renew_time
+            .as_ref()
+            .map(|metav1::MicroTime(t)| t)
+            .expect("renewTime"),
+        claim.expiry - chrono::Duration::from_std(params.lease_duration).unwrap(),
+    );
+    assert_time_eq!(
+        rsrc.acquire_time
+            .as_ref()
+            .map(|metav1::MicroTime(t)| t)
+            .expect("renewTime"),
+        claim.expiry - chrono::Duration::from_std(params.lease_duration).unwrap(),
+    );
+    assert_eq!(rsrc.lease_duration_seconds, Some(3));
     assert_eq!(rsrc.lease_transitions, Some(1));
 
     handle.delete().await;
