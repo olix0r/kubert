@@ -46,7 +46,14 @@ wildcards = "allow"
 highlight = "all"
 deny = []
 skip-tree = []
-skip = []
+skip = [
+    { name = "windows-sys" },
+    { name = "windows_aarch64_msvc" },
+    { name = "windows_i686_gnu" },
+    { name = "windows_i686_msvc" },
+    { name = "windows_x86_64_gnu" },
+    { name = "windows_x86_64_msvc" },
+]
 
 [sources]
 unknown-registry = "deny"
