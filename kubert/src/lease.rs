@@ -1,11 +1,11 @@
-//! A distributed cooperative lock implemntation for Kubernetes
+//! A distributed, advisory lock implementation for Kubernetes
 //!
 //! Applications that manage state in Kubernetes--for instance, those that
 //! update resource statuses, may need to coordinate access to that state so
 //! that only one replica is trying to update resources at a time.
 //!
-//! The module manages [`coordv1::Lease`] resources to ensure that only a single
-//! claimant owns the lease.
+//! [`LeaseManager`] interacts with a [`coordv1::Lease`] resource to ensure that
+//! only a single claimant owns the lease at a time.
 
 use k8s_openapi::{api::coordination::v1 as coordv1, apimachinery::pkg::apis::meta::v1 as metav1};
 use std::{borrow::Cow, sync::Arc};
