@@ -118,7 +118,7 @@ async fn main() -> Result<()> {
 
         Command::Get { name } => tokio::spawn(async move {
             let lease = kubert::Lease::init(api, name, field_manager).await?;
-            match lease.sync().await? {
+            match lease.claimed().await? {
                 Some(claim) => print_claim(&claim, &identity),
                 None => println!("? Unclaimed"),
             }
