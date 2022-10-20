@@ -7,7 +7,7 @@
 //! The module manages [`coordv1::Lease`] resources to ensure that only a single
 //! claimant owns the lease.
 
-use k8s_openapi::{api::coordination::v1 as coordv1, apimachinery::pkg::apis::meta::v1::MicroTime};
+use k8s_openapi::{api::coordination::v1 as coordv1, apimachinery::pkg::apis::meta::v1 as metav1};
 use std::sync::Arc;
 use tokio::time::Duration;
 
@@ -329,8 +329,8 @@ impl Lease {
                     "resourceVersion": meta.version,
                 },
                 "spec": {
-                    "acquireTime": MicroTime(now),
-                    "renewTime": MicroTime(now),
+                    "acquireTime": metav1::MicroTime(now),
+                    "renewTime": metav1::MicroTime(now),
                     "holderIdentity": claimant,
                     "leaseDurationSeconds": lease_duration.num_seconds(),
                     "leaseTransitions": meta.transitions + 1,
@@ -375,7 +375,7 @@ impl Lease {
                     "resourceVersion": meta.version,
                 },
                 "spec": {
-                    "renewTime": MicroTime(now),
+                    "renewTime": metav1::MicroTime(now),
                     "leaseDurationSeconds": lease_duration.num_seconds(),
                 },
             })))
@@ -445,7 +445,7 @@ impl Lease {
 
         let holder = or_unclaimed!(spec.holder_identity);
 
-        let MicroTime(renew_time) = or_unclaimed!(spec.renew_time);
+        let metav1::MicroTime(renew_time) = or_unclaimed!(spec.renew_time);
         let lease_duration =
             chrono::Duration::seconds(or_unclaimed!(spec.lease_duration_seconds).into());
         let expiry = renew_time + lease_duration;
