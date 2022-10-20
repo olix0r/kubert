@@ -26,6 +26,10 @@ pub mod index;
 #[cfg_attr(docsrs, doc(cfg(feature = "initialized")))]
 pub mod initialized;
 
+#[cfg(feature = "lease")]
+#[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
+pub mod lease;
+
 #[cfg(feature = "log")]
 #[cfg_attr(docsrs, doc(cfg(feature = "log")))]
 pub mod log;
@@ -54,6 +58,9 @@ pub use self::client::ClientArgs;
 
 #[cfg(all(feature = "initialized"))]
 pub use self::initialized::Initialized;
+
+#[cfg(all(feature = "lease"))]
+pub use self::lease::LeaseManager;
 
 #[cfg(all(feature = "log"))]
 pub use self::log::{LogFilter, LogFormat, LogInitError};

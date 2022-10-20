@@ -74,6 +74,7 @@ doc *flags:
 build-test *flags:
     {{ cargo }} test --no-run \
         --workspace --frozen {{ _features }} \
+        --exclude=kubert-examples \
         {{ if build-type == "release" { "--release" } else { "" } }} \
         {{ flags }} \
         {{ _fmt }}
@@ -82,6 +83,7 @@ build-test *flags:
 test *flags:
     {{ cargo }} {{ _test }} \
         --workspace --frozen {{ _features }} \
+        --exclude=kubert-examples \
         {{ if build-type == "release" { "--release" } else { "" } }} \
         {{ flags }}
 
@@ -169,6 +171,22 @@ test-cluster-deploy-watch-pods *flags: test-cluster-import-examples
 
 # Use the test cluster to run the examples (as is done in CI).
 integrate-examples: test-cluster-import-examples test-cluster-run-watch-pods test-cluster-create-ns test-cluster-deploy-watch-pods test-cluster-delete-ns
+
+build-test-lease *flags:
+    {{ cargo }} test --no-run \
+        --workspace --frozen {{ _features }} \
+        --package=kubert-examples --test=lease \
+        {{ if build-type == "release" { "--release" } else { "" } }} \
+        {{ flags }} \
+        {{ _fmt }}
+
+# Run all tests
+test-lease *flags: _test-cluster-exists
+    {{ cargo }} {{ _test }} \
+        --workspace --frozen {{ _features }} \
+        --package=kubert-examples --test=lease \
+        {{ if build-type == "release" { "--release" } else { "" } }} \
+        {{ flags }}
 
 # Display the git history minus dependabot updates
 history *paths='.':
