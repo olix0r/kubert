@@ -56,7 +56,7 @@ enum Command {
     Get { name: String },
 
     /// Release a lease if it is currently held by the given identity
-    Abdicate { name: String },
+    Vacate { name: String },
 
     Run {
         #[arg(long, default_value = "30s")]
@@ -150,19 +150,20 @@ async fn main() -> Result<()> {
             })
         }),
 
-        Command::Abdicate { name } => tokio::spawn(async move {
+        Command::Vacate { name } => tokio::spawn(async move {
             let released = kubert::LeaseManager::init(api, name)
                 .await?
                 .with_field_manager(field_manager)
-                .abdicate(&*identity)
+                .vacate(&*identity)
                 .await?;
-            if released {
-                println!("Abdicated");
+            let code = if released {
+                println!("+ Claim vacated");
+                0
             } else {
-                println!("Not abdicated");
-            }
-
-            Ok::<_, kubert::lease::Error>(if released { 0 } else { 1 })
+                println!("- Claim not vacated");
+                1
+            };
+            Ok::<_, kubert::lease::Error>(code)
         }),
 
         Command::Run {

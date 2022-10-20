@@ -234,7 +234,7 @@ async fn renews() {
 }
 
 #[tokio::test(flavor = "current_thread")]
-async fn abidcates() {
+async fn vacates() {
     let handle = Handle::setup().await;
 
     let lease = handle.init_new().await;
@@ -244,7 +244,7 @@ async fn abidcates() {
     };
     let claim0 = lease.ensure_claimed("id", &params).await.expect("claim");
     assert!(claim0.is_current_for("id"));
-    let released = lease.abdicate("id").await.expect("release");
+    let released = lease.vacate("id").await.expect("release");
     assert!(released);
 
     // Inspect the lease resource to verify that it has all expected fields.

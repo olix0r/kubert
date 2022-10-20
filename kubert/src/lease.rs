@@ -231,7 +231,7 @@ impl LeaseManager {
     ///
     /// This is typically used during process shutdown so that another process
     /// can potentially claim the lease before the prior lease duration expires.
-    pub async fn abdicate(&self, claimant: &str) -> Result<bool, Error> {
+    pub async fn vacate(&self, claimant: &str) -> Result<bool, Error> {
         let mut state = self.state.lock().await;
         if let Some(claim) = state.claim.take() {
             if claim.is_current() {
@@ -270,7 +270,7 @@ impl LeaseManager {
     /// The state of the lease is published via the returned receiver.
     ///
     /// When all receivers are dropped, the task completes and the lease is
-    /// abdicated so that another process can claim it.
+    /// vacated so that another process can claim it.
     pub async fn spawn(
         self,
         claimant: impl ToString,
@@ -306,7 +306,7 @@ impl LeaseManager {
                 }
             }
 
-            self.abdicate(&claimant).await?;
+            self.vacate(&claimant).await?;
             Ok(())
         });
 
