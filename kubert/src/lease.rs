@@ -74,6 +74,11 @@ struct Meta {
 
 type Api = kube_client::Api<coordv1::Lease>;
 
+type Spawned = (
+    tokio::sync::watch::Receiver<Arc<Claim>>,
+    tokio::task::JoinHandle<Result<(), Error>>,
+);
+
 // === impl ClaimParams ===
 
 impl Default for ClaimParams {
@@ -266,17 +271,12 @@ impl LeaseManager {
     ///
     /// When all receivers are dropped, the task completes and the lease is
     /// abdicated so that another process can claim it.
-    pub async fn spawn_claimant(
+    pub async fn spawn(
         self,
-        claimant: String,
+        claimant: impl ToString,
         params: ClaimParams,
-    ) -> Result<
-        (
-            tokio::sync::watch::Receiver<Arc<Claim>>,
-            tokio::task::JoinHandle<Result<(), Error>>,
-        ),
-        Error,
-    > {
+    ) -> Result<Spawned, Error> {
+        let claimant = claimant.to_string();
         let mut claim = self.ensure_claimed(&claimant, &params).await?;
         let (tx, rx) = tokio::sync::watch::channel(claim.clone());
 

@@ -178,7 +178,7 @@ async fn main() -> Result<()> {
             let lease = kubert::LeaseManager::init(api, name)
                 .await?
                 .with_field_manager(field_manager);
-            let (mut claims, task) = lease.spawn_claimant(identity.clone(), params).await?;
+            let (mut claims, task) = lease.spawn(&identity, params).await?;
             loop {
                 print_claim(&*claims.borrow_and_update(), &identity);
 
