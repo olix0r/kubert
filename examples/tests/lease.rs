@@ -4,7 +4,7 @@ use k8s_openapi::{
     api::coordination::v1 as coordv1,
     apimachinery::pkg::apis::meta::v1::{self as metav1},
 };
-use kubert::Lease;
+use kubert::LeaseManager;
 use maplit::{btreemap, convert_args};
 use tokio::time;
 
@@ -268,7 +268,6 @@ struct Handle {
 
 impl Handle {
     const NS: &'static str = "default";
-    const FIELD_MANAGER: &'static str = "kubert-test";
     const LABEL: &'static str = "kubert.olix0r.net/test";
 
     async fn setup() -> Self {
@@ -295,8 +294,8 @@ impl Handle {
         Handle { api, name, _guard }
     }
 
-    async fn init_new(&self) -> Lease {
-        Lease::init(self.api.clone(), &self.name, Self::FIELD_MANAGER)
+    async fn init_new(&self) -> LeaseManager {
+        LeaseManager::init(self.api.clone(), &self.name)
             .await
             .expect("lease must initialize")
     }

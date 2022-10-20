@@ -60,7 +60,7 @@ pub use self::client::ClientArgs;
 pub use self::initialized::Initialized;
 
 #[cfg(all(feature = "lease"))]
-pub use self::lease::Lease;
+pub use self::lease::LeaseManager;
 
 #[cfg(all(feature = "log"))]
 pub use self::log::{LogFilter, LogFormat, LogInitError};

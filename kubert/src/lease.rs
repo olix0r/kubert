@@ -8,15 +8,15 @@
 //! claimant owns the lease.
 
 use k8s_openapi::{api::coordination::v1 as coordv1, apimachinery::pkg::apis::meta::v1 as metav1};
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 use tokio::time::Duration;
 
-/// A Kubernetes `Lease`
+/// Manages a Kubernetes `Lease`
 #[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
-pub struct Lease {
+pub struct LeaseManager {
     api: Api,
     name: String,
-    field_manager: String,
+    field_manager: Cow<'static, str>,
     state: tokio::sync::Mutex<State>,
 }
 
@@ -116,26 +116,33 @@ impl Claim {
     }
 }
 
-// === impl Lease ===
+// === impl LeaseManager ===
 
-impl Lease {
+impl LeaseManager {
+    const DEFAULT_FIELD_MANAGER: &'static str = "kubert";
+
     /// Initialize a lease's state from the Kubernetes API.
     ///
-    /// The lease resource must already have been created, or a 404 error will
-    /// be returned.
-    pub async fn init(
-        api: Api,
-        name: impl ToString,
-        field_manager: impl ToString,
-    ) -> Result<Self, Error> {
+    /// The named lease resource must already have been created, or a 404 error
+    /// will be returned.
+    pub async fn init(api: Api, name: impl ToString) -> Result<Self, Error> {
         let name = name.to_string();
         let state = Self::get(api.clone(), &*name).await?;
         Ok(Self {
             api,
             name,
-            field_manager: field_manager.to_string(),
+            field_manager: Self::DEFAULT_FIELD_MANAGER.into(),
             state: tokio::sync::Mutex::new(state),
         })
+    }
+
+    /// Overrides the field manager used when updating the Lease
+    ///
+    /// This is intended to be used immediately following initialization and
+    /// before `ensure_claimed` is invoked.
+    pub fn with_field_manager(mut self, field_manager: impl Into<Cow<'static, str>>) -> Self {
+        self.field_manager = field_manager.into();
+        self
     }
 
     /// Return the state of the claim without updating it from the API.
@@ -404,7 +411,7 @@ impl Lease {
     {
         tracing::debug!(?patch);
         let params = kube_client::api::PatchParams {
-            field_manager: Some(self.field_manager.clone()),
+            field_manager: Some(self.field_manager.to_string()),
             // Force conflict resolution when using Server-side Apply (i.e., to
             // acquire a lease). This is the recommended behavior for
             // controllers.

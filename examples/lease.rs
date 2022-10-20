@@ -117,8 +117,10 @@ async fn main() -> Result<()> {
         }),
 
         Command::Get { name } => tokio::spawn(async move {
-            let lease = kubert::Lease::init(api, name, field_manager).await?;
-            match lease.claimed().await? {
+            let lease = kubert::LeaseManager::init(api, name)
+                .await?
+                .with_field_manager(field_manager);
+            match lease.claimed().await {
                 Some(claim) => print_claim(&claim, &identity),
                 None => println!("? Unclaimed"),
             }
@@ -135,7 +137,9 @@ async fn main() -> Result<()> {
                 renew_grace_period,
             };
 
-            let lease = kubert::Lease::init(api, name, field_manager).await?;
+            let lease = kubert::LeaseManager::init(api, name)
+                .await?
+                .with_field_manager(field_manager);
             let claim = lease.ensure_claimed(&identity, &params).await?;
             print_claim(&claim, &identity);
 
@@ -147,8 +151,9 @@ async fn main() -> Result<()> {
         }),
 
         Command::Abdicate { name } => tokio::spawn(async move {
-            let released = kubert::Lease::init(api, name, field_manager)
+            let released = kubert::LeaseManager::init(api, name)
                 .await?
+                .with_field_manager(field_manager)
                 .abdicate(&*identity)
                 .await?;
             if released {
@@ -170,7 +175,9 @@ async fn main() -> Result<()> {
                 renew_grace_period,
             };
 
-            let lease = kubert::Lease::init(api, name, field_manager).await?;
+            let lease = kubert::LeaseManager::init(api, name)
+                .await?
+                .with_field_manager(field_manager);
             let (mut claims, task) = lease.spawn_claimant(identity.clone(), params).await?;
             loop {
                 print_claim(&*claims.borrow_and_update(), &identity);
