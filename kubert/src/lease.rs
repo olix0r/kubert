@@ -35,6 +35,7 @@ pub struct ClaimParams {
 /// Describes the state of a lease
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
+#[non_exhaustive]
 pub struct Claim {
     /// The identity of the claim holder.
     pub holder: String,
@@ -99,7 +100,7 @@ impl Claim {
         chrono::Utc::now() < self.expiry
     }
 
-    /// Returns true iff the claim is still valid
+    /// Returns true iff the claim is still valid for the provided claimant
     #[inline]
     pub fn is_current_for(&self, claimant: &str) -> bool {
         self.holder == claimant && self.is_current()
@@ -175,7 +176,8 @@ impl LeaseManager {
         let mut state = self.state.lock().await;
         loop {
             if let Some(claim) = state.claim.as_ref() {
-                // If the claim is held by the provided identity,  see
+                // If the claim is held by the provided claimant, then consider
+                // renewing the claim.
                 if claim.holder == claimant {
                     let renew_at = claim.expiry
                         - chrono::Duration::from_std(params.renew_grace_period)
@@ -414,7 +416,7 @@ impl LeaseManager {
             field_manager: Some(self.field_manager.to_string()),
             // Force conflict resolution when using Server-side Apply (i.e., to
             // acquire a lease). This is the recommended behavior for
-            // controllers.
+            // controllers. See: https://kubernetes.io/docs/reference/using-api/server-side-apply/#conflicts
             force: matches!(patch, kube_client::api::Patch::Apply(_)),
             ..Default::default()
         };
@@ -423,11 +425,7 @@ impl LeaseManager {
 
     async fn get(api: Api, name: &str) -> Result<State, Error> {
         let lease = api.get(name).await?;
-
-        let spec = match lease.spec {
-            Some(spec) => spec,
-            None => return Err(Error::MissingSpec),
-        };
+        let spec = lease.spec.ok_or(Error::MissingSpec)?;
 
         let version = lease
             .metadata
