@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-latest
     container:
-      image: docker://rust:1.63
+      image: docker://rust:1.64
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
