@@ -156,7 +156,7 @@ features = ["env-filter", "fmt", "json", "smallvec", "tracing-log"]
 # === Dev ===
 
 [dev-dependencies]
-kube = { version = "0.75", default-features = false, features = ["runtime"] }
+kube = { version = "0.76", default-features = false, features = ["runtime"] }
 tokio-stream = "0.1"
 tokio-test = "0.4"
 tracing-subscriber = { version = "0.3", features = ["ansi"] }
