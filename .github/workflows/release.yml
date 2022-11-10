@@ -20,32 +20,28 @@ jobs:
   meta:
     timeout-minutes: 5
     runs-on: ubuntu-latest
-    container:
-      image: docker://rust:1.64-bullseye
+    container: ghcr.io/linkerd/dev:v34-rust
     steps:
+      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       - id: meta
         shell: bash
         run: |
           ref="${{ github.ref }}"
           if [[ "$ref" == refs/tags/release/* ]]; then
-            echo ::set-output name=version::"${ref##refs/tags/release/}"
-            echo ::set-output name=mode::release
+            version="${ref##refs/tags/release/}"
+            crate=$(just-cargo crate-version kubert)
+            if [[ "$crate" != "$version" ]]; then
+              echo "::error ::Crate version $crate does not match tag $version" >&2
+              exit 1
+            fi
+            ( echo version="$version"
+              echo mode=release
+            ) >> "$GITHUB_OUTPUT"
           else
             sha="${{ github.sha }}"
-            echo ::set-output name=version::"test-${sha:0:7}"
-            echo ::set-output name=mode::test
-          fi
-      - if: steps.meta.outputs.mode == 'release'
-        uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
-      - if: steps.meta.outputs.mode == 'release'
-        shell: bash
-        run: |
-          curl --proto '=https' --tlsv1.3 -fsSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o $HOME/jq
-          chmod 755 $HOME/jq
-          version=$(cargo metadata --format-version=1 | $HOME/jq -r '.packages[] | select(.name == "kubert") | .version')
-          if [[ "v${version}" != "${{ steps.meta.outputs.version }}" ]]; then
-            echo "::error ::Crate version v${version} does not match tag ${{ steps.meta.outputs.version }}"
-            exit 1
+            ( echo version="$(just-cargo crate-version kubert)-git-${sha:0:7}"
+              echo mode=test
+            ) >> "$GITHUB_OUTPUT"
           fi
     outputs:
       mode: ${{ steps.meta.outputs.mode }}
@@ -70,8 +66,7 @@ jobs:
     needs: [meta, release]
     timeout-minutes: 10
     runs-on: ubuntu-latest
-    container:
-      image: docker://rust:1.64.0-bullseye
+    container: ghcr.io/linkerd/dev:v34-rust
     steps:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       - run: cargo publish --package=kubert --dry-run

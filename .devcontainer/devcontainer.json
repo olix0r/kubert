@@ -1,6 +1,6 @@
 {
 	"name": "kubert",
-	"image": "ghcr.io/linkerd/dev:v32",
+	"image": "ghcr.io/linkerd/dev:v34",
 	"extensions": [
 		"kokakiwi.vscode-just",
 		"NathanRidley.autotrim",
@@ -20,6 +20,15 @@
 	"overrideCommand": false,
 	"remoteUser": "code",
 	"mounts": [
-		"source=/var/run/docker.sock,target=/var/run/docker-host.sock,type=bind"
+		{
+			"source": "/var/run/docker.sock",
+			"target": "/var/run/docker-host.sock",
+			"type": "bind"
+		},
+		{
+			"source": "${localEnv:HOME}/.docker",
+			"target": "/home/code/.docker",
+			"type": "bind"
+		}
 	]
 }

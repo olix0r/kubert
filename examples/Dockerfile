@@ -1,10 +1,11 @@
-ARG RUST_VERSION=1.64
-
-FROM docker.io/library/rust:${RUST_VERSION}-bullseye as build
+FROM ghcr.io/linkerd/dev:v34-rust as build
 WORKDIR /kubert
 COPY . .
-RUN cargo fetch
-RUN cargo build --frozen --package=kubert-examples --examples
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    CARGO_NET_RETRY=10 just-cargo fetch
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    CARGO_INCREMENTAL=0 just-cargo build --frozen --package=kubert-examples --examples
 
 FROM gcr.io/distroless/cc
-COPY --from=build /kubert/target/debug/examples/watch-pods /usr/local/bin/
+COPY --from=build /kubert/target/debug/examples/watch-pods /watch-pods
+ENTRYPOINT ["/watch-pods"]
