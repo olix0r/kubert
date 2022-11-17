@@ -1,16 +1,4 @@
-# See https://just.systems/man/en
-
-#
-# Configuration
-#
-
-export RUST_BACKTRACE := env_var_or_default("RUST_BACKTRACE", "short")
-
-# By default we compile in development mode mode because it's faster.
-build-type := if env_var_or_default("RELEASE", "") == "" { "debug" } else { "release" }
-
-toolchain := ""
-cargo := "cargo" + if toolchain != "" { " +" + toolchain } else { "" }
+# Depends on utilties from `github.com/linkerd/dev`.
 
 features := "all"
 _features := if features == "all" {
@@ -19,25 +7,6 @@ _features := if features == "all" {
         "--no-default-features --features=" + features
     } else { "" }
 
-# If we're running in Github Actions and cargo-action-fmt is installed, then add
-# a command suffix that formats errors.
-_fmt := if env_var_or_default("GITHUB_ACTIONS", "") != "true" { "" } else {
-    ```
-    if command -v cargo-action-fmt >/dev/null 2>&1; then
-        echo "--message-format=json | cargo-action-fmt"
-    fi
-    ```
-}
-
-# Use nextest if it's available.
-_test := ```
-        if command -v cargo-nextest >/dev/null 2>&1; then
-            echo "nextest run"
-        else
-            echo "test"
-        fi
-    ```
-
 #
 # Recipes
 #
@@ -45,151 +14,114 @@ _test := ```
 # Run all tests and build the proxy
 default: fetch test build
 
-lint: md-lint check-fmt clippy doc
+lint: md-lint fmt-check clippy doc
 
 md-lint:
-    markdownlint-cli2 '**/*.md' '!**/target'
+    just-md lint '**/*.md' '!**/target'
 
 # Fetch dependencies
 fetch:
-    {{ cargo }} fetch
+    @-just-cargo fetch
+
+check *args:
+    @-just-cargo check --workspace --all-targets {{ _features }} {{ args }}
+
+clippy *args:
+    @-just-cargo clippy --workspace --all-targets {{ _features }} {{ args }}
+
+doc *args:
+    @-just-cargo doc --workspace --no-deps {{ _features }} {{ args }}
 
 fmt:
-    {{ cargo }} fmt
+    @-just-cargo fmt
 
-# Fails if the code does not match the expected format (via rustfmt).
-check-fmt:
-    {{ cargo }} fmt -- --check
-
-check *flags:
-    {{ cargo }} check --workspace --all-targets --frozen {{ flags }} {{ _fmt }}
-
-clippy *flags:
-    {{ cargo }} clippy --workspace --all-targets --frozen {{ _features }} {{ flags }} {{ _fmt }}
-
-doc *flags:
-    {{ cargo }} doc --no-deps --workspace --frozen {{ _features }} {{ flags }} {{ _fmt }}
+fmt-check:
+    @-just-cargo fmt -- --check
 
 # Build all tests
-build-test *flags:
-    {{ cargo }} test --no-run \
-        --workspace --frozen {{ _features }} \
-        --exclude=kubert-examples \
-        {{ if build-type == "release" { "--release" } else { "" } }} \
-        {{ flags }} \
-        {{ _fmt }}
+test-build *args:
+    @-just-cargo test-build --workspace --exclude=kubert-examples {{ _features }} {{ args }}
 
 # Run all tests
-test *flags:
-    {{ cargo }} {{ _test }} \
-        --workspace --frozen {{ _features }} \
-        --exclude=kubert-examples \
-        {{ if build-type == "release" { "--release" } else { "" } }} \
-        {{ flags }}
+test *args:
+    @-just-cargo test --workspace --exclude=kubert-examples {{ _features }} {{ args }}
 
 # Build the proxy
-build *flags:
-    {{ cargo }} build --frozen \
-        {{ if build-type == "release" { "--release" } else { "" } }} \
-        {{ _features }} \
-        {{ flags }} \
-        {{ _fmt }}
+build *args:
+    @-just-cargo build {{ _features }} {{ args }}
 
 build-examples name='':
-    {{ cargo }} build --package=kubert-examples \
-        {{ if name == '' { "--examples" } else { "--example=" + name } }} \
-        {{ _fmt }}
+    @-just-cargo build --package=kubert-examples \
+        {{ if name == '' { "--examples" } else { "--example=" + name } }}
 
 build-examples-image:
-    docker build . -f examples/Dockerfile --tag=kubert-examples:test
-
-test-cluster-version := env_var_or_default("KUBERT_TEST_CLUSTER_VERSION", "latest")
-test-cluster-name := env_var_or_default("KUBERT_TEST_CLUSTER_NAME", 'kubert')
-
-_ctx := "--context=k3d-" + test-cluster-name
+    docker buildx build . -f examples/Dockerfile --tag=kubert-examples:test --output=type=docker
 
 test-cluster-create:
-    k3d cluster create {{ test-cluster-name }} \
-        --image=+{{ test-cluster-version }} \
-        --no-lb --k3s-arg "--disable=local-storage,traefik,servicelb,metrics-server@server:*"
-    while [ $(kubectl {{ _ctx }} get po -n kube-system -l k8s-app=kube-dns -o json |jq '.items | length') = "0" ]; do sleep 1 ; done
-    kubectl {{ _ctx }} wait -n kube-system po -l k8s-app=kube-dns  --for=condition=ready
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export K3S_DISABLE='local-storage,traefik,servicelb,metrics-server@server:*'
+    export K3D_CREATE_ARGS='--no-lb'
+    just-k3d create
 
 test-cluster-delete:
-    k3d cluster delete {{ test-cluster-name }}
+    @-just-k3d delete
 
 _test-cluster-exists:
-    #!/usr/bin/env bash
-    if ! k3d cluster list kubert >/dev/null 2>/dev/null; then
-        just \
-            test-cluster-name={{ test-cluster-name }} \
-            test-cluster-version={{ test-cluster-version }} \
-            test-cluster-create
-    fi
+    @-just-k3d ready
 
 test-cluster-import-examples: build-examples-image _test-cluster-exists
-    k3d image import kubert-examples:test \
-        --cluster={{ test-cluster-name}} \
-        --mode=direct
+    @-just-k3d import kubert-examples:test
 
 _test-sfx := `tr -dc 'a-z0-9' </dev/urandom | fold -w 5 | head -n 1`
-
 test-ns := env_var_or_default("KUBERT_TEST_NS", "kubert-" + _test-sfx)
 
 test-cluster-create-ns: _test-cluster-exists
-    kubectl create {{ _ctx }} namespace {{ test-ns }}
-    kubectl create {{ _ctx }} serviceaccount --namespace={{ test-ns }} watch-pods
-    kubectl create {{ _ctx }} clusterrole {{ test-ns }}-watch-pods --verb=get,list,watch --resource=pods
-    kubectl create {{ _ctx }} clusterrolebinding {{ test-ns }}-watch-pods --clusterrole={{ test-ns }}-watch-pods --serviceaccount={{ test-ns }}:watch-pods
-    while [ $(kubectl auth {{ _ctx }} can-i watch pods --as system:serviceaccount:{{ test-ns }}:watch-pods) = "no" ]; do sleep 1 ; done
+    #!/usr/bin/env bash
+    set -euo pipefail
+    just-k3d k create namespace {{ test-ns }}
+    just-k3d k create serviceaccount --namespace={{ test-ns }} watch-pods
+    just-k3d k create clusterrole {{ test-ns }}-watch-pods --verb=get,list,watch --resource=pods
+    just-k3d k create clusterrolebinding '{{ test-ns }}-watch-pods' \
+        --clusterrole='{{ test-ns }}-watch-pods' \
+        --serviceaccount='{{ test-ns }}:watch-pods'
+    while [ $(just-k3d k auth can-i watch pods --as 'system:serviceaccount:{{ test-ns }}:watch-pods') = "no" ]; do sleep 1 ; done
 
 test-cluster-delete-ns:
-    kubectl delete {{ _ctx }} \
-        namespace/{{ test-ns }} \
-        clusterrole/{{ test-ns }}-watch-pods \
-        clusterrolebinding/{{ test-ns }}-watch-pods
+    @-just-k3d k delete \
+        'namespace/{{ test-ns }}' \
+        'clusterrole/{{ test-ns }}-watch-pods' \
+        'clusterrolebinding/{{ test-ns }}-watch-pods'
 
-test-cluster-run-watch-pods *flags: _test-cluster-exists
-    cargo run --package=kubert-examples --example=watch-pods -- \
-        --exit {{ _ctx }} {{ flags }}
+_build-watch-pods:
+    @-just build-examples 'watch-pods'
 
-test-cluster-deploy-watch-pods *flags: test-cluster-import-examples
-    kubectl run watch-pods \
-        {{ _ctx }} \
+test-cluster-run-watch-pods *args: _build-watch-pods _test-cluster-exists
+    target/debug/examples/watch-pods \
+        --context="k3d-$(just-k3d --evaluate K3D_CLUSTER_NAME)" \
+        --exit \
+        {{ args }}
+
+test-cluster-deploy-watch-pods *args: test-cluster-import-examples
+    @-just-k3d k run watch-pods \
         --attach \
         --command \
         --image=kubert-examples:test \
         --image-pull-policy=Never \
         --labels=olix0r.net/kubert-test=watch-pods \
-        --namespace={{ test-ns }} \
-        --overrides='{"spec": {"serviceAccount": "watch-pods"}}' \
+        --namespace='{{ test-ns }}' \
+        --overrides '{"spec": {"serviceAccount": "watch-pods"}}' \
         --quiet \
         --restart=Never \
         --rm \
         -- \
-    watch-pods --exit --selector=olix0r.net/kubert-test=watch-pods {{ flags }}
+        --exit --selector=olix0r.net/kubert-test=watch-pods {{ args }}
 
-# Use the test cluster to run the examples (as is done in CI).
-integrate-examples: test-cluster-import-examples test-cluster-run-watch-pods test-cluster-create-ns test-cluster-deploy-watch-pods test-cluster-delete-ns
-
-build-test-lease *flags:
-    {{ cargo }} test --no-run \
-        --workspace --frozen {{ _features }} \
-        --package=kubert-examples --test=lease \
-        {{ if build-type == "release" { "--release" } else { "" } }} \
-        {{ flags }} \
-        {{ _fmt }}
+test-lease-build *args:
+    @-just-cargo test-build --workspace {{ _features }} {{ args }}
 
 # Run all tests
-test-lease *flags: _test-cluster-exists
-    {{ cargo }} {{ _test }} \
-        --workspace --frozen {{ _features }} \
-        --package=kubert-examples --test=lease \
-        {{ if build-type == "release" { "--release" } else { "" } }} \
-        {{ flags }}
-
-# Display the git history minus dependabot updates
-history *paths='.':
-    @-git log --oneline --graph --invert-grep --author="dependabot" -- {{ paths }}
+test-lease *args: _test-cluster-exists
+    @-just-cargo test --workspace --package=kubert-examples --test=lease {{ _features }} {{ args }}
 
 # vim: set ft=make :

@@ -25,7 +25,7 @@ jobs:
       matrix:
         k8s:
           - v1.21
-          - v1.24
+          - v1.25
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
@@ -42,6 +42,15 @@ jobs:
       - uses: extractions/setup-just@95b912dc5d3ed106a72907f2f9b91e76d60bdb76
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       - run: curl --proto =https --tlsv1.3 -fLsSv https://raw.githubusercontent.com/k3d-io/k3d/${K3D_VERSION}/install.sh | bash
+      # XXX This sucks
+      - run: |
+          cd /usr/local/bin
+          curl --proto =https --tlsv1.3 -fLsSvO https://raw.githubusercontent.com/linkerd/dev/574d6bab940a5fcfcd49169cd0b24ee72e2b5a04/bin/just-k3d
+          curl --proto =https --tlsv1.3 -fLsSvO https://raw.githubusercontent.com/linkerd/dev/574d6bab940a5fcfcd49169cd0b24ee72e2b5a04/bin/just-cargo
+          chmod 755 /usr/local/bin/just-cargo /usr/local/bin/just-k3d
+      - uses: docker://ghcr.io/linkerd/dev:v34-rust
+        with:
+          entrypoint: mount
       - name: Set kubert test server version to ${{ matrix.k8s }}
         run: echo "KUBERT_TEST_CLUSTER_VERSION=${{ matrix.k8s }}" >> $GITHUB_ENV
       - run: just fetch
@@ -54,7 +63,7 @@ jobs:
           just test-cluster-run-watch-pods --log-level=debug \
             --as=system:serviceaccount:${KUBERT_TEST_NS}:watch-pods \
             --kubeconfig=$HOME/.kube/config
-      - run: just build-test-lease
+      - run: just test-lease-build
       - run: just test-lease
 
   in-cluster:
@@ -72,6 +81,9 @@ jobs:
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       - uses: docker/setup-buildx-action@8c0edbc76e98fa90f69d9a2c020dcb50019dc325
       - run: curl --proto =https --tlsv1.3 -fLsSv https://raw.githubusercontent.com/k3d-io/k3d/${K3D_VERSION}/install.sh | bash
+      # XXX This sucks
+      - run: curl --proto =https --tlsv1.3 -fLsSv https://raw.githubusercontent.com/linkerd/dev/574d6bab940a5fcfcd49169cd0b24ee72e2b5a04/bin/just-k3d
+              -o /usr/local/bin/just-k3d && chmod 755 /usr/local/bin/just-k3d
       - name: Set kubert test server version to ${{ matrix.k8s }}
         run: echo "KUBERT_TEST_CLUSTER_VERSION=${{ matrix.k8s }}" >> $GITHUB_ENV
       - run: just build-examples-image
