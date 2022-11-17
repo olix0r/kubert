@@ -1,6 +1,6 @@
 [package]
 name = "kubert"
-version = "0.11.1"
+version = "0.12.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Kubernetes runtime helpers. Based on kube-rs."
@@ -132,18 +132,18 @@ optional = true
 default-features = false
 
 [dependencies.kube-client]
-version = "0.75"
+version = "0.76"
 optional = true
 default-features = false
 features = ["client", "config"]
 
 [dependencies.kube-core]
-version = "0.75"
+version = "0.76"
 optional = true
 default-features = false
 
 [dependencies.kube-runtime]
-version = "0.75"
+version = "0.76"
 optional = true
 default-features = false
 
@@ -156,7 +156,7 @@ features = ["env-filter", "fmt", "json", "smallvec", "tracing-log"]
 # === Dev ===
 
 [dev-dependencies]
-kube = { version = "0.75", default-features = false, features = ["runtime"] }
+kube = { version = "0.76", default-features = false, features = ["runtime"] }
 tokio-stream = "0.1"
 tokio-test = "0.4"
 tracing-subscriber = { version = "0.3", features = ["ansi"] }
