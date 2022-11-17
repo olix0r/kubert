@@ -394,6 +394,21 @@ impl<S> Runtime<S> {
         let api = Api::namespaced(self.client(), ns.as_ref());
         self.cache(api, params)
     }
+
+    #[cfg(feature = "lease")]
+    #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "lease"))))]
+    /// Initializes a [`kubert::LeaseManager`].
+    ///
+    /// The named lease resource must already have been created, or a 404 error
+    /// will be returned.
+    pub async fn init_lease(
+        &self,
+        ns: impl AsRef<str>,
+        name: impl ToString,
+    ) -> Result<crate::lease::LeaseManager, crate::lease::Error> {
+        let api = Api::namespaced(self.client(), ns.as_ref());
+        crate::LeaseManager::init(api, name).await
+    }
 }
 
 #[cfg(feature = "server")]

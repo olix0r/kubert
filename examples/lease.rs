@@ -88,18 +88,18 @@ async fn main() -> Result<()> {
     // - a Kubernetes client
     // - an admin server with /live and /ready endpoints
     // - a tracing (logging) subscriber
-    let rt = kubert::Runtime::builder()
+    let runtime = kubert::Runtime::builder()
         .with_log(log_level, log_format)
         .with_admin(admin)
         .with_client(client)
         .build()
         .await?;
 
-    let api = kube::Api::namespaced(rt.client(), &namespace);
-    let shutdown = rt.shutdown_handle();
+    let shutdown = runtime.shutdown_handle();
+    let rt = runtime.clone()
     let task = match command {
         Command::Create { name } => tokio::spawn(async move {
-            let lease = api
+            let lease = kube::Api::namespaced(rt.client(), &namespace)
                 .create(
                     &Default::default(),
                     &coordv1::Lease {
@@ -117,7 +117,7 @@ async fn main() -> Result<()> {
         }),
 
         Command::Get { name } => tokio::spawn(async move {
-            let lease = kubert::LeaseManager::init(api, name)
+            let lease = rt.init_lease(&namespace, name)
                 .await?
                 .with_field_manager(field_manager);
             match lease.claimed().await {
@@ -137,7 +137,7 @@ async fn main() -> Result<()> {
                 renew_grace_period,
             };
 
-            let lease = kubert::LeaseManager::init(api, name)
+            let lease = rt.init_lease(&namespace, name)
                 .await?
                 .with_field_manager(field_manager);
             let claim = lease.ensure_claimed(&identity, &params).await?;
@@ -204,7 +204,7 @@ async fn main() -> Result<()> {
         // Block the main thread on the shutdown signal. This won't complete until the watch stream
         // stops (after pending Pod updates are logged). If a second signal is received before the watch
         // stream completes, the future fails.
-        res = rt.run() => {
+        res = runtime.run() => {
             if let Err(error) = res {
                 bail!(error);
             }
