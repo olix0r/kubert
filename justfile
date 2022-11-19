@@ -21,37 +21,37 @@ md-lint:
 
 # Fetch dependencies
 fetch:
-    @-just-cargo fetch
+    @just-cargo fetch
 
 check *args:
-    @-just-cargo check --workspace --all-targets {{ _features }} {{ args }}
+    @just-cargo check --workspace --all-targets {{ _features }} {{ args }}
 
 clippy *args:
-    @-just-cargo clippy --workspace --all-targets {{ _features }} {{ args }}
+    @just-cargo clippy --workspace --all-targets {{ _features }} {{ args }}
 
 doc *args:
-    @-just-cargo doc --workspace --no-deps {{ _features }} {{ args }}
+    @just-cargo doc --workspace --no-deps {{ _features }} {{ args }}
 
 fmt:
-    @-just-cargo fmt
+    @just-cargo fmt
 
 fmt-check:
-    @-just-cargo fmt -- --check
+    @just-cargo fmt -- --check
 
 # Build all tests
 test-build *args:
-    @-just-cargo test-build --workspace --exclude=kubert-examples {{ _features }} {{ args }}
+    @just-cargo test-build --workspace --exclude=kubert-examples {{ _features }} {{ args }}
 
 # Run all tests
 test *args:
-    @-just-cargo test --workspace --exclude=kubert-examples {{ _features }} {{ args }}
+    @just-cargo test --workspace --exclude=kubert-examples {{ _features }} {{ args }}
 
 # Build the proxy
 build *args:
-    @-just-cargo build {{ _features }} {{ args }}
+    @just-cargo build {{ _features }} {{ args }}
 
 build-examples name='':
-    @-just-cargo build --package=kubert-examples \
+    @just-cargo build --package=kubert-examples \
         {{ if name == '' { "--examples" } else { "--example=" + name } }}
 
 build-examples-image:
@@ -65,13 +65,13 @@ test-cluster-create:
     just-k3d create
 
 test-cluster-delete:
-    @-just-k3d delete
+    @just-k3d delete
 
 _test-cluster-exists:
-    @-just-k3d ready
+    @just-k3d ready
 
 test-cluster-import-examples: build-examples-image _test-cluster-exists
-    @-just-k3d import kubert-examples:test
+    @just-k3d import kubert-examples:test
 
 _test-sfx := `tr -dc 'a-z0-9' </dev/urandom | fold -w 5 | head -n 1`
 test-ns := env_var_or_default("KUBERT_TEST_NS", "kubert-" + _test-sfx)
@@ -88,13 +88,13 @@ test-cluster-create-ns: _test-cluster-exists
     while [ $(just-k3d k auth can-i watch pods --as 'system:serviceaccount:{{ test-ns }}:watch-pods') = "no" ]; do sleep 1 ; done
 
 test-cluster-delete-ns:
-    @-just-k3d k delete \
+    @just-k3d k delete \
         'namespace/{{ test-ns }}' \
         'clusterrole/{{ test-ns }}-watch-pods' \
         'clusterrolebinding/{{ test-ns }}-watch-pods'
 
 _build-watch-pods:
-    @-just build-examples 'watch-pods'
+    @just build-examples 'watch-pods'
 
 test-cluster-run-watch-pods *args: _build-watch-pods _test-cluster-exists
     target/debug/examples/watch-pods \
@@ -103,14 +103,13 @@ test-cluster-run-watch-pods *args: _build-watch-pods _test-cluster-exists
         {{ args }}
 
 test-cluster-deploy-watch-pods *args: test-cluster-import-examples
-    @-just-k3d k run watch-pods \
+    @just-k3d k run watch-pods \
         --attach \
-        --command \
         --image=kubert-examples:test \
         --image-pull-policy=Never \
         --labels=olix0r.net/kubert-test=watch-pods \
         --namespace='{{ test-ns }}' \
-        --overrides '{"spec": {"serviceAccount": "watch-pods"}}' \
+        --overrides '{\"spec\":{\"serviceAccount\":\"watch-pods\"}}' \
         --quiet \
         --restart=Never \
         --rm \
@@ -118,10 +117,10 @@ test-cluster-deploy-watch-pods *args: test-cluster-import-examples
         --exit --selector=olix0r.net/kubert-test=watch-pods {{ args }}
 
 test-lease-build *args:
-    @-just-cargo test-build --workspace {{ _features }} {{ args }}
+    @just-cargo test-build --workspace {{ _features }} {{ args }}
 
 # Run all tests
 test-lease *args: _test-cluster-exists
-    @-just-cargo test --workspace --package=kubert-examples --test=lease {{ _features }} {{ args }}
+    @just-cargo test --workspace --package=kubert-examples --test=lease {{ _features }} {{ args }}
 
 # vim: set ft=make :
