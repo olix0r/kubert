@@ -1,6 +1,8 @@
 //! Admin server utilities.
 use futures_util::future;
 use hyper::{Body, Request, Response};
+use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
+use metrics_process::Collector;
 use std::{
     net::SocketAddr,
     sync::{
@@ -37,7 +39,6 @@ pub struct Builder {
 
 /// Supports spawning an admin server
 #[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
-#[derive(Debug)]
 pub struct Bound {
     addr: SocketAddr,
     ready: Readiness,
@@ -50,7 +51,6 @@ pub struct Bound {
 pub struct Readiness(Arc<AtomicBool>);
 
 /// A handle to a running admin server
-#[derive(Debug)]
 #[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
 pub struct Server {
     addr: SocketAddr,
@@ -132,23 +132,35 @@ impl Bound {
     /// Binds and runs the server on a background task, returning a handle
     pub fn spawn(self) -> Server {
         let ready = self.ready.clone();
-        let server = self
-            .server
-            .serve(hyper::service::make_service_fn(move |_conn| {
-                let ready = ready.clone();
-                future::ok::<_, hyper::Error>(hyper::service::service_fn(
-                    move |req: hyper::Request<hyper::Body>| match req.uri().path() {
-                        "/live" => future::ok(handle_live(req)),
-                        "/ready" => future::ok(handle_ready(&ready, req)),
-                        _ => future::ok::<_, hyper::Error>(
-                            Response::builder()
-                                .status(hyper::StatusCode::NOT_FOUND)
-                                .body(hyper::Body::default())
-                                .unwrap(),
-                        ),
-                    },
-                ))
-            }));
+        let metrics = PrometheusBuilder::new()
+            .install_recorder()
+            .expect("failed to install Prometheus recorder");
+        let process = Collector::default();
+        process.describe();
+
+        let server = {
+            let metrics = metrics.clone();
+            let process = process.clone();
+            self.server
+                .serve(hyper::service::make_service_fn(move |_conn| {
+                    let ready = ready.clone();
+                    let metrics = metrics.clone();
+                    let process = process.clone();
+                    future::ok::<_, hyper::Error>(hyper::service::service_fn(
+                        move |req: hyper::Request<hyper::Body>| match req.uri().path() {
+                            "/live" => future::ok(handle_live(req)),
+                            "/ready" => future::ok(handle_ready(&ready, req)),
+                            "/metrics" => future::ok(handle_metrics(&metrics, &process, req)),
+                            _ => future::ok::<_, hyper::Error>(
+                                Response::builder()
+                                    .status(hyper::StatusCode::NOT_FOUND)
+                                    .body(hyper::Body::default())
+                                    .unwrap(),
+                            ),
+                        },
+                    ))
+                }))
+        };
 
         let task = tokio::spawn(
             async move {
@@ -232,6 +244,25 @@ fn handle_ready(Readiness(ready): &Readiness, req: Request<Body>) -> Response<Bo
                 .body("not ready\n".into())
                 .unwrap()
         }
+        _ => Response::builder()
+            .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
+            .body(Body::default())
+            .unwrap(),
+    }
+}
+
+fn handle_metrics(
+    metrics: &PrometheusHandle,
+    process: &Collector,
+    req: Request<Body>,
+) -> Response<Body> {
+    process.collect();
+    match *req.method() {
+        hyper::Method::GET | hyper::Method::HEAD => Response::builder()
+            .status(hyper::StatusCode::OK)
+            .header(hyper::header::CONTENT_TYPE, "text/plain")
+            .body(metrics.render().into())
+            .unwrap(),
         _ => Response::builder()
             .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
             .body(Body::default())
