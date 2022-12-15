@@ -141,8 +141,6 @@ impl Bound {
         process.describe();
 
         let server = {
-            let metrics = metrics.clone();
-            let process = process.clone();
             self.server
                 .serve(hyper::service::make_service_fn(move |_conn| {
                     let ready = ready.clone();
