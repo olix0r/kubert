@@ -39,6 +39,7 @@ pub struct Builder {
 
 /// Supports spawning an admin server
 #[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
+#[derive(Debug)]
 pub struct Bound {
     addr: SocketAddr,
     ready: Readiness,
@@ -52,6 +53,7 @@ pub struct Readiness(Arc<AtomicBool>);
 
 /// A handle to a running admin server
 #[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
+#[derive(Debug)]
 pub struct Server {
     addr: SocketAddr,
     ready: Readiness,
