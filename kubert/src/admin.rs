@@ -31,18 +31,18 @@ pub struct AdminArgs {
 
 /// Supports configuring an admin server
 #[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
-#[derive(Clone, Debug)]
 pub struct Builder {
     addr: SocketAddr,
     ready: Readiness,
+    prometheus: PrometheusBuilder,
 }
 
 /// Supports spawning an admin server
 #[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
-#[derive(Debug)]
 pub struct Bound {
     addr: SocketAddr,
     ready: Readiness,
+    prometheus: PrometheusBuilder,
     server: hyper::server::Builder<hyper::server::conn::AddrIncoming>,
 }
 
@@ -87,6 +87,7 @@ impl Builder {
         Self {
             addr,
             ready: Readiness(Arc::new(false.into())),
+            prometheus: Default::default(),
         }
     }
 
@@ -100,9 +101,14 @@ impl Builder {
         self.ready.set(true);
     }
 
+    /// Use the given PrometheusBuilder for the metrics endpoint.
+    pub fn set_prometheus(&mut self, prometheus: PrometheusBuilder) {
+        self.prometheus = prometheus;
+    }
+
     /// Binds the admin server without accepting connections
     pub fn bind(self) -> Result<Bound> {
-        let Self { addr, ready } = self;
+        let Self { addr, ready, prometheus } = self;
 
         let server = hyper::server::Server::try_bind(&addr)?
             // Allow weird clients (like netcat).
@@ -115,6 +121,7 @@ impl Builder {
         Ok(Bound {
             addr,
             ready,
+            prometheus,
             server,
         })
     }
@@ -134,7 +141,8 @@ impl Bound {
     /// Binds and runs the server on a background task, returning a handle
     pub fn spawn(self) -> Server {
         let ready = self.ready.clone();
-        let metrics = PrometheusBuilder::new()
+        let metrics = self.prometheus
+
             .install_recorder()
             .expect("failed to install Prometheus recorder");
         let process = Collector::default();
