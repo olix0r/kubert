@@ -108,7 +108,11 @@ impl Builder {
 
     /// Binds the admin server without accepting connections
     pub fn bind(self) -> Result<Bound> {
-        let Self { addr, ready, prometheus } = self;
+        let Self {
+            addr,
+            ready,
+            prometheus,
+        } = self;
 
         let server = hyper::server::Server::try_bind(&addr)?
             // Allow weird clients (like netcat).
@@ -141,8 +145,8 @@ impl Bound {
     /// Binds and runs the server on a background task, returning a handle
     pub fn spawn(self) -> Server {
         let ready = self.ready.clone();
-        let metrics = self.prometheus
-
+        let metrics = self
+            .prometheus
             .install_recorder()
             .expect("failed to install Prometheus recorder");
         let process = Collector::default();
