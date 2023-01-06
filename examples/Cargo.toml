@@ -31,7 +31,7 @@ default-features = false
 features = ["v1_25"]
 
 [dev-dependencies.kube]
-version = "0.76"
+version = "0.78"
 default-features = false
 features = ["client", "derive", "openssl-tls", "runtime"]
 
