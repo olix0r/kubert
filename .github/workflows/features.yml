@@ -31,7 +31,7 @@ jobs:
         with:
           version: ${{ matrix.rust }}
           components: clippy
-      - run: scurl https://apt.llvm.org/llvm.sh | sudo bash -s 11
+      - run: curl --tlsv1.2 -sSfL https://apt.llvm.org/llvm.sh | sudo bash -s 11
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
       - run: just fetch
       - run: just features=all clippy
