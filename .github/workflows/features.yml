@@ -26,6 +26,7 @@ jobs:
     timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
+      - run: sudo apt-get update && sudo apt-get install -y clang libssl-dev
       - uses: linkerd/dev/actions/setup-tools@v38
       - uses: linkerd/dev/actions/setup-rust@v38
         with:
