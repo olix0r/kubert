@@ -32,8 +32,7 @@ jobs:
           version: ${{ matrix.rust }}
           components: clippy
       - run: scurl https://apt.llvm.org/llvm.sh | sudo bash -s 11
-      - run: command -v clang-11
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
       - run: just fetch
       - run: just features=all clippy
 
@@ -56,6 +55,6 @@ jobs:
     runs-on: ubuntu-latest
     container: ghcr.io/linkerd/dev:v39-rust
     steps:
-      - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
+      - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
       - run: just fetch
       - run: just "features=${{ matrix.features }}" clippy
