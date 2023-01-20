@@ -26,12 +26,13 @@ jobs:
     timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
-      - run: sudo apt-get update && sudo apt-get install -y clang libssl-dev llvm pkg-config
       - uses: linkerd/dev/actions/setup-tools@v39
       - uses: linkerd/dev/actions/setup-rust@v39
         with:
           version: ${{ matrix.rust }}
           components: clippy
+      - run: sudo apt-get install -y clang cmake libssl-dev llvm pkg-config
+      - run: command -v clang-11
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       - run: just fetch
       - run: just features=all clippy
