@@ -19,7 +19,7 @@ jobs:
   fmt:
     timeout-minutes: 5
     runs-on: ubuntu-latest
-    container: ghcr.io/linkerd/dev:v35-rust
+    container: ghcr.io/linkerd/dev:v39-rust
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
       - run: just fmt-check
@@ -27,7 +27,7 @@ jobs:
   doc:
     timeout-minutes: 5
     runs-on: ubuntu-latest
-    container: ghcr.io/linkerd/dev:v35-rust
+    container: ghcr.io/linkerd/dev:v39-rust
     steps:
       - uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c
       - run: just fetch
