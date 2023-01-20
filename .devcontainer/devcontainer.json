@@ -1,6 +1,6 @@
 {
 	"name": "kubert",
-	"image": "ghcr.io/linkerd/dev:v38",
+	"image": "ghcr.io/linkerd/dev:v39",
 	"extensions": [
 		"kokakiwi.vscode-just",
 		"NathanRidley.autotrim",
