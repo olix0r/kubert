@@ -31,7 +31,7 @@ jobs:
         with:
           version: ${{ matrix.rust }}
           components: clippy
-      - run: sudo apt-get install -y clang cmake libssl-dev llvm pkg-config
+      - run: scurl https://apt.llvm.org/llvm.sh | sudo bash -s 11
       - run: command -v clang-11
       - uses: actions/checkout@93ea575cb5d8a053eaa0ac8fa3b40d7e05a33cc8
       - run: just fetch
