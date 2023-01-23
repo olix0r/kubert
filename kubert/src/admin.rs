@@ -210,6 +210,7 @@ fn handle_live(req: Request<Body>) -> Response<Body> {
             .unwrap(),
         _ => Response::builder()
             .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
+            .header(hyper::header::ALLOW, "GET, HEAD")
             .body(Body::default())
             .unwrap(),
     }
@@ -234,6 +235,7 @@ fn handle_ready(Readiness(ready): &Readiness, req: Request<Body>) -> Response<Bo
         }
         _ => Response::builder()
             .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
+            .header(hyper::header::ALLOW, "GET, HEAD")
             .body(Body::default())
             .unwrap(),
     }
