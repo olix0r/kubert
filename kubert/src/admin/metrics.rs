@@ -58,7 +58,7 @@ impl Prometheus {
 impl fmt::Debug for Prometheus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Prometheus")
-            .field("metrics", &format_args!("PrometheusHandle { ... }"))
+            .field("metrics", &format_args!("PrometheusHandle {{ ... }}"))
             .field("process", &self.process)
             .finish()
     }

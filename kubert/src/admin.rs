@@ -168,7 +168,7 @@ impl fmt::Debug for Builder {
         // `fmt::Debug`, but when the "metrics" feature is enabled, at least
         // indicate that it's there.
         #[cfg(feature = "metrics")]
-        d.field("prometheus", &format_args!("PrometheusBuilder { ... }"));
+        d.field("prometheus", &format_args!("PrometheusBuilder {{ ... }}"));
 
         d.finish()
     }
