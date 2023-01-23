@@ -3,6 +3,7 @@ use futures_util::future;
 use hyper::{Body, Request, Response};
 
 use std::{
+    fmt,
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -146,6 +147,23 @@ impl Builder {
         })
     }
 }
+
+impl fmt::Debug for Builder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut d = f.debug_struct("Builder");
+        d.field("addr", &self.addr).field("ready", &self.ready);
+
+        // The `PrometheusBuilder` type does not actually implement
+        // `fmt::Debug`, but when the "metrics" feature is enabled, at least
+        // indicate that it's there.
+        #[cfg(feature = "metrics")]
+        d.field("prometheus", &format_args!("PrometheusBuilder { ... }"));
+
+        d.finish()
+    }
+}
+
+// === impl Bound ===
 
 impl Bound {
     /// Returns a readiness handle
