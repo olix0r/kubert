@@ -32,6 +32,7 @@ impl Prometheus {
                 .unwrap(),
             _ => Response::builder()
                 .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
+                .header(hyper::header::ALLOW, "GET, HEAD")
                 .body(Body::default())
                 .unwrap(),
         }
