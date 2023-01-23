@@ -20,7 +20,8 @@ pub type Result<T> = hyper::Result<T>;
 pub type Error = hyper::Error;
 
 #[cfg(feature = "metrics")]
-mod metrics;
+#[cfg_attr(docsrs, doc(cfg(all(feature = "admin", feature = "metrics"))))]
+pub mod metrics;
 
 /// Command-line arguments used to configure an admin server
 #[derive(Clone, Debug)]
@@ -110,23 +111,12 @@ impl Builder {
         self.ready.set(true);
     }
 
-    /// Use the given `PrometheusBuilder` for the metrics endpoint.
+    /// Use the given [`PrometheusBuilder`] for the metrics endpoint.
     ///
     /// This method is only available if the "metrics" feature is enabled.
-    ///
-    /// **Note**: Builder methods that configure `metrics-exporter-prometheus`'s
-    /// built-in HTTP listener, such as
-    /// [`PrometheusBuilder::with_http_listener`][http] and
-    /// [`PrometheusBuilder::add_allowed_address`][allowed] will not have an
-    /// effect on the admin server's `/metrics` endpoint, since the HTTP
-    /// server is managed by `kubert` rather than by `metrics-exporter-prometheus`.
-    ///
-    /// [http]: https://docs.rs/metrics-exporter-prometheus/latest/metrics_exporter_prometheus/struct.PrometheusBuilder.html#method.with_http_listener
-    /// [allowed]: https://docs.rs/metrics-exporter-prometheus/latest/metrics_exporter_prometheus/struct.PrometheusBuilder.html#method.add_allowed_address
-    // TODO(eliza): we may want to implement our own versions of these methods...
     #[cfg(feature = "metrics")]
     #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
-    pub fn set_prometheus(&mut self, prometheus: metrics::PrometheusBuilder) {
+    pub fn with_prometheus(&mut self, prometheus: metrics::PrometheusBuilder) {
         self.prometheus = prometheus;
     }
 
