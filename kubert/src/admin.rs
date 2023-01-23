@@ -1,8 +1,7 @@
 //! Admin server utilities.
 use futures_util::future;
 use hyper::{Body, Request, Response};
-use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
-use metrics_process::Collector;
+
 use std::{
     net::SocketAddr,
     sync::{
@@ -19,6 +18,9 @@ pub type Result<T> = hyper::Result<T>;
 /// Server errors
 pub type Error = hyper::Error;
 
+#[cfg(feature = "metrics")]
+mod metrics;
+
 /// Command-line arguments used to configure an admin server
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
@@ -34,7 +36,9 @@ pub struct AdminArgs {
 pub struct Builder {
     addr: SocketAddr,
     ready: Readiness,
-    prometheus: PrometheusBuilder,
+
+    #[cfg(feature = "metrics")]
+    prometheus: metrics::PrometheusBuilder,
 }
 
 /// Supports spawning an admin server
@@ -42,8 +46,10 @@ pub struct Builder {
 pub struct Bound {
     addr: SocketAddr,
     ready: Readiness,
-    prometheus: PrometheusBuilder,
     server: hyper::server::Builder<hyper::server::conn::AddrIncoming>,
+
+    #[cfg(feature = "metrics")]
+    prometheus: metrics::PrometheusBuilder,
 }
 
 /// Controls how the admin server advertises readiness
@@ -87,6 +93,8 @@ impl Builder {
         Self {
             addr,
             ready: Readiness(Arc::new(false.into())),
+
+            #[cfg(feature = "metrics")]
             prometheus: Default::default(),
         }
     }
@@ -101,8 +109,12 @@ impl Builder {
         self.ready.set(true);
     }
 
-    /// Use the given PrometheusBuilder for the metrics endpoint.
-    pub fn set_prometheus(&mut self, prometheus: PrometheusBuilder) {
+    /// Use the given `PrometheusBuilder` for the metrics endpoint.
+    ///
+    /// This method is only available if the "metrics" feature is enabled.
+    #[cfg(feature = "metrics")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
+    pub fn set_prometheus(&mut self, prometheus: metrics::PrometheusBuilder) {
         self.prometheus = prometheus;
     }
 
@@ -111,6 +123,8 @@ impl Builder {
         let Self {
             addr,
             ready,
+
+            #[cfg(feature = "metrics")]
             prometheus,
         } = self;
 
@@ -125,8 +139,10 @@ impl Builder {
         Ok(Bound {
             addr,
             ready,
-            prometheus,
             server,
+
+            #[cfg(feature = "metrics")]
+            prometheus,
         })
     }
 }
@@ -145,24 +161,23 @@ impl Bound {
     /// Binds and runs the server on a background task, returning a handle
     pub fn spawn(self) -> Server {
         let ready = self.ready.clone();
-        let metrics = self
-            .prometheus
-            .install_recorder()
-            .expect("failed to install Prometheus recorder");
-        let process = Collector::default();
-        process.describe();
+        #[cfg(feature = "metrics")]
+        let prometheus = metrics::Prometheus::new(self.prometheus);
 
         let server = {
             self.server
                 .serve(hyper::service::make_service_fn(move |_conn| {
                     let ready = ready.clone();
-                    let metrics = metrics.clone();
-                    let process = process.clone();
+
+                    #[cfg(feature = "metrics")]
+                    let prometheus = prometheus.clone();
+
                     future::ok::<_, hyper::Error>(hyper::service::service_fn(
                         move |req: hyper::Request<hyper::Body>| match req.uri().path() {
                             "/live" => future::ok(handle_live(req)),
                             "/ready" => future::ok(handle_ready(&ready, req)),
-                            "/metrics" => future::ok(handle_metrics(&metrics, &process, req)),
+                            #[cfg(feature = "metrics")]
+                            "/metrics" => future::ok(prometheus.handle_metrics(req)),
                             _ => future::ok::<_, hyper::Error>(
                                 Response::builder()
                                     .status(hyper::StatusCode::NOT_FOUND)
@@ -256,25 +271,6 @@ fn handle_ready(Readiness(ready): &Readiness, req: Request<Body>) -> Response<Bo
                 .body("not ready\n".into())
                 .unwrap()
         }
-        _ => Response::builder()
-            .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
-            .body(Body::default())
-            .unwrap(),
-    }
-}
-
-fn handle_metrics(
-    metrics: &PrometheusHandle,
-    process: &Collector,
-    req: Request<Body>,
-) -> Response<Body> {
-    process.collect();
-    match *req.method() {
-        hyper::Method::GET | hyper::Method::HEAD => Response::builder()
-            .status(hyper::StatusCode::OK)
-            .header(hyper::header::CONTENT_TYPE, "text/plain")
-            .body(metrics.render().into())
-            .unwrap(),
         _ => Response::builder()
             .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
             .body(Body::default())

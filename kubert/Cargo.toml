@@ -15,8 +15,6 @@ admin = [
     "hyper/http1",
     "hyper/runtime",
     "hyper/server",
-    "metrics-exporter-prometheus",
-    "metrics-process",
     "tokio/sync",
     "tracing",
 ]
@@ -51,6 +49,7 @@ lease = [
     "tracing",
 ]
 log = ["thiserror", "tracing", "tracing-subscriber"]
+metrics = ["metrics-exporter-prometheus", "metrics-process"]
 requeue = [
     "futures-core",
     "tokio/macros",
