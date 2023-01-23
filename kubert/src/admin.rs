@@ -3,7 +3,6 @@ use futures_util::future;
 use hyper::{Body, Request, Response};
 
 use std::{
-    fmt,
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -35,6 +34,7 @@ pub struct AdminArgs {
 
 /// Supports configuring an admin server
 #[cfg_attr(docsrs, doc(cfg(feature = "admin")))]
+#[derive(Debug)]
 pub struct Builder {
     addr: SocketAddr,
     ready: Readiness,
@@ -149,21 +149,6 @@ impl Builder {
     }
 }
 
-impl fmt::Debug for Builder {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut d = f.debug_struct("Builder");
-        d.field("addr", &self.addr).field("ready", &self.ready);
-
-        // The `PrometheusBuilder` type does not actually implement
-        // `fmt::Debug`, but when the "metrics" feature is enabled, at least
-        // indicate that it's there.
-        #[cfg(feature = "metrics")]
-        d.field("prometheus", &format_args!("PrometheusBuilder {{ ... }}"));
-
-        d.finish()
-    }
-}
-
 // === impl Bound ===
 
 impl Bound {
@@ -185,7 +170,8 @@ impl Bound {
 
         let server = {
             self.server
-                .serve(hyper::service::make_service_fn(move |_conn| {
+                .serve(hyper::service::make_service_fn(move |conn| {
+                    let remote_ip = conn.remote_addr().ip();
                     let ready = ready.clone();
 
                     #[cfg(feature = "metrics")]
@@ -196,7 +182,7 @@ impl Bound {
                             "/live" => future::ok(handle_live(req)),
                             "/ready" => future::ok(handle_ready(&ready, req)),
                             #[cfg(feature = "metrics")]
-                            "/metrics" => future::ok(prometheus.handle_metrics(req)),
+                            "/metrics" => future::ok(prometheus.handle_metrics(remote_ip, req)),
                             _ => future::ok::<_, hyper::Error>(
                                 Response::builder()
                                     .status(hyper::StatusCode::NOT_FOUND)

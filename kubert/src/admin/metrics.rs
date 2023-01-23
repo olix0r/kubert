@@ -1,23 +1,24 @@
-use super::*;
-
-use hyper::header;
+use hyper::{header, Body, Request, Response, StatusCode};
+use ipnet::IpNet;
 pub use metrics_exporter_prometheus::{BuildError, Matcher};
 use metrics_exporter_prometheus::{PrometheusBuilder as InnerBuilder, PrometheusHandle};
 use metrics_process::Collector;
 pub use metrics_util::MetricKindMask;
 
-use std::{fmt, time::Duration};
+use std::{fmt, net::IpAddr, sync::Arc, time::Duration};
 
 #[derive(Default)]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "admin", feature = "metrics"))))]
 pub struct PrometheusBuilder {
     inner: InnerBuilder,
+    allowed_nets: Option<Vec<IpNet>>,
 }
 
 #[derive(Clone)]
 pub(super) struct Prometheus {
     metrics: PrometheusHandle,
     process: Collector,
+    allowed_nets: Option<Arc<[IpNet]>>,
 }
 
 // === impl PrometheusBuilder ===
@@ -27,6 +28,7 @@ impl PrometheusBuilder {
     pub fn new() -> Self {
         Self {
             inner: InnerBuilder::new(),
+            allowed_nets: None,
         }
     }
 
@@ -103,6 +105,7 @@ impl PrometheusBuilder {
     pub fn idle_timeout(mut self, mask: MetricKindMask, timeout: Option<Duration>) -> Self {
         Self {
             inner: self.inner.idle_timeout(mask, timeout),
+            ..self
         }
     }
 
@@ -119,7 +122,38 @@ impl PrometheusBuilder {
     {
         Self {
             inner: self.inner.add_global_label(key, value),
+            ..self
         }
+    }
+    /// Adds an IP address or subnet to the allowlist for the scrape endpoint.
+    ///
+    /// If a client makes a request to the scrape endpoint and their IP is not present in the
+    /// allowlist, either directly or within any of the allowed subnets, they will receive a 403
+    /// Forbidden response.
+    ///
+    /// Defaults to allowing all IPs.
+    ///
+    /// ## Security Considerations
+    ///
+    /// On its own, an IP allowlist is insufficient for access control, if the exporter is running
+    /// in an environment alongside applications (such as web browsers) that are susceptible to [DNS
+    /// rebinding](https://en.wikipedia.org/wiki/DNS_rebinding) attacks.
+    ///
+    /// ## Errors
+    ///
+    /// If the given address cannot be parsed into an IP address or subnet, an error variant will be
+    /// returned describing the error.
+    pub fn add_allowed_address<A>(mut self, address: A) -> Result<Self, BuildError>
+    where
+        A: AsRef<str>,
+    {
+        use std::str::FromStr;
+
+        let address = IpNet::from_str(address.as_ref())
+            .map_err(|e| BuildError::InvalidAllowlistAddress(e.to_string()))?;
+        self.allowed_nets.get_or_insert_with(Vec::new).push(address);
+
+        Ok(self)
     }
 
     fn try_map(
@@ -128,26 +162,59 @@ impl PrometheusBuilder {
     ) -> Result<Self, BuildError> {
         Ok(Self {
             inner: f(self.inner)?,
+            ..self
         })
     }
 }
 
+impl fmt::Debug for PrometheusBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PrometheusBuilder")
+            // this type from `metrics-exporter-prometheus` doesn't implement `Debug`...
+            .field("inner", &format_args!("PrometheusBuilder {{ ... }}"))
+            .field("allowed_nets", &self.allowed_nets)
+            .finish()
+    }
+}
+
+// === impl Prometheus ===
+
 impl Prometheus {
     pub(super) fn new(builder: PrometheusBuilder) -> Self {
         let metrics = builder
+            .inner
             .install_recorder()
             .expect("failed to install Prometheus recorder");
+        let allowed_nets = builder.allowed_nets.map(Into::into);
         let process = Collector::default();
         process.describe();
-        Self { metrics, process }
+        Self {
+            metrics,
+            process,
+            allowed_nets,
+        }
     }
 
-    pub(super) fn handle_metrics(&self, req: Request<Body>) -> Response<Body> {
+    pub(super) fn handle_metrics(&self, remote_ip: IpAddr, req: Request<Body>) -> Response<Body> {
+        // If the allowlist is empty, the request is allowed.  Otherwise, it must
+        // match one of the entries in the allowlist or it will be denied.
+        let allowed = self.allowed_nets.as_ref().map_or(true, |addresses| {
+            addresses.iter().any(|address| address.contains(&remote_ip))
+        });
+
+        if !allowed {
+            tracing::info!("Denying metrics scrape from {remote_ip}; address not in allowlist");
+            return Response::builder()
+                .status(StatusCode::FORBIDDEN)
+                .body(Body::default())
+                .unwrap();
+        }
+
         self.process.collect();
         match *req.method() {
             hyper::Method::GET | hyper::Method::HEAD => {
                 let mut rsp = Response::builder()
-                    .status(hyper::StatusCode::OK)
+                    .status(StatusCode::OK)
                     .header(header::CONTENT_TYPE, "text/plain");
 
                 let metrics = self.metrics.render();
@@ -166,7 +233,7 @@ impl Prometheus {
                 rsp.body(body).unwrap()
             }
             _ => Response::builder()
-                .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
+                .status(StatusCode::METHOD_NOT_ALLOWED)
                 .header(header::ALLOW, "GET, HEAD")
                 .body(Body::default())
                 .unwrap(),
@@ -178,6 +245,7 @@ impl fmt::Debug for Prometheus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Prometheus")
             .field("metrics", &format_args!("PrometheusHandle {{ ... }}"))
+            .field("allowed_nets", &self.allowed_nets)
             .field("process", &self.process)
             .finish()
     }

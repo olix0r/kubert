@@ -54,6 +54,7 @@ metrics = [
     "metrics-exporter-prometheus",
     "metrics-process",
     "metrics-util",
+    "ipnet",
 ]
 requeue = [
     "futures-core",
@@ -113,6 +114,7 @@ chrono = { version = "0.4", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
 hyper = { version = "0.14.17", optional = true, default-features = false }
+ipnet = { version = "2", optional = true }
 parking_lot = { version = "0.12", optional = true }
 pin-project-lite = { version = "0.2", optional = true }
 metrics-exporter-prometheus = { version = "0.11.0", optional = true, default-features = false }
