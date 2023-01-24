@@ -40,12 +40,14 @@ jobs:
       matrix:
         feature:
           - admin
+          - admin,metrics
           - client
           - errors
           - index
           - initialized
           - lease
           - log
+          - metrics
           - requeue
           - runtime
           - server
