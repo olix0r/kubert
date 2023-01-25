@@ -47,7 +47,7 @@ impl PrometheusBuilder {
     /// ## Errors
     ///
     /// If `quantiles` is empty, an error variant will be thrown.
-    pub fn set_quantiles(mut self, quantiles: &[f64]) -> Result<Self, BuildError> {
+    pub fn set_quantiles(self, quantiles: &[f64]) -> Result<Self, BuildError> {
         self.try_map(|inner| inner.set_quantiles(quantiles))
     }
 
@@ -59,7 +59,7 @@ impl PrometheusBuilder {
     /// ## Errors
     ///
     /// If `values` is empty, an error variant will be thrown.
-    pub fn set_buckets(mut self, values: &[f64]) -> Result<Self, BuildError> {
+    pub fn set_buckets(self, values: &[f64]) -> Result<Self, BuildError> {
         self.try_map(|inner| inner.set_buckets(values))
     }
 
@@ -80,7 +80,7 @@ impl PrometheusBuilder {
     ///
     /// If `values` is empty, an error variant will be thrown.
     pub fn set_buckets_for_metric(
-        mut self,
+        self,
         matcher: Matcher,
         values: &[f64],
     ) -> Result<Self, BuildError> {
@@ -102,7 +102,7 @@ impl PrometheusBuilder {
     /// Refer to the documentation for [`MetricKindMask`](metrics_util::MetricKindMask) for more
     /// information on defining a metric kind mask.
     #[must_use]
-    pub fn idle_timeout(mut self, mask: MetricKindMask, timeout: Option<Duration>) -> Self {
+    pub fn idle_timeout(self, mask: MetricKindMask, timeout: Option<Duration>) -> Self {
         Self {
             inner: self.inner.idle_timeout(mask, timeout),
             ..self
@@ -115,7 +115,7 @@ impl PrometheusBuilder {
     /// over any global labels.  If this method is called multiple times, the latest value for a given label
     /// key will be used.
     #[must_use]
-    pub fn add_global_label<K, V>(mut self, key: K, value: V) -> Self
+    pub fn add_global_label<K, V>(self, key: K, value: V) -> Self
     where
         K: Into<String>,
         V: Into<String>,
