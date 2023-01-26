@@ -1,3 +1,11 @@
+//! Configuration for serving a [Prometheus] metrics endpoint using the
+//! [`metrics`] crate.
+//!
+//! The [`PrometheusBuilder`] type in this module configures how Prometheus
+//! metrics are served.
+//!
+//! [Prometheus]: https://prometheus.io/
+//! [`metrics`]: https://crates.io/crates/metrics
 use hyper::{header, Body, Request, Response, StatusCode};
 use ipnet::IpNet;
 pub use metrics_exporter_prometheus::{BuildError, Matcher};
@@ -7,6 +15,13 @@ pub use metrics_util::MetricKindMask;
 
 use std::{fmt, net::IpAddr, sync::Arc, time::Duration};
 
+/// Configures an admin server's [Prometheus] metrics endpoint.
+///
+/// This builder is passed to the [`admin::Builder::with_prometheus`] method to
+/// enable the metrics endpoint.
+///
+/// [Prometheus]: https://prometheus.io/
+/// [`admin::Builder::with_prometheus`]: super::Builder::with_prometheus
 #[derive(Default)]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "admin", feature = "metrics"))))]
 pub struct PrometheusBuilder {
@@ -25,6 +40,7 @@ pub(super) struct Prometheus {
 
 impl PrometheusBuilder {
     /// Creates a new [`PrometheusBuilder`].
+    #[must_use]
     pub fn new() -> Self {
         Self {
             inner: InnerBuilder::new(),
