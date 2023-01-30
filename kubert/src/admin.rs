@@ -3,6 +3,7 @@ use futures_util::future;
 use hyper::{Body, Request, Response};
 
 use std::{
+    collections::HashMap,
     fmt,
     net::SocketAddr,
     sync::{
@@ -18,6 +19,9 @@ pub type Result<T> = hyper::Result<T>;
 
 /// Server errors
 pub type Error = hyper::Error;
+
+/// A handler for a request path.
+type HandlerFn = Box<dyn Fn(Request<Body>) -> Response<Body> + Send + Sync + 'static>;
 
 #[cfg(feature = "metrics")]
 mod metrics;
@@ -37,9 +41,7 @@ pub struct AdminArgs {
 pub struct Builder {
     addr: SocketAddr,
     ready: Readiness,
-
-    #[cfg(feature = "metrics")]
-    prometheus: metrics::PrometheusBuilder,
+    routes: HashMap<String, HandlerFn>,
 }
 
 /// Supports spawning an admin server
@@ -48,9 +50,7 @@ pub struct Bound {
     addr: SocketAddr,
     ready: Readiness,
     server: hyper::server::Builder<hyper::server::conn::AddrIncoming>,
-
-    #[cfg(feature = "metrics")]
-    prometheus: metrics::PrometheusBuilder,
+    routes: HashMap<String, HandlerFn>,
 }
 
 /// Controls how the admin server advertises readiness
@@ -94,9 +94,7 @@ impl Builder {
         Self {
             addr,
             ready: Readiness(Arc::new(false.into())),
-
-            #[cfg(feature = "metrics")]
-            prometheus: Default::default(),
+            routes: Default::default(),
         }
     }
 
@@ -110,7 +108,8 @@ impl Builder {
         self.ready.set(true);
     }
 
-    /// Use the given `PrometheusBuilder` for the metrics endpoint.
+    /// Use the given `PrometheusBuilder` to add a default `/metrics` route to
+    /// the admin server.
     ///
     /// This method is only available if the "metrics" feature is enabled.
     ///
@@ -123,11 +122,39 @@ impl Builder {
     ///
     /// [http]: https://docs.rs/metrics-exporter-prometheus/latest/metrics_exporter_prometheus/struct.PrometheusBuilder.html#method.with_http_listener
     /// [allowed]: https://docs.rs/metrics-exporter-prometheus/latest/metrics_exporter_prometheus/struct.PrometheusBuilder.html#method.add_allowed_address
-    // TODO(eliza): we may want to implement our own versions of these methods...
     #[cfg(feature = "metrics")]
     #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
-    pub fn set_prometheus(&mut self, prometheus: metrics::PrometheusBuilder) {
-        self.prometheus = prometheus;
+    pub fn with_default_prometheus(&mut self, prometheus: metrics::PrometheusBuilder) -> &mut Self {
+        let prometheus = metrics::Prometheus::new(prometheus);
+        self.add_handler("/metrics", move |req| prometheus.handle_metrics(req))
+    }
+
+    /// Adds a request handler for `path` to the admin server.
+    ///
+    /// Requests to `path` will be handled by invoking the provided `handler`
+    /// function with each request. This can be used to add additional
+    /// functionality to the admin server.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if called with the path `/ready` or `/live`, as these
+    /// paths would conflict with the built-in readiness and liveness endpoints.
+    pub fn add_handler(
+        &mut self,
+        path: impl ToString,
+        handler: impl Fn(Request<Body>) -> Response<Body> + Send + Sync + 'static,
+    ) -> &mut Self {
+        let path = path.to_string();
+        assert_ne!(
+            path, "/ready",
+            "the built-in `/ready` handler cannot be overridden"
+        );
+        assert_ne!(
+            path, "/live",
+            "the built-in `/live` handler cannot be overridden"
+        );
+        self.routes.insert(path, Box::new(handler));
+        self
     }
 
     /// Binds the admin server without accepting connections
@@ -135,9 +162,7 @@ impl Builder {
         let Self {
             addr,
             ready,
-
-            #[cfg(feature = "metrics")]
-            prometheus,
+            routes,
         } = self;
 
         let server = hyper::server::Server::try_bind(&addr)?
@@ -152,9 +177,7 @@ impl Builder {
             addr,
             ready,
             server,
-
-            #[cfg(feature = "metrics")]
-            prometheus,
+            routes,
         })
     }
 }
@@ -163,12 +186,6 @@ impl fmt::Debug for Builder {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut d = f.debug_struct("Builder");
         d.field("addr", &self.addr).field("ready", &self.ready);
-
-        // The `PrometheusBuilder` type does not actually implement
-        // `fmt::Debug`, but when the "metrics" feature is enabled, at least
-        // indicate that it's there.
-        #[cfg(feature = "metrics")]
-        d.field("prometheus", &format_args!("PrometheusBuilder {{ ... }}"));
 
         d.finish()
     }
@@ -190,29 +207,29 @@ impl Bound {
     /// Binds and runs the server on a background task, returning a handle
     pub fn spawn(self) -> Server {
         let ready = self.ready.clone();
-        #[cfg(feature = "metrics")]
-        let prometheus = metrics::Prometheus::new(self.prometheus);
+        let routes = Arc::new(self.routes);
 
         let server = {
             self.server
                 .serve(hyper::service::make_service_fn(move |_conn| {
                     let ready = ready.clone();
-
-                    #[cfg(feature = "metrics")]
-                    let prometheus = prometheus.clone();
+                    let routes = routes.clone();
 
                     future::ok::<_, hyper::Error>(hyper::service::service_fn(
-                        move |req: hyper::Request<hyper::Body>| match req.uri().path() {
-                            "/live" => future::ok(handle_live(req)),
-                            "/ready" => future::ok(handle_ready(&ready, req)),
-                            #[cfg(feature = "metrics")]
-                            "/metrics" => future::ok(prometheus.handle_metrics(req)),
-                            _ => future::ok::<_, hyper::Error>(
-                                Response::builder()
-                                    .status(hyper::StatusCode::NOT_FOUND)
-                                    .body(hyper::Body::default())
-                                    .unwrap(),
-                            ),
+                        move |req: hyper::Request<hyper::Body>| {
+                            future::ok::<_, hyper::Error>(match req.uri().path() {
+                                "/live" => handle_live(req),
+                                "/ready" => handle_ready(&ready, req),
+                                path => routes
+                                    .get(path)
+                                    .map(|handler| handler(req))
+                                    .unwrap_or_else(|| {
+                                        Response::builder()
+                                            .status(hyper::StatusCode::NOT_FOUND)
+                                            .body(hyper::Body::default())
+                                            .unwrap()
+                                    }),
+                            })
                         },
                     ))
                 }))
@@ -267,7 +284,7 @@ impl Server {
     }
 }
 
-// === handlers ===
+// === routes ===
 
 fn handle_live(req: Request<Body>) -> Response<Body> {
     match *req.method() {
