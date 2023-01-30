@@ -169,14 +169,10 @@ impl Bound {
         let prometheus = metrics::Prometheus::new(self.prometheus);
 
         let server = {
-            self.server.serve(hyper::service::make_service_fn(
-                move |conn: &hyper::server::conn::AddrStream| {
-                    let ready = ready.clone();
-
-                    #[cfg(feature = "metrics")]
+            self.server
+                .serve(hyper::service::make_service_fn(move |conn| {
                     let remote_ip = conn.remote_addr().ip();
-                    #[cfg(not(feature = "metrics"))]
-                    let _ = conn;
+                    let ready = ready.clone();
 
                     #[cfg(feature = "metrics")]
                     let prometheus = prometheus.clone();
@@ -195,8 +191,7 @@ impl Bound {
                             ),
                         },
                     ))
-                },
-            ))
+                }))
         };
 
         let task = tokio::spawn(
