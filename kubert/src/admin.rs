@@ -1,7 +1,6 @@
 //! Admin server utilities.
 use futures_util::future;
 use hyper::{Body, Request, Response};
-
 use std::{
     collections::HashMap,
     fmt,
