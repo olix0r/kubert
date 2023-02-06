@@ -11,6 +11,7 @@ keywords = ["kubernetes", "client", "runtime", "server"]
 
 [features]
 admin = [
+    "ahash",
     "futures-util",
     "hyper/http1",
     "hyper/runtime",

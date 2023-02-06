@@ -1,8 +1,8 @@
 //! Admin server utilities.
+use ahash::AHashMap;
 use futures_util::future;
 use hyper::{Body, Request, Response};
 use std::{
-    collections::HashMap,
     fmt,
     net::SocketAddr,
     sync::{
@@ -40,7 +40,7 @@ pub struct AdminArgs {
 pub struct Builder {
     addr: SocketAddr,
     ready: Readiness,
-    routes: HashMap<String, HandlerFn>,
+    routes: AHashMap<String, HandlerFn>,
 }
 
 /// Supports spawning an admin server
@@ -49,7 +49,7 @@ pub struct Bound {
     addr: SocketAddr,
     ready: Readiness,
     server: hyper::server::Builder<hyper::server::conn::AddrIncoming>,
-    routes: HashMap<String, HandlerFn>,
+    routes: AHashMap<String, HandlerFn>,
 }
 
 /// Controls how the admin server advertises readiness
