@@ -9,7 +9,7 @@ ignore = []
 
 [licenses]
 unlicensed = "deny"
-allow = ["Apache-2.0", "BSD-3-Clause", "ISC", "MIT"]
+allow = ["Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC", "MIT"]
 deny = []
 copyleft = "deny"
 allow-osi-fsf-free = "neither"
@@ -32,6 +32,7 @@ exceptions = [
         "Apache-2.0",
         "Unicode-DFS-2016",
     ], name = "unicode-ident" },
+    { allow = ["Zlib"], name = "adler32" },
 ]
 
 [[licenses.clarify]]
@@ -45,14 +46,22 @@ multiple-versions = "deny"
 wildcards = "allow"
 highlight = "all"
 deny = []
-skip-tree = []
 skip = [
+    # `rustls-pemfile` and `k8s-openapi` depend on versions of `base64` that
+    # have diverged significantly.
+    { name = "base64" },
+]
+skip-tree = [
     { name = "windows-sys" },
     { name = "windows_aarch64_msvc" },
     { name = "windows_i686_gnu" },
     { name = "windows_i686_msvc" },
     { name = "windows_x86_64_gnu" },
     { name = "windows_x86_64_msvc" },
+    # `metrics` and `kube-runtime` have conflicting versions of `ahash` and
+    # `wasi`.
+    # TODO(eliza): remove this skip when the conflicts are resolved.
+    { name = "metrics" },
 ]
 
 [sources]
