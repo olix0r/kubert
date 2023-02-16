@@ -171,7 +171,7 @@ tracing-subscriber = { version = "0.3", features = ["ansi"] }
 [dev-dependencies.k8s-openapi]
 version = "0.16"
 default-features = false
-features = ["v1_25"]
+features = ["v1_26"]
 
 [dev-dependencies.tokio]
 version = "1.18"

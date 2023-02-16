@@ -24,7 +24,7 @@ jobs:
       matrix:
         k8s:
           - v1.21
-          - v1.25
+          - v1.26
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
@@ -52,7 +52,7 @@ jobs:
       matrix:
         k8s:
           - v1.21
-          - v1.25
+          - v1.26
     timeout-minutes: 10
     runs-on: ubuntu-latest
     env:
