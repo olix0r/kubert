@@ -1,35 +1,35 @@
 use super::*;
 
 use hyper::header;
-pub(super) use metrics_exporter_prometheus::PrometheusBuilder;
-use metrics_exporter_prometheus::PrometheusHandle;
-use metrics_process::Collector;
-
+pub(super) use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
 use std::fmt;
 
 #[derive(Clone)]
 pub(super) struct Prometheus {
     metrics: PrometheusHandle,
-    process: Collector,
+    collect: Arc<dyn Fn() + Send + Sync + 'static>,
 }
 
 impl Prometheus {
-    pub(super) fn new(builder: PrometheusBuilder) -> Self {
-        let metrics = builder
-            .install_recorder()
-            .expect("failed to install Prometheus recorder");
-        let process = Collector::default();
-        process.describe();
-        Self { metrics, process }
+    pub(super) fn new(
+        metrics: PrometheusHandle,
+        collect: impl Fn() + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            metrics,
+            collect: Arc::new(collect),
+        }
     }
 
     pub(super) fn handle_metrics(&self, req: Request<Body>) -> Response<Body> {
-        self.process.collect();
         match *req.method() {
             hyper::Method::GET | hyper::Method::HEAD => {
                 let mut rsp = Response::builder()
                     .status(hyper::StatusCode::OK)
                     .header(header::CONTENT_TYPE, "text/plain");
+
+                // TODO(ver) Limit collection frequency.
+                (*self.collect)();
 
                 let metrics = self.metrics.render();
                 // if the requestor accepts gzip compression, compress the metrics.
@@ -59,7 +59,6 @@ impl fmt::Debug for Prometheus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Prometheus")
             .field("metrics", &format_args!("PrometheusHandle {{ ... }}"))
-            .field("process", &self.process)
             .finish()
     }
 }

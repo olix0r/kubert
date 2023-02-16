@@ -107,8 +107,25 @@ impl Builder {
         self.ready.set(true);
     }
 
-    /// Use the given `PrometheusBuilder` to add a default `/metrics` route to
-    /// the admin server.
+    /// Use the default `PrometheusBuilder` to configure a `/metrics` endpoint
+    /// on the admin server. Process metrics are exposed by default.
+    ///
+    /// This method is only available if the "metrics" feature is enabled.
+    #[cfg(feature = "metrics")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
+    pub fn with_default_prometheus(&mut self) -> &mut Self {
+        let metrics = metrics::PrometheusBuilder::new()
+            .install_recorder()
+            .expect("failed to install Prometheus recorder");
+
+        let process = metrics_process::Collector::default();
+        process.describe();
+
+        self.add_prometheus_handler("/metrics", metrics, move || process.collect())
+    }
+
+    /// Use the given `PrometheusHandle` to add a metrics route to the admin
+    /// server.
     ///
     /// This method is only available if the "metrics" feature is enabled.
     ///
@@ -123,9 +140,14 @@ impl Builder {
     /// [allowed]: https://docs.rs/metrics-exporter-prometheus/latest/metrics_exporter_prometheus/struct.PrometheusBuilder.html#method.add_allowed_address
     #[cfg(feature = "metrics")]
     #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
-    pub fn with_default_prometheus(&mut self, prometheus: metrics::PrometheusBuilder) -> &mut Self {
-        let prometheus = metrics::Prometheus::new(prometheus);
-        self.add_handler("/metrics", move |req| prometheus.handle_metrics(req))
+    pub fn add_prometheus_handler(
+        &mut self,
+        path: impl ToString,
+        metrics: metrics::PrometheusHandle,
+        collect: impl Fn() + Send + Sync + 'static,
+    ) -> &mut Self {
+        let prom = metrics::Prometheus::new(metrics, collect);
+        self.add_handler(path, move |req| prom.handle_metrics(req))
     }
 
     /// Adds a request handler for `path` to the admin server.
