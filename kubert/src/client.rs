@@ -98,13 +98,17 @@ impl ClientArgs {
 
         if let Some(user) = &self.impersonate_user {
             for auth in kubeconfig.auth_infos.iter_mut() {
-                auth.auth_info.impersonate = Some(user.clone());
+                if let Some(ai) = auth.auth_info.as_mut() {
+                    ai.impersonate = Some(user.clone());
+                }
             }
         }
 
         if let Some(group) = &self.impersonate_group {
-            for mut auth in kubeconfig.auth_infos.iter_mut() {
-                auth.auth_info.impersonate_groups = Some(vec![group.clone()]);
+            for auth in kubeconfig.auth_infos.iter_mut() {
+                if let Some(ai) = auth.auth_info.as_mut() {
+                    ai.impersonate_groups = Some(vec![group.clone()]);
+                }
             }
         }
 
