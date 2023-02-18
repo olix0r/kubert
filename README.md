@@ -17,6 +17,7 @@ Rust Kubernetes runtime helpers. Based on [`kube-rs`][krs].
 
 * [`clap`](https://docs.rs/clap) command-line interface support;
 * A basic admin server with `/ready` and `/live` probe endpoints;
+* Optional Prometheus [`metrics`][mt] integration;
 * A default Kubernetes client;
 * Graceful shutdown on `SIGTERM` or `SIGINT` signals;
 * An HTTPS server (for admission controllers and API extensions) with
@@ -51,4 +52,5 @@ This crate is still fairly experimental, though it's based on production code
 from Linkerd; and we plan to use it in Linkerd moving forward.
 
 [krs]: https://docs.rs/kube
+[mt]: https://docs.rs/metrics
 [rt]: https://docs.rs/kubert/latest/kubert/runtime/struct.Runtime.html
