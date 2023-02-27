@@ -35,7 +35,6 @@ pub struct ClaimParams {
 /// Describes the state of a lease
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
-#[non_exhaustive]
 pub struct Claim {
     /// The identity of the claim holder.
     pub holder: String,
