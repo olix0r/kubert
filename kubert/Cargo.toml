@@ -150,7 +150,7 @@ optional = true
 default-features = false
 
 [dependencies.kube-runtime]
-version = "0.79"
+version = "0.80"
 optional = true
 default-features = false
 
