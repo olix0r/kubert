@@ -145,7 +145,7 @@ default-features = false
 features = ["client", "config"]
 
 [dependencies.kube-core]
-version = "0.79"
+version = "0.80"
 optional = true
 default-features = false
 
