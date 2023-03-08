@@ -6,6 +6,15 @@ updates:
       interval: daily
       time: "03:30"
       timezone: "UTC"
+    allow:
+      - dependency-type: "all"
+    ignore:
+      # We need to update all of these together, so we'll do it manually.
+      - dependency-name: "kube"
+      - dependency-name: "kube-client"
+      - dependency-name: "kube-core"
+      - dependency-name: "kube-derive"
+      - dependency-name: "kube-runtime"
 
   - package-ecosystem: "github-actions"
     directory: "/"
