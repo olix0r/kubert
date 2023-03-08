@@ -132,7 +132,7 @@ impl LeaseManager {
     /// will be returned.
     pub async fn init(api: Api, name: impl ToString) -> Result<Self, Error> {
         let name = name.to_string();
-        let state = Self::get(api.clone(), &*name).await?;
+        let state = Self::get(api.clone(), &name).await?;
         Ok(Self {
             api,
             name,
@@ -190,7 +190,7 @@ impl LeaseManager {
                         Err(e) if Self::is_conflict(&e) => {
                             // Another process updated the claim's resource version, so
                             // re-sync the state and try again.
-                            *state = Self::get(self.api.clone(), &*self.name).await?;
+                            *state = Self::get(self.api.clone(), &self.name).await?;
                             continue;
                         }
                         Err(e) => return Err(e),
@@ -214,7 +214,7 @@ impl LeaseManager {
                 Err(e) if Self::is_conflict(&e) => {
                     // Another process updated the claim's resource version, so
                     // re-sync the state and try again.
-                    *state = Self::get(self.api.clone(), &*self.name).await?;
+                    *state = Self::get(self.api.clone(), &self.name).await?;
                     continue;
                 }
                 Err(e) => return Err(e),
@@ -419,7 +419,7 @@ impl LeaseManager {
             force: matches!(patch, kube_client::api::Patch::Apply(_)),
             ..Default::default()
         };
-        self.api.patch(&*self.name, &params, patch).await
+        self.api.patch(&self.name, &params, patch).await
     }
 
     async fn get(api: Api, name: &str) -> Result<State, Error> {

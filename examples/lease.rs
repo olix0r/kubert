@@ -143,18 +143,14 @@ async fn main() -> Result<()> {
             let claim = lease.ensure_claimed(&identity, &params).await?;
             print_claim(&claim, &identity);
 
-            Ok::<_, kubert::lease::Error>(if claim.is_current_for(&identity) {
-                0
-            } else {
-                1
-            })
+            Ok::<_, kubert::lease::Error>(!claim.is_current_for(&identity) as i32)
         }),
 
         Command::Vacate { name } => tokio::spawn(async move {
             let released = kubert::LeaseManager::init(api, name)
                 .await?
                 .with_field_manager(field_manager)
-                .vacate(&*identity)
+                .vacate(&identity)
                 .await?;
             let code = if released {
                 println!("+ Claim vacated");
@@ -181,7 +177,7 @@ async fn main() -> Result<()> {
                 .with_field_manager(field_manager);
             let (mut claims, task) = lease.spawn(&identity, params).await?;
             loop {
-                print_claim(&*claims.borrow_and_update(), &identity);
+                print_claim(&claims.borrow_and_update(), &identity);
 
                 let shutdown = shutdown.clone();
                 tokio::select! {
