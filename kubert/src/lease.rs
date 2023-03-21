@@ -494,15 +494,15 @@ impl LeaseManager {
                     .map(|code| code.is_server_error())
                     .unwrap_or(false)
             }
-            // Retry I/O errors, timeouts, etc.
+            // Retry hyper errors which are not caused by the client's behavior
+            // (i.e. protocol errors that aren't our fault, which probably
+            // indicate a transient network issue).
+            Error::Api(kube_client::Error::HyperError(error)) => !error.is_user(),
+            // Retry any I/O errors and timeouts.
             Error::Api(e) => {
                 let mut source = e.source();
                 while let Some(curr) = source {
                     if curr.is::<std::io::Error>() {
-                        return true;
-                    }
-
-                    if curr.is::<hyper::Error>() {
                         return true;
                     }
 
