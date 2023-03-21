@@ -187,10 +187,8 @@ impl LeaseManager {
 
                     let (claim, meta) = match self.renew(&state.meta, claimant, params).await {
                         Ok(renew) => renew,
-                        Err(e) if Self::is_conflict(&e) => {
-                            // Another process updated the claim's resource version, so
-                            // re-sync the state and try again.
-                            *state = Self::get(self.api.clone(), &self.name).await?;
+                        Err(e) if Self::should_resync(&e) => {
+                            *state = Self::get(self.api.clone(), &*self.name).await?;
                             continue;
                         }
                         Err(e) => return Err(e),
@@ -211,10 +209,8 @@ impl LeaseManager {
             // There's no current claim, so try to acquire it.
             let (claim, meta) = match self.acquire(&state.meta, claimant, params).await {
                 Ok(acquire) => acquire,
-                Err(e) if Self::is_conflict(&e) => {
-                    // Another process updated the claim's resource version, so
-                    // re-sync the state and try again.
-                    *state = Self::get(self.api.clone(), &self.name).await?;
+                Err(e) if Self::should_resync(&e) => {
+                    *state = Self::get(self.api.clone(), &*self.name).await?;
                     continue;
                 }
                 Err(e) => return Err(e),
@@ -302,13 +298,14 @@ impl LeaseManager {
                 // Update the claim and broadcast it to all receivers.
                 match self.ensure_claimed(&claimant, &params).await {
                     Ok(new_claim) => claim = new_claim,
-                    Err(error) => {
-                        tracing::warn!(%error, "failed to claim lease");
+                    Err(error) if Self::is_retryable(&error) => {
+                        tracing::debug!(%error, "failed to claim lease, retrying");
                         // TODO(eliza): this will immediately retry (since the
                         // expiration should have elapsed)...should we back off
                         // here?
                         continue;
                     }
+                    Err(error) => return Err(error),
                 }
                 if tx.send(claim.clone()).is_err() {
                     // All receivers have been dropped.
@@ -472,11 +469,52 @@ impl LeaseManager {
         })
     }
 
-    fn is_conflict(err: &Error) -> bool {
-        matches!(
-            err,
-            Error::Api(kube_client::Error::Api(kube_core::ErrorResponse { code, .. }))
-                if hyper::StatusCode::from_u16(*code).ok() == Some(hyper::StatusCode::CONFLICT)
-        )
+    fn should_resync(err: &Error) -> bool {
+        match err {
+            Error::Api(kube_client::Error::Api(kube_core::ErrorResponse { code, .. })) => {
+                let status = hyper::StatusCode::from_u16(*code).ok();
+
+                // A 409 Conflict indicates that another process updated the
+                // claim's resource version, while a 410 Gone indicates that our
+                // resource version is too old. In re-sync the state and try
+                // again.
+                status == Some(hyper::StatusCode::CONFLICT)
+                    || status == Some(hyper::StatusCode::GONE)
+            }
+            _ => false,
+        }
+    }
+
+    fn is_retryable(err: &Error) -> bool {
+        use std::error::Error as _;
+        match err {
+            // Retry any 5xx errors returned by the API.
+            Error::Api(kube_client::Error::Api(kube_core::ErrorResponse { code, .. })) => {
+                hyper::StatusCode::from_u16(*code)
+                    .map(|code| code.is_server_error())
+                    .unwrap_or(false)
+            }
+            // Retry I/O errors, timeouts, etc.
+            Error::Api(e) => {
+                let mut source = e.source();
+                while let Some(curr) = source {
+                    if curr.is::<std::io::Error>() {
+                        return true;
+                    }
+
+                    if curr.is::<hyper::Error>() {
+                        return true;
+                    }
+
+                    if curr.is::<tokio::time::error::Elapsed>() {
+                        return true;
+                    }
+
+                    source = curr.source();
+                }
+                false
+            }
+            _ => false,
+        }
     }
 }
