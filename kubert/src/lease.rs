@@ -300,7 +300,16 @@ impl LeaseManager {
                 }
 
                 // Update the claim and broadcast it to all receivers.
-                claim = self.ensure_claimed(&claimant, &params).await?;
+                match self.ensure_claimed(&claimant, &params).await {
+                    Ok(new_claim) => claim = new_claim,
+                    Err(error) => {
+                        tracing::warn!(%error, "failed to claim lease");
+                        // TODO(eliza): this will immediately retry (since the
+                        // expiration should have elapsed)...should we back off
+                        // here?
+                        continue;
+                    }
+                }
                 if tx.send(claim.clone()).is_err() {
                     // All receivers have been dropped.
                     break;
