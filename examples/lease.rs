@@ -154,7 +154,7 @@ async fn main() -> Result<()> {
             let released = kubert::LeaseManager::init(api, name)
                 .await?
                 .with_field_manager(field_manager)
-                .vacate(&*identity)
+                .vacate(&identity)
                 .await?;
             let code = if released {
                 println!("+ Claim vacated");
@@ -181,7 +181,7 @@ async fn main() -> Result<()> {
                 .with_field_manager(field_manager);
             let (mut claims, task) = lease.spawn(&identity, params).await?;
             loop {
-                print_claim(&*claims.borrow_and_update(), &identity);
+                print_claim(&claims.borrow_and_update(), &identity);
 
                 let shutdown = shutdown.clone();
                 tokio::select! {
