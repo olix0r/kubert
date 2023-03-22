@@ -7,9 +7,12 @@
 //! [`LeaseManager`] interacts with a [`coordv1::Lease`] resource to ensure that
 //! only a single claimant owns the lease at a time.
 
+use futures_util::StreamExt;
 use k8s_openapi::{api::coordination::v1 as coordv1, apimachinery::pkg::apis::meta::v1 as metav1};
 use std::{borrow::Cow, sync::Arc};
 use tokio::time::Duration;
+
+use crate::errors::ExponentialBackoff;
 
 /// Manages a Kubernetes `Lease`
 #[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
@@ -18,6 +21,7 @@ pub struct LeaseManager {
     name: String,
     field_manager: Cow<'static, str>,
     state: tokio::sync::Mutex<State>,
+    retry_backoff: ExponentialBackoff,
 }
 
 /// Configuration used when obtaining a lease.
@@ -125,7 +129,6 @@ impl Claim {
 
 impl LeaseManager {
     const DEFAULT_FIELD_MANAGER: &'static str = "kubert";
-
     /// Initialize a lease's state from the Kubernetes API.
     ///
     /// The named lease resource must already have been created, or a 404 error
@@ -133,11 +136,18 @@ impl LeaseManager {
     pub async fn init(api: Api, name: impl ToString) -> Result<Self, Error> {
         let name = name.to_string();
         let state = Self::get(api.clone(), &name).await?;
+        let retry_backoff = ExponentialBackoff::try_new(
+            Duration::from_millis(100),
+            Duration::from_millis(500),
+            0.5,
+        )
+        .expect("100 ms is les than 500 ms");
         Ok(Self {
             api,
             name,
             field_manager: Self::DEFAULT_FIELD_MANAGER.into(),
             state: tokio::sync::Mutex::new(state),
+            retry_backoff,
         })
     }
 
@@ -148,6 +158,15 @@ impl LeaseManager {
     pub fn with_field_manager(mut self, field_manager: impl Into<Cow<'static, str>>) -> Self {
         self.field_manager = field_manager.into();
         self
+    }
+
+    /// Overrides the default exponential backoff configuration used for
+    /// retrying API errors in `LeaseManager::spawn`.
+    pub fn with_retry_backoff(self, retry_backoff: ExponentialBackoff) -> Self {
+        Self {
+            retry_backoff,
+            ..self
+        }
     }
 
     /// Return the state of the claim without updating it from the API.
@@ -276,7 +295,7 @@ impl LeaseManager {
         let claimant = claimant.to_string();
         let mut claim = self.ensure_claimed(&claimant, &params).await?;
         let (tx, rx) = tokio::sync::watch::channel(claim.clone());
-
+        let mut backoff = self.retry_backoff.stream();
         let task = tokio::spawn(async move {
             loop {
                 // The claimant has the privilege of renewing the lease before
@@ -296,17 +315,24 @@ impl LeaseManager {
                 }
 
                 // Update the claim and broadcast it to all receivers.
-                match self.ensure_claimed(&claimant, &params).await {
-                    Ok(new_claim) => claim = new_claim,
-                    Err(error) if Self::is_retryable(&error) => {
-                        tracing::debug!(%error, "failed to claim lease, retrying");
-                        // TODO(eliza): this will immediately retry (since the
-                        // expiration should have elapsed)...should we back off
-                        // here?
-                        continue;
+                'ensure_claimed: loop {
+                    match self.ensure_claimed(&claimant, &params).await {
+                        Ok(new_claim) => {
+                            claim = new_claim;
+                            // Reset the backoff if we have successfully claimed
+                            // the least.
+                            backoff = self.retry_backoff.stream();
+                            break 'ensure_claimed;
+                        }
+                        Err(error) if Self::is_retryable(&error) => {
+                            tracing::debug!(%error, "failed to claim lease, retrying");
+                            backoff.next().await;
+                            continue 'ensure_claimed;
+                        }
+                        Err(error) => return Err(error),
                     }
-                    Err(error) => return Err(error),
                 }
+
                 if tx.send(claim.clone()).is_err() {
                     // All receivers have been dropped.
                     break;
