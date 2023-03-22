@@ -9,6 +9,9 @@ use std::{
 use tokio::time;
 use tracing::info;
 
+pub mod backoff;
+pub use self::backoff::ExponentialBackoff;
+
 pin_project_lite::pin_project! {
     /// Wraps a [`Stream`], handling errors by logging them and applying a backoff
     ///
