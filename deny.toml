@@ -50,6 +50,10 @@ skip = [
     # `rustls-pemfile` and `k8s-openapi` depend on versions of `base64` that
     # have diverged significantly.
     { name = "base64" },
+    # `num_cpus` (transitive dep of `metrics-util` and `tokio`) and
+    # `io-lifetimes` (a transitive dep of `metrics-process`) depend on
+    # incompatible versions of this crate.
+    { name = "hermit-abi" },
 ]
 skip-tree = [
     { name = "windows-sys" },
