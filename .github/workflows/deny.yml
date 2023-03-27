@@ -28,7 +28,7 @@ jobs:
     # Prevent sudden announcement of a new advisory from failing Ci.
     continue-on-error: ${{ matrix.checks == 'advisories' }}
     steps:
-    - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f
+    - uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3
     - uses: EmbarkStudios/cargo-deny-action@8a8607bd8e2b3a514d5a40174cc7c55b229d9ba7
       with:
         command: check ${{ matrix.checks }}
