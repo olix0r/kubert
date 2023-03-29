@@ -3,7 +3,7 @@
 #[cfg(feature = "server")]
 use crate::server::{self, ServerArgs};
 use crate::{
-    admin::{self, AdminArgs, Readiness},
+    admin::{self, Readiness},
     client::{self, Client, ClientArgs},
     errors,
     initialized::{self, Initialized},
@@ -25,7 +25,7 @@ pub use reflector::Store;
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
 #[must_use]
 pub struct Builder<S = NoServer> {
-    admin: Option<AdminArgs>,
+    admin: admin::Builder,
     client: Option<ClientArgs>,
     error_delay: Option<Duration>,
     log: Option<LogSettings>,
@@ -102,9 +102,9 @@ struct LogSettings {
 impl<S> Builder<S> {
     const DEFAULT_ERROR_DELAY: Duration = Duration::from_secs(5);
 
-    /// Configures the runtime to use the given [`AdminArgs`]
-    pub fn with_admin(mut self, admin: AdminArgs) -> Self {
-        self.admin = Some(admin);
+    /// Configures the runtime to use the given [`Builder`]
+    pub fn with_admin(mut self, admin: impl Into<admin::Builder>) -> Self {
+        self.admin = admin.into();
         self
     }
 
@@ -131,7 +131,7 @@ impl<S> Builder<S> {
         self.log.unwrap_or_default().try_init()?;
         let client = self.client.unwrap_or_default().try_client().await?;
         let (shutdown, shutdown_rx) = shutdown::sigint_or_sigterm()?;
-        let admin = self.admin.unwrap_or_default().into_builder().bind()?;
+        let admin = self.admin.bind()?;
         Ok(Runtime {
             client,
             shutdown_rx,

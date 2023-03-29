@@ -85,6 +85,18 @@ impl AdminArgs {
 
 // === impl Builder ===
 
+impl Default for Builder {
+    fn default() -> Self {
+        AdminArgs::default().into_builder()
+    }
+}
+
+impl From<AdminArgs> for Builder {
+    fn from(args: AdminArgs) -> Self {
+        args.into_builder()
+    }
+}
+
 impl Builder {
     /// Creates a new [`Builder`] with the given server address
     ///
