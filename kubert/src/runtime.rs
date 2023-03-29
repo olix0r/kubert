@@ -102,7 +102,7 @@ struct LogSettings {
 impl<S> Builder<S> {
     const DEFAULT_ERROR_DELAY: Duration = Duration::from_secs(5);
 
-    /// Configures the runtime to use the given [`AdminArgs`]
+    /// Configures the runtime to use the given [`Builder`]
     pub fn with_admin(mut self, admin: impl Into<admin::Builder>) -> Self {
         self.admin = admin.into();
         self
