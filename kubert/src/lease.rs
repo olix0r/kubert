@@ -7,6 +7,7 @@
 //! [`LeaseManager`] interacts with a [`coordv1::Lease`] resource to ensure that
 //! only a single claimant owns the lease at a time.
 
+use futures_util::TryFutureExt;
 use k8s_openapi::{api::coordination::v1 as coordv1, apimachinery::pkg::apis::meta::v1 as metav1};
 use std::{borrow::Cow, sync::Arc};
 use tokio::time::Duration;
@@ -18,6 +19,7 @@ pub struct LeaseManager {
     name: String,
     field_manager: Cow<'static, str>,
     state: tokio::sync::Mutex<State>,
+    min_backoff: Duration,
 }
 
 /// Configuration used when obtaining a lease.
@@ -125,6 +127,7 @@ impl Claim {
 
 impl LeaseManager {
     const DEFAULT_FIELD_MANAGER: &'static str = "kubert";
+    const DEFAULT_MIN_BACKOFF: Duration = Duration::from_secs(2);
 
     /// Initialize a lease's state from the Kubernetes API.
     ///
@@ -138,6 +141,7 @@ impl LeaseManager {
             name,
             field_manager: Self::DEFAULT_FIELD_MANAGER.into(),
             state: tokio::sync::Mutex::new(state),
+            min_backoff: Self::DEFAULT_MIN_BACKOFF,
         })
     }
 
@@ -280,6 +284,10 @@ impl LeaseManager {
         let claimant = claimant.to_string();
         let mut claim = self.ensure_claimed(&claimant, &params).await?;
         let (tx, rx) = tokio::sync::watch::channel(claim.clone());
+        let mut new_backoff = backoff::ExponentialBackoffBuilder::default();
+        new_backoff
+            .with_initial_interval(self.min_backoff)
+            .with_randomization_factor(0.5);
 
         let task = tokio::spawn(async move {
             loop {
@@ -300,7 +308,32 @@ impl LeaseManager {
                 }
 
                 // Update the claim and broadcast it to all receivers.
-                claim = self.ensure_claimed(&claimant, &params).await?;
+                let backoff = new_backoff.with_max_interval(grace).build();
+                claim = backoff::future::retry(backoff, || {
+                    self.ensure_claimed(&claimant, &params).map_err(|err| match err {
+                        err @ Error::Api(kube_client::Error::Auth(_))
+                        | err @ Error::Api(kube_client::Error::Discovery(_))
+                        | err @ Error::Api(kube_client::Error::BuildRequest(_)) => {
+                            backoff::Error::Permanent(err)
+                        },
+                        err @ Error::Api(kube_client::Error::InferConfig(_)) => {
+                            debug_assert!(false, "InferConfig errors should only be returned when constructing a new client");
+                            backoff::Error::Permanent(err)
+                        },
+                        // Retry any other API request errors.
+                        err @ Error::Api(_) => {
+                            tracing::debug!(error = %err, "Error claiming lease, retrying...");
+                            backoff::Error::Transient {
+                                err,
+                                // Allow the backoff implementation to select how
+                                // long to wait before retrying.
+                                retry_after: None,
+                            }
+                        }
+                        err @ Error::MissingResourceVersion | err @ Error::MissingSpec => backoff::Error::Permanent(err),
+                    })
+                })
+                .await?;
                 if tx.send(claim.clone()).is_err() {
                     // All receivers have been dropped.
                     break;

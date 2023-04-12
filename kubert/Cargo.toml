@@ -38,6 +38,7 @@ index = [
 ]
 initialized = ["futures-core", "futures-util", "pin-project-lite", "tokio/sync"]
 lease = [
+    "backoff",
     "chrono",
     "hyper",
     "k8s-openapi",
@@ -103,6 +104,7 @@ features = ["k8s-openapi/v1_26"]
 
 [dependencies]
 ahash = { version = "0.8", optional = true }
+backoff = { version = "0.4", features = ["tokio"], optional = true }
 deflate = { version = "1", optional = true, default-features = false, features = [
     "gzip",
 ] }
