@@ -19,7 +19,6 @@ pub struct LeaseManager {
     name: String,
     field_manager: Cow<'static, str>,
     state: tokio::sync::Mutex<State>,
-    min_backoff: Duration,
 }
 
 /// Configuration used when obtaining a lease.
@@ -128,6 +127,7 @@ impl Claim {
 impl LeaseManager {
     const DEFAULT_FIELD_MANAGER: &'static str = "kubert";
     const DEFAULT_MIN_BACKOFF: Duration = Duration::from_secs(2);
+    const DEFAULT_BACKOFF_JITTER: f64 = 0.5; // up to 50% of the backoff duration
 
     /// Initialize a lease's state from the Kubernetes API.
     ///
@@ -141,7 +141,6 @@ impl LeaseManager {
             name,
             field_manager: Self::DEFAULT_FIELD_MANAGER.into(),
             state: tokio::sync::Mutex::new(state),
-            min_backoff: Self::DEFAULT_MIN_BACKOFF,
         })
     }
 
@@ -286,8 +285,8 @@ impl LeaseManager {
         let (tx, rx) = tokio::sync::watch::channel(claim.clone());
         let mut new_backoff = backoff::ExponentialBackoffBuilder::default();
         new_backoff
-            .with_initial_interval(self.min_backoff)
-            .with_randomization_factor(0.5);
+            .with_initial_interval(Self::DEFAULT_MIN_BACKOFF)
+            .with_randomization_factor(Self::DEFAULT_BACKOFF_JITTER);
 
         let task = tokio::spawn(async move {
             loop {
