@@ -33,7 +33,7 @@ jobs:
       - uses: linkerd/dev/actions/setup-tools@v39
       - uses: linkerd/dev/actions/setup-rust@v39
       - run: sudo apt-get install libssl-dev
-      - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f
+      - uses: actions/checkout@83b7061638ee4956cf7545a6f7efe594e5ad0247
       - run: just fetch
       - run: just build-examples
       - run: just test-cluster-create
@@ -61,7 +61,7 @@ jobs:
     steps:
       - uses: linkerd/dev/actions/setup-tools@v39
       - uses: linkerd/dev/actions/setup-rust@v39
-      - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f
+      - uses: actions/checkout@83b7061638ee4956cf7545a6f7efe594e5ad0247
       - run: just build-examples-image
       - run: just test-cluster-create
       - run: just test-cluster-import-examples

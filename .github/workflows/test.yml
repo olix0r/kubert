@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     container: ghcr.io/linkerd/dev:v39-rust
     steps:
-      - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f
+      - uses: actions/checkout@83b7061638ee4956cf7545a6f7efe594e5ad0247
       - run: just fetch
       - run: just test-build
       - run: just test
