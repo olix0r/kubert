@@ -126,7 +126,7 @@ impl Claim {
 
 impl LeaseManager {
     const DEFAULT_FIELD_MANAGER: &'static str = "kubert";
-    const DEFAULT_MIN_BACKOFF: Duration = Duration::from_secs(2);
+    const DEFAULT_MIN_BACKOFF: Duration = Duration::from_millis(5);
     const DEFAULT_BACKOFF_JITTER: f64 = 0.5; // up to 50% of the backoff duration
 
     /// Initialize a lease's state from the Kubernetes API.
