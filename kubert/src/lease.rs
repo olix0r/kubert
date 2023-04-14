@@ -320,7 +320,7 @@ impl LeaseManager {
                             backoff::Error::Permanent(err)
                         },
                         // Retry any other API request errors.
-                        err @ Error::Api(_) => {
+                        err => {
                             tracing::debug!(error = %err, "Error claiming lease, retrying...");
                             backoff::Error::Transient {
                                 err,
@@ -329,7 +329,6 @@ impl LeaseManager {
                                 retry_after: None,
                             }
                         }
-                        err @ Error::MissingResourceVersion | err @ Error::MissingSpec => backoff::Error::Permanent(err),
                     })
                 })
                 .await?;
