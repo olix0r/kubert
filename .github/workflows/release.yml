@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     container: ghcr.io/linkerd/dev:v39-rust
     steps:
-      - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab
       - id: meta
         shell: bash
         run: |
@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     container: ghcr.io/linkerd/dev:v39-rust
     steps:
-      - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f
+      - uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab
       - run: cargo publish --package=kubert --dry-run
       - if: needs.meta.outputs.mode == 'release'
         run: cargo publish --package=kubert --token=${{ secrets.CRATESIO_TOKEN }}
