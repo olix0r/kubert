@@ -26,8 +26,8 @@ jobs:
     timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v39
-      - uses: linkerd/dev/actions/setup-rust@v39
+      - uses: linkerd/dev/actions/setup-tools@v40
+      - uses: linkerd/dev/actions/setup-rust@v40
         with:
           version: ${{ matrix.rust }}
           components: clippy
