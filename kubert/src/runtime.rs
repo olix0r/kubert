@@ -10,7 +10,7 @@ use crate::{
     shutdown, LogFilter, LogFormat, LogInitError,
 };
 use futures_core::Stream;
-use kube_core::{params::ListParams, NamespaceResourceScope, Resource};
+use kube_core::{NamespaceResourceScope, Resource};
 use kube_runtime::{reflector, watcher};
 use serde::de::DeserializeOwned;
 use std::{fmt::Debug, hash::Hash, time::Duration};
@@ -290,13 +290,13 @@ impl<S> Runtime<S> {
     pub fn watch<T>(
         &mut self,
         api: Api<T>,
-        params: ListParams,
+        config: watcher::Config,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
         T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
-        let watch = watcher::watcher(api, params);
+        let watch = watcher::watcher(api, config);
         let successful = errors::LogAndSleep::fixed_delay(self.error_delay, watch);
         let initialized = self.initialized.add_handle().release_on_ready(successful);
         shutdown::CancelOnShutdown::new(self.shutdown_rx.clone(), initialized)
@@ -306,12 +306,12 @@ impl<S> Runtime<S> {
     ///
     /// See [`Runtime::watch`] for more details.
     #[inline]
-    pub fn watch_all<T>(&mut self, params: ListParams) -> impl Stream<Item = watcher::Event<T>>
+    pub fn watch_all<T>(&mut self, config: watcher::Config) -> impl Stream<Item = watcher::Event<T>>
     where
         T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
-        self.watch(Api::all(self.client()), params)
+        self.watch(Api::all(self.client()), config)
     }
 
     /// Creates a namespace-level watch on the default Kubernetes client
@@ -321,7 +321,7 @@ impl<S> Runtime<S> {
     pub fn watch_namespaced<T>(
         &mut self,
         ns: impl AsRef<str>,
-        params: ListParams,
+        config: watcher::Config,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
         T: Resource<Scope = NamespaceResourceScope>,
@@ -329,7 +329,7 @@ impl<S> Runtime<S> {
         T::DynamicType: Default,
     {
         let api = Api::namespaced(self.client(), ns.as_ref());
-        self.watch(api, params)
+        self.watch(api, config)
     }
 
     /// Creates a cached watch with the given [`Api`]
@@ -344,7 +344,7 @@ impl<S> Runtime<S> {
     pub fn cache<T>(
         &mut self,
         api: Api<T>,
-        params: ListParams,
+        config: watcher::Config,
     ) -> (Store<T>, impl Stream<Item = watcher::Event<T>>)
     where
         T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
@@ -353,7 +353,7 @@ impl<S> Runtime<S> {
         let writer = reflector::store::Writer::<T>::default();
         let store = writer.as_reader();
 
-        let watch = watcher::watcher(api, params);
+        let watch = watcher::watcher(api, config);
         let cached = reflector::reflector(writer, watch);
         let successful = errors::LogAndSleep::fixed_delay(self.error_delay, cached);
         let initialized = self.initialized.add_handle().release_on_ready(successful);
@@ -368,13 +368,13 @@ impl<S> Runtime<S> {
     #[inline]
     pub fn cache_all<T>(
         &mut self,
-        params: ListParams,
+        config: watcher::Config,
     ) -> (Store<T>, impl Stream<Item = watcher::Event<T>>)
     where
         T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Clone + Default + Eq + Hash + Clone,
     {
-        self.cache(Api::all(self.client()), params)
+        self.cache(Api::all(self.client()), config)
     }
 
     /// Creates a cached namespace-level watch on the default Kubernetes client
@@ -384,7 +384,7 @@ impl<S> Runtime<S> {
     pub fn cache_namespaced<T>(
         &mut self,
         ns: impl AsRef<str>,
-        params: ListParams,
+        config: watcher::Config,
     ) -> (Store<T>, impl Stream<Item = watcher::Event<T>>)
     where
         T: Resource<Scope = NamespaceResourceScope>,
@@ -392,7 +392,7 @@ impl<S> Runtime<S> {
         T::DynamicType: Clone + Default + Eq + Hash + Clone,
     {
         let api = Api::namespaced(self.client(), ns.as_ref());
-        self.cache(api, params)
+        self.cache(api, config)
     }
 }
 
