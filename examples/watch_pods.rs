@@ -5,7 +5,10 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
-use kube::{api::ListParams, runtime::watcher::Event, ResourceExt};
+use kube::{
+    runtime::watcher::{self, Event},
+    ResourceExt,
+};
 use tokio::time;
 use tracing::Instrument;
 
@@ -77,7 +80,7 @@ async fn main() -> Result<()> {
     tracing::debug!(?selector);
     let params = selector
         .iter()
-        .fold(ListParams::default(), |p, l| p.labels(l));
+        .fold(watcher::Config::default(), |p, l| p.labels(l));
     let pods = runtime.watch_all::<Pod>(params);
     let mut deadline = Some(deadline);
     let task = tokio::spawn(
