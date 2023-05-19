@@ -10,6 +10,8 @@ rust-version = "1.60"
 keywords = ["kubernetes", "client", "runtime", "server"]
 
 [features]
+default = ["logging"]
+logging = []
 admin = [
     "ahash",
     "futures-util",
