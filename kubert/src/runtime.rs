@@ -128,6 +128,7 @@ impl<S> Builder<S> {
 
     #[inline]
     async fn build_inner(self) -> Result<Runtime<S>, BuildError> {
+        #[cfg(feature = "logging")]
         self.log.unwrap_or_default().try_init()?;
         let client = self.client.unwrap_or_default().try_client().await?;
         let (shutdown, shutdown_rx) = shutdown::sigint_or_sigterm()?;
