@@ -5,7 +5,10 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use futures::prelude::*;
 use k8s_openapi::api::core::v1::Pod;
-use kube::{api::ListParams, runtime::watcher::Event, ResourceExt};
+use kube::{
+    runtime::watcher::{self, Event},
+    ResourceExt,
+};
 use tokio::time;
 use tracing::Instrument;
 
@@ -75,10 +78,10 @@ async fn main() -> Result<()> {
     // This stream completes when shutdown is signaled; and the admin endpoint does not return ready
     // until the first update is received.
     tracing::debug!(?selector);
-    let params = selector
+    let watcher_config = selector
         .iter()
-        .fold(ListParams::default(), |p, l| p.labels(l));
-    let pods = runtime.watch_all::<Pod>(params);
+        .fold(watcher::Config::default(), |p, l| p.labels(l));
+    let pods = runtime.watch_all::<Pod>(watcher_config);
     let mut deadline = Some(deadline);
     let task = tokio::spawn(
         async move {
