@@ -1,8 +1,10 @@
 //! Utilities for configuring a [`kube_client::Client`] from the command line
 
+use hyper::{body::HttpBody, Body, Request, Response};
 pub use kube_client::*;
 use std::path::PathBuf;
 use thiserror::Error;
+use tower::{BoxError, Service, ServiceBuilder};
 
 /// Configures a Kubernetes client
 #[derive(Clone, Debug, Default)]
@@ -67,6 +69,40 @@ impl ClientArgs {
         };
 
         client.try_into().map_err(Into::into)
+    }
+
+    /// Initializes a Kubernetes client from a [`tower::Service`].
+    ///
+    /// This will respect the `$KUBECONFIG` environment variable, but otherwise default to
+    /// `~/.kube/config`. The _current-context_ is used unless `context` is set.
+    ///
+    /// This is basically equivalent to using `kube_client::Client::new`, except that it
+    /// supports kubeconfig configuration from the command-line.
+    pub async fn try_from_service<S, B>(self, svc: S) -> Result<Client, ConfigError>
+    where
+        S: Service<Request<Body>, Response = Response<B>> + Send + Clone + 'static,
+        S::Future: Send + 'static,
+        S::Error: Into<BoxError>,
+        B: HttpBody<Data = bytes::Bytes> + Send + 'static,
+        B::Error: Into<BoxError>,
+    {
+        use kube_client::client::{ClientBuilder, ConfigExt};
+
+        let config = match self.load_local_config().await {
+            Ok(client) => client,
+            Err(e) if self.is_customized() => return Err(e),
+            Err(_) => Config::incluster()?,
+        };
+
+        let stack = ServiceBuilder::new()
+            .layer(config.base_uri_layer())
+            // TODO(eliza): add an equivalent gzip config to the one from kube_client?
+            .option_layer(config.auth_layer()?)
+            .layer(config.extra_headers_layer()?)
+            // TODO(eliza): consider adding tracing layer a la kube-client?
+            .service(svc);
+
+        Ok(ClientBuilder::new(stack, config.default_namespace).build())
     }
 
     /// Indicates whether the command-line arguments attempt to customize the Kubernetes

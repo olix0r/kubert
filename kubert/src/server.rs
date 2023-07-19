@@ -8,7 +8,7 @@ use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, syn
 use thiserror::Error;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_rustls::{rustls, TlsAcceptor};
-use tower_service::Service;
+use tower::Service;
 use tracing::{debug, error, info, info_span, Instrument};
 
 /// Command-line arguments used to configure a server
