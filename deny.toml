@@ -73,8 +73,8 @@ skip-tree = [
     # 1.0 to `syn` 2.0
     { name = "syn" },
     # `parking-lot-core` and `dirs-next` (transitive deps via `kube-client`)
-    # depend on incompatible versions of `redox-syscall`.
-    { name = "redox-syscall" },
+    # depend on incompatible versions of `redox_syscall`.
+    { name = "redox_syscall" },
 ]
 
 [sources]
