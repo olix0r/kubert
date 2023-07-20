@@ -67,11 +67,14 @@ skip-tree = [
     # libraries.
     # TODO(eliza): remove this skip when the conflicts are resolved.
     { name = "metrics-process" },
-    # serde_json and serde_yaml depend on incompatible versions of indexmap
+    # `serde_json` and `serde_yaml` depend on incompatible versions of indexmap
     { name = "indexmap" },
     # the proc-macro ecosystem is still in the process of migrating from `syn`
     # 1.0 to `syn` 2.0
     { name = "syn" },
+    # `parking-lot-core` and `dirs-next` (transitive deps via `kube-client`)
+    # depend on incompatible versions of `redox-syscall`.
+    { name = "redox-syscall" },
 ]
 
 [sources]
