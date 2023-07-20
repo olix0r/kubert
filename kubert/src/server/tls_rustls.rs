@@ -1,8 +1,8 @@
 use super::*;
-use rustls::TlsAcceptor;
 use std::sync::Arc;
+use tokio_rustls::{rustls, server::TlsStream, TlsAcceptor};
 
-async fn load_tls(pk: &TlsKeyPath, crts: &TlsCertPath) -> Result<TlsAcceptor, Error> {
+pub(super) async fn load_tls(pk: &TlsKeyPath, crts: &TlsCertPath) -> Result<TlsAcceptor, Error> {
     let key = pk
         .load_private_key()
         .await
@@ -14,10 +14,17 @@ async fn load_tls(pk: &TlsKeyPath, crts: &TlsCertPath) -> Result<TlsAcceptor, Er
         .with_safe_defaults()
         .with_no_client_auth()
         .with_single_cert(certs, key)
-        .map_err(Error::InvalidTlsCredentials)?;
+        .map_err(|err| Error::InvalidTlsCredentials(Box::new(err)))?;
     cfg.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
 
     Ok(TlsAcceptor::from(Arc::new(cfg)))
+}
+
+pub(super) async fn accept(
+    acceptor: &TlsAcceptor,
+    sock: TcpStream,
+) -> Result<TlsStream<TcpStream>, std::io::Error> {
+    acceptor.accept(sock).await
 }
 
 // === impl TlsCertPath ===

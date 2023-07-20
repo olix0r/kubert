@@ -10,7 +10,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tower::Service;
 use tracing::{debug, error, info, info_span, Instrument};
 
-#[cfg(all(feature = "rustls-tls", not(feature = "boring-tls")))]
+#[cfg(feature = "rustls-tls")]
 #[path = "server/tls_rustls.rs"]
 mod tls;
 
@@ -272,7 +272,7 @@ async fn serve_conn<S, B>(
     };
     tracing::trace!("loaded TLS credentials");
 
-    let socket = match tls.accept(tcp).await {
+    let socket = match tls::accept(&tls, tcp).await {
         Ok(s) => s,
         Err(error) => {
             info!(%error, "TLS handshake failed");
