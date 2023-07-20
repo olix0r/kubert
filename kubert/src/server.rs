@@ -4,12 +4,22 @@
 //! Unlike a normal `hyper` server, this server reloads its TLS credentials for each connection to
 //! support certificate rotation.
 
-use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr};
 use thiserror::Error;
 use tokio::net::{TcpListener, TcpStream};
-use tokio_rustls::{rustls, TlsAcceptor};
 use tower::Service;
 use tracing::{debug, error, info, info_span, Instrument};
+
+#[cfg(all(feature = "rustls-tls", not(feature = "boring-tls")))]
+#[path = "server/tls_rustls.rs"]
+mod tls;
+
+#[cfg(all(feature = "boring-tls", not(feature = "rustls-tls")))]
+#[path = "server/tls_boring.rs"]
+mod tls;
+
+#[cfg(all(feature = "boring-tls", feature = "rustls-tls"))]
+compile_error!("only one TLS implementation ('boring-tls' or 'rustls-tls') can be enabled");
 
 /// Command-line arguments used to configure a server
 #[derive(Clone, Debug)]
@@ -79,7 +89,7 @@ pub enum Error {
 
     /// The configured TLS credentials were invalid
     #[error("failed to load TLS credentials: {0}")]
-    InvalidTlsCredentials(#[source] rustls::Error),
+    InvalidTlsCredentials(#[source] Box<dyn std::error::Error + Send + Sync>),
 
     /// An error occurred while binding a server
     #[error("failed to bind {0:?}: {1}")]
@@ -100,7 +110,7 @@ impl ServerArgs {
 
         // Ensure the TLS key and certificate files load properly before binding the socket and
         // spawning the server.
-        let _ = load_tls(&tls_key, &tls_certs).await?;
+        let _ = tls::load_tls(&tls_key, &tls_certs).await?;
 
         let tcp = TcpListener::bind(&self.server_addr)
             .await
@@ -253,7 +263,7 @@ async fn serve_conn<S, B>(
     tracing::debug!("accepted TCP connection");
 
     // Reload the TLS credentials for each connection.
-    let tls = match load_tls(&tls_key, &tls_certs).await {
+    let tls = match tls::load_tls(&tls_key, &tls_certs).await {
         Ok(tls) => tls,
         Err(error) => {
             info!(%error, "Connection failed");
@@ -292,38 +302,6 @@ async fn serve_conn<S, B>(
     }
 }
 
-async fn load_tls(pk: &TlsKeyPath, crts: &TlsCertPath) -> Result<TlsAcceptor, Error> {
-    let key = pk
-        .load_private_key()
-        .await
-        .map_err(Error::TlsKeyReadError)?;
-
-    let certs = crts.load_certs().await.map_err(Error::TlsCertsReadError)?;
-
-    let mut cfg = rustls::ServerConfig::builder()
-        .with_safe_defaults()
-        .with_no_client_auth()
-        .with_single_cert(certs, key)
-        .map_err(Error::InvalidTlsCredentials)?;
-    cfg.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
-
-    Ok(TlsAcceptor::from(Arc::new(cfg)))
-}
-
-// === impl TlsCertPath ===
-
-impl TlsCertPath {
-    // Load public certificate from file
-    async fn load_certs(&self) -> std::io::Result<Vec<rustls::Certificate>> {
-        // Open certificate file.
-        let pem = tokio::fs::read(&self.0).await?;
-
-        // Load and return certificate.
-        let certs = rustls_pemfile::certs(&mut pem.as_slice())?;
-        Ok(certs.into_iter().map(rustls::Certificate).collect())
-    }
-}
-
 impl FromStr for TlsCertPath {
     type Err = Infallible;
 
@@ -333,36 +311,6 @@ impl FromStr for TlsCertPath {
 }
 
 // === impl TlsKeyPath ===
-
-impl TlsKeyPath {
-    async fn load_private_key(&self) -> std::io::Result<rustls::PrivateKey> {
-        // Open keyfile.
-        let pem = tokio::fs::read(&self.0).await?;
-
-        // Load and return a single private key.
-        let mut keys = rustls_pemfile::pkcs8_private_keys(&mut pem.as_slice())?;
-
-        if keys.is_empty() {
-            keys = rustls_pemfile::rsa_private_keys(&mut pem.as_slice())?;
-
-            if keys.is_empty() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "could not load private key",
-                ));
-            }
-        }
-
-        if keys.len() > 1 {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "too many private keys",
-            ));
-        }
-
-        Ok(rustls::PrivateKey(keys[0].clone()))
-    }
-}
 
 impl FromStr for TlsKeyPath {
     type Err = Infallible;
