@@ -202,7 +202,11 @@ impl Bound {
         let Self {
             local_addr,
             tcp,
+
+            #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
             tls_key,
+
+            #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
             tls_certs,
         } = self;
 

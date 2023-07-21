@@ -7,8 +7,7 @@ _features := if features == "all" {
         "--no-default-features --features=" + features
     } else { "" }
 
-# required to build boringssl
-# For dev:v40
+# Required to build boringssl (for dev:v40)
 export CXX := 'clang++-14'
 
 #
