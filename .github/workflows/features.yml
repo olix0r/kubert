@@ -42,6 +42,9 @@ jobs:
           - admin
           - admin,metrics
           - client
+          - "client rustls-tls"
+          - "client boring-tls"
+          - "client boring-tls rustls-tls"
           - errors
           - index
           - initialized
@@ -51,6 +54,9 @@ jobs:
           - requeue
           - runtime
           - server
+          - "server rustls-tls"
+          - "server boring-tls"
+          - "server boring-tls rustls-tls"
           - shutdown
     timeout-minutes: 5
     runs-on: ubuntu-latest
