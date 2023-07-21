@@ -7,10 +7,13 @@ use boring::{
 };
 use once_cell::sync::Lazy;
 
-pub(super) type TlsAcceptor = ssl::SslAcceptor;
-pub(super) use tokio_boring::accept;
+pub(in crate::server) type TlsAcceptor = ssl::SslAcceptor;
+pub(in crate::server) use tokio_boring::accept;
 
-pub(super) async fn load_tls(pk: &TlsKeyPath, crts: &TlsCertPath) -> Result<TlsAcceptor, Error> {
+pub(in crate::server) async fn load_tls(
+    pk: &TlsKeyPath,
+    crts: &TlsCertPath,
+) -> Result<TlsAcceptor, Error> {
     let key = pk
         .load_private_key()
         .await

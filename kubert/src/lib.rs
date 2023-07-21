@@ -100,17 +100,8 @@ pub mod requeue;
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
 pub mod runtime;
 
-#[cfg(all(
-    feature = "server",
-    any(feature = "rustls-tls", feature = "boring-tls")
-))]
-#[cfg_attr(
-    docsrs,
-    doc(cfg(all(
-        feature = "server",
-        any(feature = "rustls-tls", feature = "boring-tls")
-    )))
-)]
+#[cfg(all(feature = "server"))]
+#[cfg_attr(docsrs, doc(cfg(feature = "server")))]
 pub mod server;
 
 #[cfg(feature = "shutdown")]
@@ -135,8 +126,5 @@ pub use self::log::{LogFilter, LogFormat, LogInitError};
 #[cfg(all(feature = "runtime"))]
 pub use self::runtime::Runtime;
 
-#[cfg(all(
-    feature = "server",
-    any(feature = "rustls-tls", feature = "boring-tls")
-))]
+#[cfg(feature = "server")]
 pub use self::server::ServerArgs;

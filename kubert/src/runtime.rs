@@ -1,9 +1,6 @@
 //! A controller runtime
 
-#[cfg(all(
-    feature = "server",
-    any(feature = "rustls-tls", feature = "boring-tls")
-))]
+#[cfg(feature = "server")]
 use crate::server::{self, ServerArgs};
 use crate::{
     admin::{self, Readiness},
@@ -32,15 +29,9 @@ pub struct Builder<S = NoServer> {
     error_delay: Option<Duration>,
     log: Option<LogSettings>,
 
-    #[cfg(all(
-        feature = "server",
-        any(feature = "rustls-tls", feature = "boring-tls")
-    ))]
+    #[cfg(feature = "server")]
     server: S,
-    #[cfg(not(all(
-        feature = "server",
-        any(feature = "rustls-tls", feature = "boring-tls")
-    )))]
+    #[cfg(not(feature = "server"))]
     server: std::marker::PhantomData<S>,
 }
 
@@ -63,15 +54,9 @@ pub struct Runtime<S = NoServer> {
     shutdown_rx: drain::Watch,
     shutdown: shutdown::Shutdown,
 
-    #[cfg(all(
-        feature = "server",
-        any(feature = "rustls-tls", feature = "boring-tls")
-    ))]
+    #[cfg(feature = "server")]
     server: S,
-    #[cfg(not(all(
-        feature = "server",
-        any(feature = "rustls-tls", feature = "boring-tls")
-    )))]
+    #[cfg(not(feature = "server"))]
     server: std::marker::PhantomData<S>,
 }
 
@@ -95,10 +80,7 @@ pub enum BuildError {
     #[error(transparent)]
     Client(#[from] client::ConfigError),
 
-    #[cfg(all(
-        feature = "server",
-        any(feature = "rustls-tls", feature = "boring-tls")
-    ))]
+    #[cfg(feature = "server")]
     /// Indicates that the HTTPS server could not be initialized
     #[error(transparent)]
     Server(#[from] server::Error),
@@ -168,10 +150,7 @@ impl<S> Builder<S> {
     }
 }
 
-#[cfg(all(
-    feature = "server",
-    any(feature = "rustls-tls", feature = "boring-tls")
-))]
+#[cfg(feature = "server")]
 impl Builder<NoServer> {
     /// Configures the runtime to start a server with the given [`ServerArgs`]
     #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "server"))))]
@@ -227,10 +206,7 @@ impl Builder<NoServer> {
     }
 }
 
-#[cfg(all(
-    feature = "server",
-    any(feature = "rustls-tls", feature = "boring-tls")
-))]
+#[cfg(feature = "server")]
 impl Builder<ServerArgs> {
     /// Attempts to build a runtime by initializing logs, loading the default Kubernetes client,
     /// registering signal handlers and binding admin and HTTPS servers
@@ -284,10 +260,7 @@ impl Builder<ServerArgs> {
     }
 }
 
-#[cfg(all(
-    feature = "server",
-    any(feature = "rustls-tls", feature = "boring-tls")
-))]
+#[cfg(feature = "server")]
 impl Builder<Option<ServerArgs>> {
     /// Attempts to build a runtime by initializing logs, loading the default Kubernetes client,
     /// registering signal handlers and binding admin and HTTPS servers
@@ -519,10 +492,7 @@ impl<S> Runtime<S> {
     }
 }
 
-#[cfg(all(
-    feature = "server",
-    any(feature = "rustls-tls", feature = "boring-tls")
-))]
+#[cfg(feature = "server")]
 impl Runtime<server::Bound> {
     /// Returns the bound local address of the server
     pub fn server_addr(&self) -> std::net::SocketAddr {
@@ -559,10 +529,7 @@ impl Runtime<server::Bound> {
     }
 }
 
-#[cfg(all(
-    feature = "server",
-    any(feature = "rustls-tls", feature = "boring-tls")
-))]
+#[cfg(feature = "server")]
 impl Runtime<Option<server::Bound>> {
     /// Returns the bound local address of the server
     pub fn server_addr(&self) -> Option<std::net::SocketAddr> {

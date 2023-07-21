@@ -2,7 +2,10 @@ use super::*;
 use std::sync::Arc;
 use tokio_rustls::{rustls, server::TlsStream, TlsAcceptor};
 
-pub(super) async fn load_tls(pk: &TlsKeyPath, crts: &TlsCertPath) -> Result<TlsAcceptor, Error> {
+pub(in crate::server) async fn load_tls(
+    pk: &TlsKeyPath,
+    crts: &TlsCertPath,
+) -> Result<TlsAcceptor, Error> {
     let key = pk
         .load_private_key()
         .await
@@ -20,7 +23,7 @@ pub(super) async fn load_tls(pk: &TlsKeyPath, crts: &TlsCertPath) -> Result<TlsA
     Ok(TlsAcceptor::from(Arc::new(cfg)))
 }
 
-pub(super) async fn accept(
+pub(in crate::server) async fn accept(
     acceptor: &TlsAcceptor,
     sock: TcpStream,
 ) -> Result<TlsStream<TcpStream>, std::io::Error> {
