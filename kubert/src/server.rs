@@ -10,16 +10,13 @@ use tokio::net::{TcpListener, TcpStream};
 use tower::Service;
 use tracing::{debug, error, info, info_span, Instrument};
 
-#[cfg(feature = "rustls-tls")]
+#[cfg(all(feature = "rustls-tls", not(feature = "boring-tls")))]
 #[path = "server/tls_rustls.rs"]
 mod tls;
 
-#[cfg(all(feature = "boring-tls", not(feature = "rustls-tls")))]
+#[cfg(feature = "boring-tls")]
 #[path = "server/tls_boring.rs"]
 mod tls;
-
-#[cfg(all(feature = "boring-tls", feature = "rustls-tls"))]
-compile_error!("only one TLS implementation ('boring-tls' or 'rustls-tls') can be enabled");
 
 /// Command-line arguments used to configure a server
 #[derive(Clone, Debug)]
