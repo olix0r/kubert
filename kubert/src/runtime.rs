@@ -198,8 +198,8 @@ impl Builder<NoServer> {
             + 'static,
         C::Future: Send + 'static,
         C::Error: Into<tower::BoxError>,
-        B: hyper::body::HttpBody<Data = bytes::Bytes> + Send + 'static,
-        B::Error: Into<tower::BoxError>,
+        B: hyper::body::HttpBody<Data = bytes::Bytes> + Send + Unpin + 'static,
+        B::Error: Into<tower::BoxError> + Send + Sync,
     {
         self.build_inner(move |client_args| client_args.try_from_service(client))
             .await
@@ -240,8 +240,8 @@ impl Builder<ServerArgs> {
             + 'static,
         C::Future: Send + 'static,
         C::Error: Into<tower::BoxError>,
-        B: hyper::body::HttpBody<Data = bytes::Bytes> + Send + 'static,
-        B::Error: Into<tower::BoxError>,
+        B: hyper::body::HttpBody<Data = bytes::Bytes> + Send + Unpin + 'static,
+        B::Error: Into<tower::BoxError> + Send + Sync,
     {
         let rt = self
             .build_inner(move |client_args| client_args.try_from_service(client))
@@ -298,8 +298,8 @@ impl Builder<Option<ServerArgs>> {
             + 'static,
         C::Future: Send + 'static,
         C::Error: Into<tower::BoxError>,
-        B: hyper::body::HttpBody<Data = bytes::Bytes> + Send + 'static,
-        B::Error: Into<tower::BoxError>,
+        B: hyper::body::HttpBody<Data = bytes::Bytes> + Send + Unpin + 'static,
+        B::Error: Into<tower::BoxError> + Send + Sync,
     {
         let rt = self
             .build_inner(move |client_args| client_args.try_from_service(client))
