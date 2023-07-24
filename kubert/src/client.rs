@@ -83,8 +83,8 @@ impl ClientArgs {
         S: Service<Request<Body>, Response = Response<B>> + Send + Clone + 'static,
         S::Future: Send + 'static,
         S::Error: Into<BoxError>,
-        B: HttpBody<Data = bytes::Bytes> + Send + 'static,
-        B::Error: Into<BoxError>,
+        B: HttpBody<Data = bytes::Bytes> + Send + Unpin + 'static,
+        B::Error: Into<BoxError> + Send + Sync,
     {
         use kube_client::client::{ClientBuilder, ConfigExt};
 
@@ -98,11 +98,24 @@ impl ClientArgs {
             .layer(config.base_uri_layer())
             // TODO(eliza): add an equivalent gzip config to the one from kube_client?
             .option_layer(config.auth_layer()?)
-            .layer(config.extra_headers_layer()?)
-            // TODO(eliza): consider adding tracing layer a la kube-client?
-            .service(svc);
+            .layer(config.extra_headers_layer()?);
 
-        Ok(ClientBuilder::new(stack, config.default_namespace).build())
+        #[cfg(feature = "gzip")]
+        let stack = {
+            use tower_http::{
+                decompression::DecompressionLayer, map_response_body::MapResponseBodyLayer,
+            };
+            stack
+                .layer(DecompressionLayer::new())
+                .layer(MapResponseBodyLayer::new(|body| {
+                    Box::new(HttpBody::map_err(body, Into::into))
+                        as Box<dyn HttpBody<Data = bytes::Bytes, Error = BoxError> + Send + Unpin>
+                }))
+        };
+
+        let svc = stack.service(svc);
+
+        Ok(ClientBuilder::new(svc, config.default_namespace).build())
     }
 
     /// Indicates whether the command-line arguments attempt to customize the Kubernetes
