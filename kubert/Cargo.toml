@@ -19,7 +19,15 @@ admin = [
     "tokio/sync",
     "tracing",
 ]
-client = ["kube-client", "thiserror"]
+client = [
+    "bytes",
+    "kube-client",
+    "thiserror",
+    "tower",
+    "tower/util",
+    "tower-http",
+    "hyper",
+]
 errors = [
     "futures-core",
     "futures-util",
@@ -27,6 +35,7 @@ errors = [
     "tokio/time",
     "tracing",
 ]
+gzip = ["tower-http?/decompression-gzip"]
 index = [
     "ahash",
     "futures-core",
@@ -85,7 +94,7 @@ server = [
     "tokio/net",
     "tokio/rt",
     "tokio-rustls",
-    "tower-service",
+    "tower",
     "tracing",
 ]
 shutdown = [
@@ -105,6 +114,7 @@ features = ["k8s-openapi/v1_26"]
 [dependencies]
 ahash = { version = "0.8", optional = true }
 backoff = { version = "0.4", features = ["tokio"], optional = true }
+bytes = { version = "1", optional = true }
 deflate = { version = "1", optional = true, default-features = false, features = [
     "gzip",
 ] }
@@ -124,7 +134,8 @@ serde_json = { version = "1", optional = true }
 tokio = { version = "1.17.0", optional = false, default-features = false }
 tokio-util = { version = "0.7", optional = true, default-features = false }
 tokio-rustls = { version = "0.23.2", optional = true, default-features = false }
-tower-service = { version = "0.3.1", optional = true }
+tower-http = { version = "0.4.0", optional = true, default-features = false, features = ["map-response-body"] }
+tower = { version = "0.4", default-features = false, optional = true }
 tracing = { version = "0.1.31", optional = true }
 
 [dependencies.clap]
