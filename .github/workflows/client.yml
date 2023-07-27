@@ -17,6 +17,7 @@ env:
   RUST_VERSION: 1.64.0
   RUSTUP_MAX_RETRIES: 10
   KUBERT_TEST_NS: kubert-test
+  GITHUB_ACTIONS=false
 
 jobs:
   local:
