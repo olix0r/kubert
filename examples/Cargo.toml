@@ -33,12 +33,12 @@ features = ["v1_26"]
 [dev-dependencies.kube]
 version = "0.84"
 default-features = false
-features = ["client", "derive", "openssl-tls", "runtime"]
+features = ["client", "derive", "rustls-tls", "runtime"]
 
 [dev-dependencies.kubert]
 path = "../kubert"
 default-features = false
-features = ["clap", "lease", "runtime"]
+features = ["clap", "lease", "runtime", "rustls-tls"]
 
 [dev-dependencies.tokio]
 version = "1"
