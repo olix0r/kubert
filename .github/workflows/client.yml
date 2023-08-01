@@ -3,8 +3,8 @@ name: client
 on:
   pull_request:
     paths:
-      - "**/Cargo.toml"
-      - "**/*.rs"
+      - '**/Cargo.toml'
+      - '**/*.rs'
       - justfile
       - .github/workflows/client.yml
 
