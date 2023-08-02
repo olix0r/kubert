@@ -100,7 +100,7 @@ pub mod requeue;
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
 pub mod runtime;
 
-#[cfg(all(feature = "server"))]
+#[cfg(feature = "server")]
 #[cfg_attr(docsrs, doc(cfg(feature = "server")))]
 pub mod server;
 
