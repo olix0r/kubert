@@ -4,16 +4,19 @@
 //! Unlike a normal `hyper` server, this server reloads its TLS credentials for each connection to
 //! support certificate rotation.
 
-use std::net::SocketAddr;
+use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr};
 use thiserror::Error;
 use tokio::net::{TcpListener, TcpStream};
 use tower::Service;
 use tracing::{debug, error, info, info_span, Instrument};
 
-#[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
+#[cfg(all(feature = "rustls-tls", not(feature = "boring-tls")))]
+#[path = "./server/tls_rustls.rs"]
 mod tls;
-#[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-use tls::{TlsCertPath, TlsKeyPath};
+
+#[cfg(feature = "boring-tls")]
+#[path = "./server/tls_boring.rs"]
+mod tls;
 
 /// Command-line arguments used to configure a server
 #[derive(Clone, Debug)]
@@ -24,28 +27,18 @@ pub struct ServerArgs {
     #[cfg_attr(feature = "clap", clap(long, default_value = "0.0.0.0:443"))]
     pub server_addr: SocketAddr,
 
-    /// The path to the server's TLS key
+    /// The path to the server's TLS key.
+    ///
+    /// TLS requires that `kubert` be built with one of the "rustls-tls" or
+    /// "boring-tls" feature flags enabled.
     #[cfg_attr(feature = "clap", clap(long))]
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "server",
-            any(feature = "rustls-tls", feature = "boring-tls")
-        )))
-    )]
     pub server_tls_key: Option<TlsKeyPath>,
 
     /// The path to the server's TLS certificate
+    ///
+    /// TLS requires that `kubert` be built with one of the "rustls-tls" or
+    /// "boring-tls" feature flags enabled.
     #[cfg_attr(feature = "clap", clap(long))]
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "server",
-            any(feature = "rustls-tls", feature = "boring-tls")
-        )))
-    )]
     pub server_tls_certs: Option<TlsCertPath>,
 }
 
@@ -55,11 +48,7 @@ pub struct ServerArgs {
 pub struct Bound {
     local_addr: SocketAddr,
     tcp: tokio::net::TcpListener,
-
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-    tls_key: TlsKeyPath,
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-    tls_certs: TlsCertPath,
+    tls: Option<TlsPaths>,
 }
 
 /// A running server
@@ -75,63 +64,23 @@ pub struct SpawnedServer {
 #[non_exhaustive]
 pub enum Error {
     /// No TLS key path was configured
-    #[error("--server-tls-key must be set")]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "server",
-            any(feature = "rustls-tls", feature = "boring-tls")
-        )))
-    )]
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
+    #[error("--server-tls-key must be set if TLS is enabled")]
     NoTlsKey,
 
     /// No TLS certificate path was configured
-    #[error("--server-tls-certs must be set")]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "server",
-            any(feature = "rustls-tls", feature = "boring-tls")
-        )))
-    )]
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
+    #[error("--server-tls-certs must be set if TLS is enabled")]
     NoTlsCerts,
 
     /// The configured TLS certificate path could not be read
     #[error("failed to read TLS certificates: {0}")]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "server",
-            any(feature = "rustls-tls", feature = "boring-tls")
-        )))
-    )]
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
     TlsCertsReadError(#[source] std::io::Error),
 
     /// The configured TLS key path could not be read
     #[error("failed to read TLS key: {0}")]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "server",
-            any(feature = "rustls-tls", feature = "boring-tls")
-        )))
-    )]
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
     TlsKeyReadError(#[source] std::io::Error),
 
     /// The configured TLS credentials were invalid
     #[error("failed to load TLS credentials: {0}")]
-    #[cfg_attr(
-        docsrs,
-        doc(cfg(all(
-            feature = "server",
-            any(feature = "rustls-tls", feature = "boring-tls")
-        )))
-    )]
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
     InvalidTlsCredentials(#[source] Box<dyn std::error::Error + Send + Sync>),
 
     /// An error occurred while binding a server
@@ -143,20 +92,50 @@ pub enum Error {
     LocalAddr(#[source] std::io::Error),
 }
 
+/// The path to the server's TLS private key
+#[derive(Clone, Debug)]
+pub struct TlsKeyPath(PathBuf);
+
+/// The path to the server's TLS certificate bundle
+#[derive(Clone, Debug)]
+pub struct TlsCertPath(PathBuf);
+
+#[derive(Clone, Debug)]
+// TLS paths may not be used if TLS is not enabled.
+#[cfg_attr(
+    not(any(feature = "rustls-tls", feature = "boring-tls")),
+    allow(dead_code)
+)]
+struct TlsPaths {
+    key: TlsKeyPath,
+    certs: TlsCertPath,
+}
+
 // === impl ServerArgs ===
 
 impl ServerArgs {
     /// Attempts to load credentials and bind the server socket
     pub async fn bind(self) -> Result<Bound, Error> {
         #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-        let tls_key = self.server_tls_key.ok_or(Error::NoTlsKey)?;
-        #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-        let tls_certs = self.server_tls_certs.ok_or(Error::NoTlsCerts)?;
+        let tls = {
+            let key = self.server_tls_key.ok_or(Error::NoTlsKey)?;
+            let certs = self.server_tls_certs.ok_or(Error::NoTlsCerts)?;
+            // Ensure the TLS key and certificate files load properly before binding the socket and
+            // spawning the server.
+            let _ = tls::load_tls(&key, &certs).await?;
+            Some(TlsPaths { key, certs })
+        };
 
-        // Ensure the TLS key and certificate files load properly before binding the socket and
-        // spawning the server.
-        #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-        let _ = tls::load_tls(&tls_key, &tls_certs).await?;
+        #[cfg(not(any(feature = "rustls-tls", feature = "boring-tls")))]
+        let tls = {
+            if self.server_tls_key.is_some() || self.server_tls_certs.is_some() {
+                tracing::warn!(
+                    "Ignoring `--server-tls-key` and `--server-tls-cert` \
+                    arguments, as no TLS implementation is enabled"
+                );
+            }
+            None
+        };
 
         let tcp = TcpListener::bind(&self.server_addr)
             .await
@@ -165,10 +144,7 @@ impl ServerArgs {
         Ok(Bound {
             local_addr,
             tcp,
-            #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-            tls_key,
-            #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-            tls_certs,
+            tls,
         })
     }
 }
@@ -202,25 +178,12 @@ impl Bound {
         let Self {
             local_addr,
             tcp,
-
-            #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-            tls_key,
-
-            #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-            tls_certs,
+            tls,
         } = self;
 
         let task = tokio::spawn(
-            accept_loop(
-                tcp,
-                drain,
-                service,
-                #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-                tls_key,
-                #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-                tls_certs,
-            )
-            .instrument(info_span!("server", port = %local_addr.port())),
+            accept_loop(tcp, drain, service, tls)
+                .instrument(info_span!("server", port = %local_addr.port())),
         );
 
         SpawnedServer { local_addr, task }
@@ -246,13 +209,8 @@ impl SpawnedServer {
     }
 }
 
-async fn accept_loop<S, B>(
-    tcp: TcpListener,
-    drain: drain::Watch,
-    service: S,
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))] tls_key: TlsKeyPath,
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))] tls_certs: TlsCertPath,
-) where
+async fn accept_loop<S, B>(tcp: TcpListener, drain: drain::Watch, service: S, tls: Option<TlsPaths>)
+where
     S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync,
     S::Future: Send,
@@ -290,16 +248,7 @@ async fn accept_loop<S, B>(
         };
 
         tokio::spawn(
-            serve_conn(
-                socket,
-                drain.clone(),
-                service.clone(),
-                #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-                tls_key.clone(),
-                #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
-                tls_certs.clone(),
-            )
-            .instrument(info_span!(
+            serve_conn(socket, drain.clone(), service.clone(), tls.clone()).instrument(info_span!(
                 "conn",
                 client.ip = %client_addr.ip(),
                 client.port = %client_addr.port(),
@@ -308,13 +257,13 @@ async fn accept_loop<S, B>(
     }
 }
 
-async fn serve_conn<S, B>(
-    socket: TcpStream,
-    drain: drain::Watch,
-    service: S,
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))] tls_key: TlsKeyPath,
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))] tls_certs: TlsCertPath,
-) where
+// TLS paths may not be used if TLS is not enabled.
+#[cfg_attr(
+    not(any(feature = "rustls-tls", feature = "boring-tls")),
+    allow(unused_variables)
+)]
+async fn serve_conn<S, B>(socket: TcpStream, drain: drain::Watch, service: S, tls: Option<TlsPaths>)
+where
     S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>> + Send + 'static,
     S::Error: std::error::Error + Send + Sync,
     S::Future: Send,
@@ -326,8 +275,10 @@ async fn serve_conn<S, B>(
 
     #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
     let socket = {
+        let TlsPaths { key, certs } = tls
+            .expect("if the 'rustls-tls' or 'boring-tls' features are enabled, TLS paths are required by the CLI");
         // Reload the TLS credentials for each connection.
-        let tls = match tls::load_tls(&tls_key, &tls_certs).await {
+        let tls = match tls::load_tls(&key, &certs).await {
             Ok(tls) => tls,
             Err(error) => {
                 info!(%error, "Connection failed");
@@ -365,5 +316,25 @@ async fn serve_conn<S, B>(
     match res {
         Ok(()) => debug!("Connection closed"),
         Err(error) => info!(%error, "Connection lost"),
+    }
+}
+
+// === impl TlsCertPath ===
+
+impl FromStr for TlsCertPath {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
+    }
+}
+
+// === impl TlsKeyPath ===
+
+impl FromStr for TlsKeyPath {
+    type Err = Infallible;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        s.parse().map(Self)
     }
 }
