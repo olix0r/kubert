@@ -4,7 +4,7 @@
 //! Unlike a normal `hyper` server, this server reloads its TLS credentials for each connection to
 //! support certificate rotation.
 
-use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr};
+use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use thiserror::Error;
 use tokio::net::{TcpListener, TcpStream};
 use tower::Service;
@@ -48,7 +48,7 @@ pub struct ServerArgs {
 pub struct Bound {
     local_addr: SocketAddr,
     tcp: tokio::net::TcpListener,
-    tls: Option<TlsPaths>,
+    tls: Option<Arc<TlsPaths>>,
 }
 
 /// A running server
@@ -123,7 +123,7 @@ impl ServerArgs {
             // Ensure the TLS key and certificate files load properly before binding the socket and
             // spawning the server.
             let _ = tls::load_tls(&key, &certs).await?;
-            Some(TlsPaths { key, certs })
+            Some(Arc::new(TlsPaths { key, certs }))
         };
 
         #[cfg(not(any(feature = "rustls-tls", feature = "boring-tls")))]
@@ -209,8 +209,12 @@ impl SpawnedServer {
     }
 }
 
-async fn accept_loop<S, B>(tcp: TcpListener, drain: drain::Watch, service: S, tls: Option<TlsPaths>)
-where
+async fn accept_loop<S, B>(
+    tcp: TcpListener,
+    drain: drain::Watch,
+    service: S,
+    tls: Option<Arc<TlsPaths>>,
+) where
     S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync,
     S::Future: Send,
@@ -262,8 +266,12 @@ where
     not(any(feature = "rustls-tls", feature = "boring-tls")),
     allow(unused_variables)
 )]
-async fn serve_conn<S, B>(socket: TcpStream, drain: drain::Watch, service: S, tls: Option<TlsPaths>)
-where
+async fn serve_conn<S, B>(
+    socket: TcpStream,
+    drain: drain::Watch,
+    service: S,
+    tls: Option<Arc<TlsPaths>>,
+) where
     S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>> + Send + 'static,
     S::Error: std::error::Error + Send + Sync,
     S::Future: Send,
@@ -275,10 +283,10 @@ where
 
     #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
     let socket = {
-        let TlsPaths { key, certs } = tls
+        let TlsPaths { ref key, ref certs } = &*tls
             .expect("if the 'rustls-tls' or 'boring-tls' features are enabled, TLS paths are required by the CLI");
         // Reload the TLS credentials for each connection.
-        let tls = match tls::load_tls(&key, &certs).await {
+        let tls = match tls::load_tls(key, certs).await {
             Ok(tls) => tls,
             Err(error) => {
                 info!(%error, "Connection failed");
