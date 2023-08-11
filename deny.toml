@@ -50,6 +50,9 @@ skip = [
     # `rustls-pemfile` and `k8s-openapi` depend on versions of `base64` that
     # have diverged significantly.
     { name = "base64" },
+    # the current versions of `hyper` and `tokio` depend on semver-incompatible
+    # versions of `socket2` (0.4 and 0.5, respectively).
+    { name = "socket2" }
 ]
 skip-tree = [
     { name = "windows-sys" },
