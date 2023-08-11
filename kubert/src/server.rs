@@ -3,6 +3,16 @@
 //!
 //! Unlike a normal `hyper` server, this server reloads its TLS credentials for each connection to
 //! support certificate rotation.
+//!
+//! # TLS Feature Flags
+//!
+//! The server module requires that one of the [TLS implementation Cargo
+//! features](crate#tls-features) be enabled in order to run the server.
+//! If neither TLS implementation is selected, running the server will panic.
+//! However, this module itself is still enabled if neither TLS feature flag is
+//! selected. This is to allow the server module to be used in a library crate
+//! which does not require either particular TLS implementation, so that the
+//! top-level binary crate may choose which TLS implementation is used.
 
 use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use thiserror::Error;
@@ -18,6 +28,30 @@ mod tls;
 #[path = "./server/tls_boring.rs"]
 mod tls;
 
+#[cfg(not(any(feature = "rustls-tls", feature = "boring-tls")))]
+mod tls {
+    use super::*;
+
+    pub(super) struct TlsAcceptor;
+
+    const PANIC_MESSAGE: &str = "using Kubert's `server` module requires one \
+        of the \"rustls-tls\" or \"boring-tls\" Cargo features to be enabled";
+
+    pub(super) async fn load_certs(
+        pk: &TlsKeyPath,
+        crts: &TlsCertPath,
+    ) -> Result<TlsAcceptor, Error> {
+        panic!("{PANIC_MESSAGE}")
+    }
+
+    pub(super) async fn accept(
+        acceptor: &TlsAcceptor,
+        sock: TcpStream,
+    ) -> Result<TcpStream, std::io::Error> {
+        panic!("{PANIC_MESSAGE}")
+    }
+}
+
 /// Command-line arguments used to configure a server
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
@@ -28,16 +62,10 @@ pub struct ServerArgs {
     pub server_addr: SocketAddr,
 
     /// The path to the server's TLS key.
-    ///
-    /// TLS requires that `kubert` be built with one of the "rustls-tls" or
-    /// "boring-tls" feature flags enabled.
     #[cfg_attr(feature = "clap", clap(long))]
     pub server_tls_key: Option<TlsKeyPath>,
 
     /// The path to the server's TLS certificate
-    ///
-    /// TLS requires that `kubert` be built with one of the "rustls-tls" or
-    /// "boring-tls" feature flags enabled.
     #[cfg_attr(feature = "clap", clap(long))]
     pub server_tls_certs: Option<TlsCertPath>,
 }
@@ -48,7 +76,7 @@ pub struct ServerArgs {
 pub struct Bound {
     local_addr: SocketAddr,
     tcp: tokio::net::TcpListener,
-    tls: Option<Arc<TlsPaths>>,
+    tls: Arc<TlsPaths>,
 }
 
 /// A running server
@@ -64,11 +92,11 @@ pub struct SpawnedServer {
 #[non_exhaustive]
 pub enum Error {
     /// No TLS key path was configured
-    #[error("--server-tls-key must be set if TLS is enabled")]
+    #[error("--server-tls-key must be set")]
     NoTlsKey,
 
     /// No TLS certificate path was configured
-    #[error("--server-tls-certs must be set if TLS is enabled")]
+    #[error("--server-tls-certs must be set")]
     NoTlsCerts,
 
     /// The configured TLS certificate path could not be read
@@ -115,26 +143,23 @@ struct TlsPaths {
 
 impl ServerArgs {
     /// Attempts to load credentials and bind the server socket
+    ///
+    /// # Panics
+    ///
+    /// This method panics if neither of [the "rustls-tls" or "boring-tls" Cargo
+    /// features][tls-features] are enabled. See [the module-level
+    /// documentation][tls-doc] for details.
+    ///
+    /// [tls-features]: crate#tls-features
+    /// [tls-doc]: crate::server#tls-feature-flags
     pub async fn bind(self) -> Result<Bound, Error> {
-        #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
         let tls = {
             let key = self.server_tls_key.ok_or(Error::NoTlsKey)?;
             let certs = self.server_tls_certs.ok_or(Error::NoTlsCerts)?;
             // Ensure the TLS key and certificate files load properly before binding the socket and
             // spawning the server.
             let _ = tls::load_tls(&key, &certs).await?;
-            Some(Arc::new(TlsPaths { key, certs }))
-        };
-
-        #[cfg(not(any(feature = "rustls-tls", feature = "boring-tls")))]
-        let tls = {
-            if self.server_tls_key.is_some() || self.server_tls_certs.is_some() {
-                tracing::warn!(
-                    "Ignoring `--server-tls-key` and `--server-tls-cert` \
-                    arguments, as no TLS implementation is enabled"
-                );
-            }
-            None
+            Arc::new(TlsPaths { key, certs })
         };
 
         let tcp = TcpListener::bind(&self.server_addr)
@@ -209,12 +234,8 @@ impl SpawnedServer {
     }
 }
 
-async fn accept_loop<S, B>(
-    tcp: TcpListener,
-    drain: drain::Watch,
-    service: S,
-    tls: Option<Arc<TlsPaths>>,
-) where
+async fn accept_loop<S, B>(tcp: TcpListener, drain: drain::Watch, service: S, tls: Arc<TlsPaths>)
+where
     S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>> + Clone + Send + 'static,
     S::Error: std::error::Error + Send + Sync,
     S::Future: Send,
@@ -261,17 +282,8 @@ async fn accept_loop<S, B>(
     }
 }
 
-// TLS paths may not be used if TLS is not enabled.
-#[cfg_attr(
-    not(any(feature = "rustls-tls", feature = "boring-tls")),
-    allow(unused_variables)
-)]
-async fn serve_conn<S, B>(
-    socket: TcpStream,
-    drain: drain::Watch,
-    service: S,
-    tls: Option<Arc<TlsPaths>>,
-) where
+async fn serve_conn<S, B>(socket: TcpStream, drain: drain::Watch, service: S, tls: Arc<TlsPaths>)
+where
     S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>> + Send + 'static,
     S::Error: std::error::Error + Send + Sync,
     S::Future: Send,
@@ -283,8 +295,7 @@ async fn serve_conn<S, B>(
 
     #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
     let socket = {
-        let TlsPaths { ref key, ref certs } = &*tls
-            .expect("if the 'rustls-tls' or 'boring-tls' features are enabled, TLS paths are required by the CLI");
+        let TlsPaths { ref key, ref certs } = &*tls;
         // Reload the TLS credentials for each connection.
         let tls = match tls::load_tls(key, certs).await {
             Ok(tls) => tls,

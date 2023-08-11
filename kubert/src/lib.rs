@@ -43,7 +43,7 @@
 //! [`client`] and [`server`] modules. If neither feature is enabled, `kubert`'s
 //! [`client`] module will use whatever TLS implementation is provided by the
 //! [`kube-client`] crate's feature flags, and `kubert`'s [`server`] module will
-//! serve plaintext HTTP only.
+//! panic when starting the server.
 //!
 //! - **rustls-tls**: Use [`rustls`] as the TLS implementation.
 //! - **boring-tls**: Use [BoringSSL] (via the [`boring`] crate) as the TLS
