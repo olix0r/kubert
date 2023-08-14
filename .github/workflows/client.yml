@@ -30,8 +30,8 @@ jobs:
     env:
       KUBERT_TEST_CLUSTER_VERSION: ${{ matrix.k8s }}
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v39
-      - uses: linkerd/dev/actions/setup-rust@v39
+      - uses: linkerd/dev/actions/setup-tools@v40
+      - uses: linkerd/dev/actions/setup-rust@v40
       - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f
       - run: just fetch
       - run: just build-examples
@@ -58,8 +58,8 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       KUBERT_TEST_CLUSTER_VERSION: ${{ matrix.k8s }}
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v39
-      - uses: linkerd/dev/actions/setup-rust@v39
+      - uses: linkerd/dev/actions/setup-tools@v40
+      - uses: linkerd/dev/actions/setup-rust@v40
       - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f
       - run: just build-examples-image
       - run: just test-cluster-create
