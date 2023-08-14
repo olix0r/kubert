@@ -293,7 +293,6 @@ where
 {
     tracing::debug!("accepted TCP connection");
 
-    #[cfg(any(feature = "rustls-tls", feature = "boring-tls"))]
     let socket = {
         let TlsPaths { ref key, ref certs } = &*tls;
         // Reload the TLS credentials for each connection.
