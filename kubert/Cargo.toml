@@ -60,6 +60,7 @@ initialized = ["futures-core", "futures-util", "pin-project-lite", "tokio/sync"]
 lease = [
     "backoff",
     "chrono",
+    "futures-util",
     "hyper",
     "k8s-openapi",
     "kube-client",
