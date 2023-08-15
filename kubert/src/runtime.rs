@@ -212,18 +212,13 @@ impl Builder<ServerArgs> {
     /// registering signal handlers and binding admin and HTTPS servers
     #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "server"))))]
     pub async fn build(self) -> Result<Runtime<server::Bound>, BuildError> {
-        let rt = self.build_inner(ClientArgs::try_client).await?;
-        let server = rt.server.bind().await?;
-
-        Ok(Runtime {
-            server,
-            admin: rt.admin,
-            client: rt.client,
-            error_delay: rt.error_delay,
-            initialized: rt.initialized,
-            shutdown_rx: rt.shutdown_rx,
-            shutdown: rt.shutdown,
-        })
+        self.build_inner(ClientArgs::try_client)
+            .await?
+            .bind_server(|args| async move {
+                let srv = args.bind().await?;
+                Ok(srv)
+            })
+            .await
     }
 
     /// Attempts to build a runtime using the provided client [`Service`], by
@@ -243,20 +238,13 @@ impl Builder<ServerArgs> {
         B: hyper::body::HttpBody<Data = bytes::Bytes> + Send + Unpin + 'static,
         B::Error: Into<tower::BoxError> + Send + Sync,
     {
-        let rt = self
-            .build_inner(move |client_args| client_args.try_from_service(client))
-            .await?;
-        let server = rt.server.bind().await?;
-
-        Ok(Runtime {
-            server,
-            admin: rt.admin,
-            client: rt.client,
-            error_delay: rt.error_delay,
-            initialized: rt.initialized,
-            shutdown_rx: rt.shutdown_rx,
-            shutdown: rt.shutdown,
-        })
+        self.build_inner(move |client_args| client_args.try_from_service(client))
+            .await?
+            .bind_server(|args| async move {
+                let srv = args.bind().await?;
+                Ok(srv)
+            })
+            .await
     }
 }
 
@@ -266,21 +254,18 @@ impl Builder<Option<ServerArgs>> {
     /// registering signal handlers and binding admin and HTTPS servers
     #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "server"))))]
     pub async fn build(self) -> Result<Runtime<Option<server::Bound>>, BuildError> {
-        let rt = self.build_inner(ClientArgs::try_client).await?;
-        let server = match rt.server {
-            Some(s) => Some(s.bind().await?),
-            None => None,
-        };
-
-        Ok(Runtime {
-            server,
-            admin: rt.admin,
-            client: rt.client,
-            error_delay: rt.error_delay,
-            initialized: rt.initialized,
-            shutdown_rx: rt.shutdown_rx,
-            shutdown: rt.shutdown,
-        })
+        self.build_inner(ClientArgs::try_client)
+            .await?
+            .bind_server(|args| async move {
+                match args {
+                    Some(args) => {
+                        let srv = args.bind().await?;
+                        Ok(Some(srv))
+                    }
+                    None => Ok(None),
+                }
+            })
+            .await
     }
 
     /// Attempts to build a runtime using the provided client [`Service`], by
@@ -301,23 +286,18 @@ impl Builder<Option<ServerArgs>> {
         B: hyper::body::HttpBody<Data = bytes::Bytes> + Send + Unpin + 'static,
         B::Error: Into<tower::BoxError> + Send + Sync,
     {
-        let rt = self
-            .build_inner(move |client_args| client_args.try_from_service(client))
-            .await?;
-        let server = match rt.server {
-            Some(s) => Some(s.bind().await?),
-            None => None,
-        };
-
-        Ok(Runtime {
-            server,
-            admin: rt.admin,
-            client: rt.client,
-            error_delay: rt.error_delay,
-            initialized: rt.initialized,
-            shutdown_rx: rt.shutdown_rx,
-            shutdown: rt.shutdown,
-        })
+        self.build_inner(move |client_args| client_args.try_from_service(client))
+            .await?
+            .bind_server(|args| async move {
+                match args {
+                    Some(args) => {
+                        let srv = args.bind().await?;
+                        Ok(Some(srv))
+                    }
+                    None => Ok(None),
+                }
+            })
+            .await
     }
 }
 
@@ -490,6 +470,37 @@ impl<S> Runtime<S> {
         let api = Api::namespaced(self.client(), ns.as_ref());
         self.cache(api, watcher_config)
     }
+
+    #[cfg(feature = "server")]
+    async fn bind_server<F, T>(self, bind: impl Fn(S) -> F) -> Result<Runtime<T>, BuildError>
+    where
+        F: std::future::Future<Output = Result<T, BuildError>>,
+    {
+        let server = bind(self.server).await?;
+        Ok(Runtime {
+            server,
+            admin: self.admin,
+            client: self.client,
+            error_delay: self.error_delay,
+            initialized: self.initialized,
+            shutdown_rx: self.shutdown_rx,
+            shutdown: self.shutdown,
+        })
+    }
+
+    #[cfg(feature = "server")]
+    fn spawn_server_inner(self, spawn: impl FnOnce(S)) -> Runtime<NoServer> {
+        spawn(self.server);
+        Runtime {
+            server: NoServer(()),
+            admin: self.admin,
+            client: self.client,
+            error_delay: self.error_delay,
+            initialized: self.initialized,
+            shutdown_rx: self.shutdown_rx,
+            shutdown: self.shutdown,
+        }
+    }
 }
 
 #[cfg(feature = "server")]
@@ -515,17 +526,10 @@ impl Runtime<server::Bound> {
         B::Data: Send,
         B::Error: std::error::Error + Send + Sync,
     {
-        self.server.spawn(service, self.shutdown_rx.clone());
-
-        Runtime {
-            admin: self.admin,
-            client: self.client,
-            error_delay: self.error_delay,
-            initialized: self.initialized,
-            server: NoServer(()),
-            shutdown_rx: self.shutdown_rx,
-            shutdown: self.shutdown,
-        }
+        let shutdown = self.shutdown_rx.clone();
+        self.spawn_server_inner(move |s| {
+            s.spawn(service, shutdown);
+        })
     }
 }
 
@@ -553,21 +557,15 @@ impl Runtime<Option<server::Bound>> {
         B::Data: Send,
         B::Error: std::error::Error + Send + Sync,
     {
-        if let Some(s) = self.server {
-            s.spawn(mk(), self.shutdown_rx.clone());
-        } else {
-            tracing::debug!("No server is configured")
-        }
-
-        Runtime {
-            admin: self.admin,
-            client: self.client,
-            error_delay: self.error_delay,
-            initialized: self.initialized,
-            server: NoServer(()),
-            shutdown_rx: self.shutdown_rx,
-            shutdown: self.shutdown,
-        }
+        let shutdown = self.shutdown_rx.clone();
+        self.spawn_server_inner(move |s| match s {
+            Some(s) => {
+                s.spawn(mk(), shutdown);
+            }
+            None => {
+                tracing::debug!("No server is configured");
+            }
+        })
     }
 }
 
