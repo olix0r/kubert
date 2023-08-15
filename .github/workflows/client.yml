@@ -25,14 +25,14 @@ jobs:
         k8s:
           - v1.21
           - v1.26
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
       KUBERT_TEST_CLUSTER_VERSION: ${{ matrix.k8s }}
     steps:
       - uses: linkerd/dev/actions/setup-tools@v40
       - uses: linkerd/dev/actions/setup-rust@v40
-      - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
       - run: just fetch
       - run: just build-examples
       - run: just test-cluster-create
@@ -60,7 +60,7 @@ jobs:
     steps:
       - uses: linkerd/dev/actions/setup-tools@v40
       - uses: linkerd/dev/actions/setup-rust@v40
-      - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f
+      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
       - run: just build-examples-image
       - run: just test-cluster-create
       - run: just test-cluster-import-examples
