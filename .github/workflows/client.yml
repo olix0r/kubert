@@ -25,7 +25,7 @@ jobs:
         k8s:
           - v1.21
           - v1.26
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
       KUBERT_TEST_CLUSTER_VERSION: ${{ matrix.k8s }}
