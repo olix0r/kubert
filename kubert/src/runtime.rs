@@ -29,10 +29,8 @@ pub struct Builder<S = NoServer> {
     error_delay: Option<Duration>,
     log: Option<LogSettings>,
 
-    #[cfg(feature = "server")]
+    #[cfg_attr(not(feature = "server"), allow(dead_code))]
     server: S,
-    #[cfg(not(feature = "server"))]
-    server: std::marker::PhantomData<S>,
 }
 
 /// Provides infrastructure for running:
@@ -54,10 +52,8 @@ pub struct Runtime<S = NoServer> {
     shutdown_rx: drain::Watch,
     shutdown: shutdown::Shutdown,
 
-    #[cfg(feature = "server")]
+    #[cfg_attr(not(feature = "server"), allow(dead_code))]
     server: S,
-    #[cfg(not(feature = "server"))]
-    server: std::marker::PhantomData<S>,
 }
 
 /// Indicates that no HTTPS server is configured
@@ -471,6 +467,7 @@ impl<S> Runtime<S> {
         self.cache(api, watcher_config)
     }
 
+    #[cfg(feature = "server")]
     async fn bind_server<F, T>(self, bind: impl Fn(S) -> F) -> Result<Runtime<T>, BuildError>
     where
         F: std::future::Future<Output = Result<T, BuildError>>,
@@ -487,6 +484,7 @@ impl<S> Runtime<S> {
         })
     }
 
+    #[cfg(feature = "server")]
     fn spawn_server_inner(self, spawn: impl FnOnce(S)) -> Runtime<NoServer> {
         spawn(self.server);
         Runtime {
