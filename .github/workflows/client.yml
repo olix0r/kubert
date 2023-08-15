@@ -3,8 +3,8 @@ name: client
 on:
   pull_request:
     paths:
-      - '**/Cargo.toml'
-      - '**/*.rs'
+      - "**/Cargo.toml"
+      - "**/*.rs"
       - justfile
       - .github/workflows/client.yml
 
@@ -32,7 +32,6 @@ jobs:
     steps:
       - uses: linkerd/dev/actions/setup-tools@v40
       - uses: linkerd/dev/actions/setup-rust@v40
-      - run: sudo apt-get install libssl-dev
       - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f
       - run: just fetch
       - run: just build-examples
