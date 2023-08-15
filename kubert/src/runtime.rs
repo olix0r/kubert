@@ -29,8 +29,10 @@ pub struct Builder<S = NoServer> {
     error_delay: Option<Duration>,
     log: Option<LogSettings>,
 
-    #[cfg_attr(not(feature = "server"), allow(dead_code))]
+    #[cfg(feature = "server")]
     server: S,
+    #[cfg(not(feature = "server"))]
+    server: std::marker::PhantomData<S>,
 }
 
 /// Provides infrastructure for running:
@@ -52,8 +54,10 @@ pub struct Runtime<S = NoServer> {
     shutdown_rx: drain::Watch,
     shutdown: shutdown::Shutdown,
 
-    #[cfg_attr(not(feature = "server"), allow(dead_code))]
+    #[cfg(feature = "server")]
     server: S,
+    #[cfg(not(feature = "server"))]
+    server: std::marker::PhantomData<S>,
 }
 
 /// Indicates that no HTTPS server is configured
