@@ -3,8 +3,8 @@ name: features
 on:
   pull_request:
     paths:
-      - '**/Cargo.toml'
-      - '**/*.rs'
+      - "**/Cargo.toml"
+      - "**/*.rs"
       - justfile
       - .github/workflows/features.yml
 
@@ -23,11 +23,11 @@ jobs:
         rust:
           - "1.60"
           - "1.66"
-    timeout-minutes: 5
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v39
-      - uses: linkerd/dev/actions/setup-rust@v39
+      - uses: linkerd/dev/actions/setup-tools@v40
+      - uses: linkerd/dev/actions/setup-rust@v40
         with:
           version: ${{ matrix.rust }}
           components: clippy
@@ -42,6 +42,9 @@ jobs:
           - admin
           - admin,metrics
           - client
+          - "client rustls-tls"
+          - "client boring-tls"
+          - "client boring-tls rustls-tls"
           - errors
           - index
           - initialized
@@ -51,10 +54,13 @@ jobs:
           - requeue
           - runtime
           - server
+          - "server rustls-tls"
+          - "server boring-tls"
+          - "server boring-tls rustls-tls"
           - shutdown
-    timeout-minutes: 5
+    timeout-minutes: 10
     runs-on: ubuntu-latest
-    container: ghcr.io/linkerd/dev:v39-rust
+    container: ghcr.io/linkerd/dev:v40-rust
     steps:
       - uses: actions/checkout@24cb9080177205b6e8c946b17badbe402adc938f
       - run: just fetch

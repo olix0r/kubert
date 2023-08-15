@@ -39,6 +39,7 @@ pub struct ClientArgs {
 /// Indicates an error occurred while configuring the Kubernetes client
 #[derive(Debug, Error)]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
+#[non_exhaustive]
 pub enum ConfigError {
     /// Indicates that the kubeconfig file could not be read
     #[error(transparent)]
@@ -51,6 +52,13 @@ pub enum ConfigError {
     /// Indicates that the client could not be initialized
     #[error(transparent)]
     Client(#[from] Error),
+
+    /// Indicates that an error was returned by the BoringSSL TLS
+    /// implementation.
+    #[cfg(feature = "boring-tls")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "boring-tls")))]
+    #[error(transparent)]
+    BoringTls(#[from] boring::error::ErrorStack),
 }
 
 impl ClientArgs {
@@ -61,7 +69,23 @@ impl ClientArgs {
     ///
     /// This is basically equivalent to using `kube_client::Client::try_default`, except that it
     /// supports kubeconfig configuration from the command-line.
+
     pub async fn try_client(self) -> Result<Client, ConfigError> {
+        self.try_client_inner().await
+    }
+
+    // If the `boring-tls` feature flag is enabled, build the client using
+    // BoringSSL, instead of whatever TLS implementation `kube-client` will
+    // use.
+    #[cfg(feature = "boring-tls")]
+    async fn try_client_inner(self) -> Result<Client, ConfigError> {
+        let connector = hyper_boring::HttpsConnector::new()?;
+        let client = hyper::client::Client::builder().build(connector);
+        self.try_from_service(client).await
+    }
+
+    #[cfg(not(feature = "boring-tls"))]
+    async fn try_client_inner(self) -> Result<Client, ConfigError> {
         let client = match self.load_local_config().await {
             Ok(client) => client,
             Err(e) if self.is_customized() => return Err(e),
