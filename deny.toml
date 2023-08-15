@@ -78,9 +78,6 @@ skip-tree = [
     # `parking-lot-core` and `dirs-next` (transitive deps via `kube-client`)
     # depend on incompatible versions of `redox_syscall`.
     { name = "redox_syscall" },
-    # the current versions of `openssl` and `boring` depend on versions 0.3 and
-    # 0.5 of `foreign-types` and `foreign-types-shared`, respectively.
-    { name = "foreign-types" },
 ]
 
 [sources]
