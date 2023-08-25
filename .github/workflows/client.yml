@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: linkerd/dev/actions/setup-tools@v40
       - uses: linkerd/dev/actions/setup-rust@v40
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
       - run: just fetch
       - run: just build-examples
       - run: just test-cluster-create
@@ -60,7 +60,7 @@ jobs:
     steps:
       - uses: linkerd/dev/actions/setup-tools@v40
       - uses: linkerd/dev/actions/setup-rust@v40
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744
       - run: just build-examples-image
       - run: just test-cluster-create
       - run: just test-cluster-import-examples
