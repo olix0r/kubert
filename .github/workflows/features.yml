@@ -31,7 +31,7 @@ jobs:
         with:
           version: ${{ matrix.rust }}
           components: clippy
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
+      - uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
       - run: just fetch
       - run: just features=all clippy
 
@@ -62,6 +62,6 @@ jobs:
     runs-on: ubuntu-latest
     container: ghcr.io/linkerd/dev:v40-rust
     steps:
-      - uses: actions/checkout@c85c95e3d7251135ab7dc9ce3241c5835cc595a9
+      - uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac
       - run: just fetch
       - run: just "features=${{ matrix.feature }}" clippy
