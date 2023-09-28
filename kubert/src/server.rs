@@ -28,6 +28,9 @@ mod tls;
 #[path = "./server/tls_boring.rs"]
 mod tls;
 
+#[cfg(all(test, any(feature = "rustls-tls", feature = "boring-tls")))]
+mod tests;
+
 #[cfg(not(any(feature = "rustls-tls", feature = "boring-tls")))]
 mod tls {
     use super::*;
