@@ -17,9 +17,13 @@ rustls-tls = [
 ]
 boring-tls = [
     "boring",
+    "base64",
     "hyper-boring",
     "tokio-boring",
     "once_cell",
+    "serde",
+    "serde_json",
+    "secrecy",
 ]
 admin = [
     "ahash",
@@ -125,6 +129,7 @@ features = ["k8s-openapi/v1_27"]
 [dependencies]
 ahash = { version = "0.8", optional = true }
 backoff = { version = "0.4", features = ["tokio"], optional = true }
+base64 = { version = "0.21", optional = true }
 boring = { version = "3.0.4", optional = true }
 bytes = { version = "1", optional = true }
 deflate = { version = "1", optional = true, default-features = false, features = [
@@ -143,6 +148,7 @@ parking_lot = { version = "0.12", optional = true }
 pin-project-lite = { version = "0.2", optional = true }
 rustls-pemfile = { version = "1", optional = true }
 thiserror = { version = "1.0.30", optional = true }
+secrecy = { version = "0.8", optional = true, features = ["alloc", "serde"] }
 serde = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
 tokio = { version = "1.17.0", optional = false, default-features = false }

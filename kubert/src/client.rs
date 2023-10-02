@@ -1,6 +1,7 @@
 //! Utilities for configuring a [`kube_client::Client`] from the command line
 
 use hyper::{body::HttpBody, Body, Request, Response};
+use kube_client::client::{ClientBuilder, ConfigExt};
 pub use kube_client::*;
 use std::path::PathBuf;
 use thiserror::Error;
@@ -58,8 +59,15 @@ pub enum ConfigError {
     #[cfg(feature = "boring-tls")]
     #[cfg_attr(docsrs, doc(cfg(feature = "boring-tls")))]
     #[error(transparent)]
-    BoringTls(#[from] boring::error::ErrorStack),
+    BoringTls(#[from] BoringTlsError),
 }
+
+#[cfg(feature = "boring-tls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "boring-tls")))]
+pub use self::tls_boring::{Error as BoringTlsError, LoadDataError};
+
+#[cfg(feature = "boring-tls")]
+mod tls_boring;
 
 impl ClientArgs {
     /// Initializes a Kubernetes client
@@ -79,9 +87,16 @@ impl ClientArgs {
     // use.
     #[cfg(feature = "boring-tls")]
     async fn try_client_inner(self) -> Result<Client, ConfigError> {
-        let connector = hyper_boring::HttpsConnector::new()?;
-        let client = hyper::client::Client::builder().build(connector);
-        self.try_from_service(client).await
+        let config = match self.load_local_config().await {
+            Ok(client) => client,
+            Err(e) if self.is_customized() => return Err(e),
+            Err(_) => Config::incluster()?,
+        };
+        let svc = {
+            let connector = tls_boring::https_connector(&config)?;
+            hyper::client::Client::builder().build(connector)
+        };
+        self.try_from_service_with_config(config, svc)
     }
 
     #[cfg(not(feature = "boring-tls"))]
@@ -110,14 +125,27 @@ impl ClientArgs {
         B: HttpBody<Data = bytes::Bytes> + Send + Unpin + 'static,
         B::Error: Into<BoxError> + Send + Sync,
     {
-        use kube_client::client::{ClientBuilder, ConfigExt};
-
         let config = match self.load_local_config().await {
             Ok(client) => client,
             Err(e) if self.is_customized() => return Err(e),
             Err(_) => Config::incluster()?,
         };
 
+        self.try_from_service_with_config(config, svc)
+    }
+
+    fn try_from_service_with_config<S, B>(
+        self,
+        config: Config,
+        svc: S,
+    ) -> Result<Client, ConfigError>
+    where
+        S: Service<Request<Body>, Response = Response<B>> + Send + Clone + 'static,
+        S::Future: Send + 'static,
+        S::Error: Into<BoxError>,
+        B: HttpBody<Data = bytes::Bytes> + Send + Unpin + 'static,
+        B::Error: Into<BoxError> + Send + Sync,
+    {
         let stack = ServiceBuilder::new()
             .layer(config.base_uri_layer())
             // TODO(eliza): add an equivalent gzip config to the one from kube_client?
