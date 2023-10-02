@@ -1,10 +1,14 @@
+
+ARG FEATURES="rustls-tls"
 FROM ghcr.io/linkerd/dev:v40-rust as build
 WORKDIR /kubert
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     CARGO_NET_RETRY=10 just-cargo fetch
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    CARGO_INCREMENTAL=0 just-cargo build --frozen --package=kubert-examples --examples
+    CARGO_INCREMENTAL=0 just-cargo build \
+    --frozen --package=kubert-examples --examples \
+    --no-default-features --features=${FEATURES}
 
 FROM gcr.io/distroless/cc
 COPY --from=build /kubert/target/debug/examples/watch-pods /watch-pods

@@ -9,6 +9,16 @@ rust-version = "1.60"
 [package.metadata.release]
 release = false
 
+[features]
+default = ["rustls-tls"]
+rustls-tls = ["kubert/rustls-tls"]
+boring-tls = ["kubert/boring-tls"]
+
+[dependencies.kubert]
+path = "../kubert"
+default-features = false
+features = ["clap", "lease", "runtime", ]
+
 [dev-dependencies]
 anyhow = "1"
 chrono = { version = "0.4", default-features = false }
@@ -34,11 +44,6 @@ features = ["v1_27"]
 version = "0.85"
 default-features = false
 features = ["client", "derive", "rustls-tls", "runtime"]
-
-[dev-dependencies.kubert]
-path = "../kubert"
-default-features = false
-features = ["clap", "lease", "runtime", "rustls-tls"]
 
 [dev-dependencies.tokio]
 version = "1"

@@ -55,10 +55,13 @@ build *args:
 
 build-examples name='':
     @just-cargo build --package=kubert-examples \
-        {{ if name == '' { "--examples" } else { "--example=" + name } }}
+        {{ if name == '' { "--examples" } else { "--example=" + name } }} \
+        {{ _features }}
 
 build-examples-image:
-    docker buildx build . -f examples/Dockerfile --tag=kubert-examples:test --output=type=docker
+    docker buildx build . -f examples/Dockerfile \
+        --tag=kubert-examples:test --output=type=docker \
+        {{ if features != "all" { "--build-arg='FEATURES={{ features }}'" } else { "" } }}
 
 test-cluster-create:
     #!/usr/bin/env bash
