@@ -111,19 +111,19 @@ pub mod shutdown;
 #[cfg(all(feature = "admin", feature = "clap"))]
 pub use self::admin::AdminArgs;
 
-#[cfg(all(feature = "client"))]
+#[cfg(feature = "client")]
 pub use self::client::ClientArgs;
 
-#[cfg(all(feature = "initialized"))]
+#[cfg(feature = "initialized")]
 pub use self::initialized::Initialized;
 
-#[cfg(all(feature = "lease"))]
+#[cfg(feature = "lease")]
 pub use self::lease::LeaseManager;
 
-#[cfg(all(feature = "log"))]
+#[cfg(feature = "log")]
 pub use self::log::{LogFilter, LogFormat, LogInitError};
 
-#[cfg(all(feature = "runtime"))]
+#[cfg(feature = "runtime")]
 pub use self::runtime::Runtime;
 
 #[cfg(feature = "server")]
