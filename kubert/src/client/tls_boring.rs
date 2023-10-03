@@ -186,7 +186,7 @@ fn identity_pem(cfg: &AuthInfo) -> Result<Option<Vec<u8>>, Error> {
 
     let client_cert = load_from_base64_or_file(
         cfg.client_certificate_data.as_deref(),
-        cfg.client_certificate,
+        cfg.client_certificate.as_ref(),
     )
     .map_err(Error::LoadClientCertificate)?;
 
@@ -195,7 +195,7 @@ fn identity_pem(cfg: &AuthInfo) -> Result<Option<Vec<u8>>, Error> {
             .client_key_data
             .as_ref()
             .map(|secret| secret.expose_secret().as_str());
-        load_from_base64_or_file(data, cfg.client_key).map_err(Error::LoadClientKey)?
+        load_from_base64_or_file(data, cfg.client_key.as_ref()).map_err(Error::LoadClientKey)?
     };
 
     Ok(Some(make_identity_pem(client_cert, client_key)))
@@ -241,7 +241,7 @@ fn auth_plugin_identity_pem(auth: &kube_client::config::ExecConfig) -> Option<Ve
         client_key_data: Option<String>,
     }
 
-    let mut cmd = Command::new(&auth.command?);
+    let mut cmd = Command::new(auth.command.as_deref()?);
     if let Some(args) = &auth.args {
         cmd.args(args);
     }
