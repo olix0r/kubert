@@ -61,7 +61,7 @@ build-examples name='':
 build-examples-image:
     docker buildx build . -f examples/Dockerfile \
         --tag=kubert-examples:test --output=type=docker \
-        {{ if features != "all" { "--build-arg='FEATURES={{ features }}'" } else { "" } }}
+        {{ if features != "all" { "--build-arg='FEATURES=" + features + "'" } else { "" } }}
 
 test-cluster-create:
     #!/usr/bin/env bash
