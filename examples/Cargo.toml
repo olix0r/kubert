@@ -9,6 +9,21 @@ rust-version = "1.60"
 [package.metadata.release]
 release = false
 
+[features]
+default = ["rustls-tls"]
+rustls-tls = ["kubert/rustls-tls"]
+openssl-tls = ["kubert/openssl-tls", "openssl"]
+
+[dependencies.kubert]
+path = "../kubert"
+default-features = false
+features = ["clap", "lease", "runtime", ]
+
+[dependencies.openssl]
+version = "0.10.57"
+optional = true
+features = ["vendored"]
+
 [dev-dependencies]
 anyhow = "1"
 chrono = { version = "0.4", default-features = false }

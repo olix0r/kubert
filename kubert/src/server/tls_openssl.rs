@@ -117,6 +117,6 @@ impl TlsKeyPath {
         let pem = tokio::fs::read(&self.0).await?;
 
         // Load and return a single private key.
-        Ok(PKey::private_key_from_pkcs8(&pem)?)
+        Ok(PKey::private_key_from_pem(&pem)?)
     }
 }

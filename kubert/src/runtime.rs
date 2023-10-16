@@ -14,7 +14,6 @@ use kube_core::{NamespaceResourceScope, Resource};
 use kube_runtime::{reflector, watcher};
 use serde::de::DeserializeOwned;
 use std::{fmt::Debug, future::Future, hash::Hash, time::Duration};
-use tower::Service;
 
 pub use kube_client::Api;
 pub use reflector::Store;
