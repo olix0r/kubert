@@ -124,6 +124,10 @@ features = ["k8s-openapi/v1_27"]
 
 [dependencies]
 ahash = { version = "0.8", optional = true }
+# dependency of clap, which we must take an explicit dep on to ensure that it's
+# pinned to the version before the MSRV became incompatible with what's in the
+# devcontainer.
+anstyle = "=1.0.0"
 backoff = { version = "0.4", features = ["tokio"], optional = true }
 boring = { version = "3.0.4", optional = true }
 bytes = { version = "1", optional = true }
@@ -156,6 +160,8 @@ tower = { version = "0.4", default-features = false, optional = true }
 tracing = { version = "0.1.31", optional = true }
 
 [dependencies.clap]
+# temporarily pin to the version before the MSRV became 1.70, since Rust 1.70 is
+# newer than what's in our devcontainer.
 version = "=4.3.24"
 optional = true
 default-features = false
