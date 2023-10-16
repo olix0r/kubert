@@ -15,7 +15,9 @@ chrono = { version = "0.4", default-features = false }
 futures = { version = "0.3", default-features = false }
 maplit = "1"
 rand = "0.8"
-regex = "1"
+# this is pinned to avoid a dep on `regex-syntax` v0.8.x, which requires Rust
+# >1.65 (where we only have 1.64).
+regex = "=1.9.6"
 thiserror = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["ansi", "env-filter"] }
