@@ -55,7 +55,6 @@ mod tls {
 #[cfg(test)]
 mod tests;
 
-
 /// Command-line arguments used to configure a server
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "clap", derive(clap::Parser))]
