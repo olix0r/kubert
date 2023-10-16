@@ -15,11 +15,12 @@ rustls-tls = [
     "rustls-pemfile",
     "kube-client?/rustls-tls",
 ]
-boring-tls = [
-    "boring",
-    "hyper-boring",
-    "tokio-boring",
+openssl-tls = [
+    "openssl",
+    "hyper-openssl",
+    "tokio-openssl",
     "once_cell",
+    "kube-client?/openssl-tls",
 ]
 admin = [
     "ahash",
@@ -134,7 +135,7 @@ ahash = { version = "0.8", optional = true }
 # devcontainer.
 anstyle = { version = "=1.0.0", optional = true }
 backoff = { version = "0.4", features = ["tokio"], optional = true }
-boring = { version = "3.0.4", optional = true }
+openssl = { version = "0.10.57", optional = true, default-features = false }
 bytes = { version = "1", optional = true }
 deflate = { version = "1", optional = true, default-features = false, features = [
     "gzip",
@@ -148,7 +149,7 @@ clap_lex = { version = "=0.5.0", optional = true }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
 hyper = { version = "0.14.17", optional = true, default-features = false }
-hyper-boring = { version = "3.0.4", optional = true }
+hyper-openssl = { version = "0.9.2", optional = true }
 metrics-exporter-prometheus = { version = "0.12.0", optional = true, default-features = false }
 metrics-process = { version = "1.0.11", optional = true }
 once_cell = { version = "1", optional = true }
@@ -159,9 +160,9 @@ thiserror = { version = "1.0.30", optional = true }
 serde = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
 tokio = { version = "1.17.0", optional = false, default-features = false }
-tokio-boring = { version = "3.0.4", optional = true }
-tokio-util = { version = "0.7", optional = true, default-features = false }
 tokio-rustls = { version = "0.24.1", optional = true, default-features = false }
+tokio-openssl = { version = "0.6.3", optional = true }
+tokio-util = { version = "0.7", optional = true, default-features = false }
 tower-http = { version = "0.4.0", optional = true, default-features = false, features = [
     "map-response-body",
 ] }
@@ -212,6 +213,10 @@ kube = { version = "0.85", default-features = false, features = ["runtime"] }
 tokio-stream = "0.1"
 tokio-test = "0.4"
 tracing-subscriber = { version = "0.3", features = ["ansi"] }
+# used for generating TLS certificates in the server tests.
+rcgen = { version = "0.11.2" }
+# used for creating temporary dirs for TLS certificates in the server tests.
+tempfile = "3.8"
 
 [dev-dependencies.k8s-openapi]
 version = "0.19"

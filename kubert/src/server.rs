@@ -20,22 +20,22 @@ use tokio::net::{TcpListener, TcpStream};
 use tower::Service;
 use tracing::{debug, error, info, info_span, Instrument};
 
-#[cfg(all(feature = "rustls-tls", not(feature = "boring-tls")))]
+#[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
 #[path = "./server/tls_rustls.rs"]
 mod tls;
 
-#[cfg(feature = "boring-tls")]
-#[path = "./server/tls_boring.rs"]
+#[cfg(feature = "openssl-tls")]
+#[path = "./server/tls_openssl.rs"]
 mod tls;
 
-#[cfg(not(any(feature = "rustls-tls", feature = "boring-tls")))]
+#[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
 mod tls {
     use super::*;
 
     pub(super) struct TlsAcceptor;
 
     const PANIC_MESSAGE: &str = "using Kubert's `server` module requires one \
-        of the \"rustls-tls\" or \"boring-tls\" Cargo features to be enabled";
+        of the \"rustls-tls\" or \"openssl-tls\" Cargo features to be enabled";
 
     pub(super) async fn load_certs(
         pk: &TlsKeyPath,
@@ -51,6 +51,10 @@ mod tls {
         panic!("{PANIC_MESSAGE}")
     }
 }
+
+#[cfg(test)]
+mod tests;
+
 
 /// Command-line arguments used to configure a server
 #[derive(Clone, Debug)]
@@ -131,7 +135,7 @@ pub struct TlsCertPath(PathBuf);
 #[derive(Clone, Debug)]
 // TLS paths may not be used if TLS is not enabled.
 #[cfg_attr(
-    not(any(feature = "rustls-tls", feature = "boring-tls")),
+    not(any(feature = "rustls-tls", feature = "openssl-tls")),
     allow(dead_code)
 )]
 struct TlsPaths {
@@ -146,7 +150,7 @@ impl ServerArgs {
     ///
     /// # Panics
     ///
-    /// This method panics if neither of [the "rustls-tls" or "boring-tls" Cargo
+    /// This method panics if neither of [the "rustls-tls" or "openssl-tls" Cargo
     /// features][tls-features] are enabled. See [the module-level
     /// documentation][tls-doc] for details.
     ///

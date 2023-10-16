@@ -1,14 +1,37 @@
 use super::*;
-use boring::{
+use once_cell::sync::Lazy;
+use openssl::{
     error::ErrorStack,
     pkey::{PKey, Private},
-    ssl,
+    ssl::{self, Ssl},
     x509::X509,
 };
-use once_cell::sync::Lazy;
+use std::pin::Pin;
+use tokio_openssl::SslStream;
 
 pub(in crate::server) type TlsAcceptor = ssl::SslAcceptor;
-pub(in crate::server) use tokio_boring::accept;
+
+#[derive(Debug, thiserror::Error)]
+pub enum AcceptError {
+    #[error("failed to construct SSL from acceptor context: {0}")]
+    Ssl(#[source] ErrorStack),
+    #[error("failed to construct SslStream from SSL: {0}")]
+    Stream(#[source] ErrorStack),
+    #[error("failed to accept TLS connection: {0}")]
+    Accept(#[from] ssl::Error),
+}
+
+pub(in crate::server) async fn accept(
+    acceptor: &TlsAcceptor,
+    sock: TcpStream,
+) -> Result<SslStream<TcpStream>, AcceptError> {
+    let ssl = Ssl::new(acceptor.context()).map_err(AcceptError::Ssl)?;
+
+    let mut stream = SslStream::new(ssl, sock).map_err(AcceptError::Stream)?;
+
+    Pin::new(&mut stream).accept().await?;
+    Ok(stream)
+}
 
 pub(in crate::server) async fn load_tls(
     pk: &TlsKeyPath,
