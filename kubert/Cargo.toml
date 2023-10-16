@@ -156,7 +156,7 @@ tower = { version = "0.4", default-features = false, optional = true }
 tracing = { version = "0.1.31", optional = true }
 
 [dependencies.clap]
-version = "4"
+version = "=4.3.24"
 optional = true
 default-features = false
 features = ["derive", "std"]
