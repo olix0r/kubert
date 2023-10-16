@@ -78,6 +78,12 @@ skip-tree = [
     # `parking-lot-core` and `dirs-next` (transitive deps via `kube-client`)
     # depend on incompatible versions of `redox_syscall`.
     { name = "redox_syscall" },
+    # `rcgen` (used to generate test key material in TLS server tests) depends
+    # on a version of the `pem` crate that has diverged substantially from
+    # `kube-client`'s dep on the same crate (v3.0 vs v1.1). however, since
+    # `rcgen` is a test-only dependency, it's not a huge deal if it introduces
+    # duplicate deps, as they won't be present in real life.
+    { name = "rcgen" },
 ]
 
 [sources]
