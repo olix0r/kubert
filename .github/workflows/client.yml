@@ -62,7 +62,7 @@ jobs:
           - "openssl-tls"
           - "rustls-tls"
     name: "in-cluster (k8s ${{ matrix.k8s }}, ${{ matrix.tls }})"
-    timeout-minutes: 10
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
