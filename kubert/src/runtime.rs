@@ -14,6 +14,7 @@ use kube_core::{NamespaceResourceScope, Resource};
 use kube_runtime::{reflector, watcher};
 use serde::de::DeserializeOwned;
 use std::{fmt::Debug, future::Future, hash::Hash, time::Duration};
+#[cfg(feature = "server")]
 use tower::Service;
 
 pub use kube_client::Api;
@@ -186,24 +187,6 @@ impl Builder<NoServer> {
     pub async fn build(self) -> Result<Runtime<NoServer>, BuildError> {
         self.build_inner(ClientArgs::try_client).await
     }
-
-    /// Attempts to build a runtime using the provided client [`Service`], by
-    /// initializing logs, configuring the client from CLI arguments,
-    /// registering signal handlers and binding an admin server
-    pub async fn build_with_client<C, B>(self, client: C) -> Result<Runtime<NoServer>, BuildError>
-    where
-        C: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
-            + Send
-            + Clone
-            + 'static,
-        C::Future: Send + 'static,
-        C::Error: Into<tower::BoxError>,
-        B: hyper::body::HttpBody<Data = bytes::Bytes> + Send + Unpin + 'static,
-        B::Error: Into<tower::BoxError> + Send + Sync,
-    {
-        self.build_inner(move |client_args| client_args.try_from_service(client))
-            .await
-    }
 }
 
 #[cfg(feature = "server")]
@@ -220,32 +203,6 @@ impl Builder<ServerArgs> {
             })
             .await
     }
-
-    /// Attempts to build a runtime using the provided client [`Service`], by
-    /// initializing logs, configuring the client from CLI arguments,
-    /// registering signal handlers and binding admin and HTTPS servers.
-    pub async fn build_with_client<C, B>(
-        self,
-        client: C,
-    ) -> Result<Runtime<server::Bound>, BuildError>
-    where
-        C: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
-            + Send
-            + Clone
-            + 'static,
-        C::Future: Send + 'static,
-        C::Error: Into<tower::BoxError>,
-        B: hyper::body::HttpBody<Data = bytes::Bytes> + Send + Unpin + 'static,
-        B::Error: Into<tower::BoxError> + Send + Sync,
-    {
-        self.build_inner(move |client_args| client_args.try_from_service(client))
-            .await?
-            .bind_server(|args| async move {
-                let srv = args.bind().await?;
-                Ok(srv)
-            })
-            .await
-    }
 }
 
 #[cfg(feature = "server")]
@@ -255,38 +212,6 @@ impl Builder<Option<ServerArgs>> {
     #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "server"))))]
     pub async fn build(self) -> Result<Runtime<Option<server::Bound>>, BuildError> {
         self.build_inner(ClientArgs::try_client)
-            .await?
-            .bind_server(|args| async move {
-                match args {
-                    Some(args) => {
-                        let srv = args.bind().await?;
-                        Ok(Some(srv))
-                    }
-                    None => Ok(None),
-                }
-            })
-            .await
-    }
-
-    /// Attempts to build a runtime using the provided client [`Service`], by
-    /// initializing logs, configuring the client from CLI arguments,
-    /// registering signal handlers and binding admin and HTTPS servers.
-    #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "server"))))]
-    pub async fn build_with_client<C, B>(
-        self,
-        client: C,
-    ) -> Result<Runtime<Option<server::Bound>>, BuildError>
-    where
-        C: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
-            + Send
-            + Clone
-            + 'static,
-        C::Future: Send + 'static,
-        C::Error: Into<tower::BoxError>,
-        B: hyper::body::HttpBody<Data = bytes::Bytes> + Send + Unpin + 'static,
-        B::Error: Into<tower::BoxError> + Send + Sync,
-    {
-        self.build_inner(move |client_args| client_args.try_from_service(client))
             .await?
             .bind_server(|args| async move {
                 match args {

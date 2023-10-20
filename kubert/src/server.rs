@@ -20,37 +20,36 @@ use tokio::net::{TcpListener, TcpStream};
 use tower::Service;
 use tracing::{debug, error, info, info_span, Instrument};
 
-#[cfg(all(feature = "rustls-tls", not(feature = "boring-tls")))]
-#[path = "./server/tls_rustls.rs"]
-mod tls;
+#[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
+mod tls_rustls;
+#[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
+use tls_rustls as tls;
 
-#[cfg(feature = "boring-tls")]
-#[path = "./server/tls_boring.rs"]
-mod tls;
+#[cfg(feature = "openssl-tls")]
+mod tls_openssl;
+#[cfg(feature = "openssl-tls")]
+use tls_openssl as tls;
 
-#[cfg(not(any(feature = "rustls-tls", feature = "boring-tls")))]
+#[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
 mod tls {
     use super::*;
 
     pub(super) struct TlsAcceptor;
 
     const PANIC_MESSAGE: &str = "using Kubert's `server` module requires one \
-        of the \"rustls-tls\" or \"boring-tls\" Cargo features to be enabled";
+        of the \"rustls-tls\" or \"openssl-tls\" Cargo features to be enabled";
 
-    pub(super) async fn load_certs(
-        pk: &TlsKeyPath,
-        crts: &TlsCertPath,
-    ) -> Result<TlsAcceptor, Error> {
+    pub(super) async fn load_tls(_: &TlsKeyPath, _: &TlsCertPath) -> Result<TlsAcceptor, Error> {
         panic!("{PANIC_MESSAGE}")
     }
 
-    pub(super) async fn accept(
-        acceptor: &TlsAcceptor,
-        sock: TcpStream,
-    ) -> Result<TcpStream, std::io::Error> {
+    pub(super) async fn accept(_: &TlsAcceptor, _: TcpStream) -> Result<TcpStream, std::io::Error> {
         panic!("{PANIC_MESSAGE}")
     }
 }
+
+#[cfg(test)]
+mod tests;
 
 /// Command-line arguments used to configure a server
 #[derive(Clone, Debug)]
@@ -61,11 +60,17 @@ pub struct ServerArgs {
     #[cfg_attr(feature = "clap", clap(long, default_value = "0.0.0.0:443"))]
     pub server_addr: SocketAddr,
 
-    /// The path to the server's TLS key.
+    /// The path to the server's TLS key file.
+    ///
+    /// This should be a PEM-encoded file containing a single PKCS#8 or RSA
+    /// private key.
     #[cfg_attr(feature = "clap", clap(long))]
     pub server_tls_key: Option<TlsKeyPath>,
 
-    /// The path to the server's TLS certificate
+    /// The path to the server's TLS certificate file.
+    ///
+    /// This should be a PEM-encoded file containing at least one TLS end-entity
+    /// certificate.
     #[cfg_attr(feature = "clap", clap(long))]
     pub server_tls_certs: Option<TlsCertPath>,
 }
@@ -131,7 +136,7 @@ pub struct TlsCertPath(PathBuf);
 #[derive(Clone, Debug)]
 // TLS paths may not be used if TLS is not enabled.
 #[cfg_attr(
-    not(any(feature = "rustls-tls", feature = "boring-tls")),
+    not(any(feature = "rustls-tls", feature = "openssl-tls")),
     allow(dead_code)
 )]
 struct TlsPaths {
@@ -146,7 +151,7 @@ impl ServerArgs {
     ///
     /// # Panics
     ///
-    /// This method panics if neither of [the "rustls-tls" or "boring-tls" Cargo
+    /// This method panics if neither of [the "rustls-tls" or "openssl-tls" Cargo
     /// features][tls-features] are enabled. See [the module-level
     /// documentation][tls-doc] for details.
     ///

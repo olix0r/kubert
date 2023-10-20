@@ -25,7 +25,7 @@ jobs:
       - run: just fmt-check
 
   doc:
-    timeout-minutes: 5
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     container: ghcr.io/linkerd/dev:v40-rust
     steps:

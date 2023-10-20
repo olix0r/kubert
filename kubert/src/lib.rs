@@ -46,10 +46,14 @@
 //! panic when starting the server.
 //!
 //! - **rustls-tls**: Use [`rustls`] as the TLS implementation.
-//! - **boring-tls**: Use [BoringSSL] (via the [`boring`] crate) as the TLS
+//! - **openssl-tls**: Use [OpenSSL] (via the [`openssl`] crate) as the TLS
 //!   implementation. This feature takes priority over the **rustls-tls**
-//!   feature flag. If both are enabled, BoringSSL will be used instead of
+//!   feature flag. If both are enabled, OpenSSL will be used instead of
 //!   Rustls.
+//!
+//! If the `client` feature flag is enabled, these features will also enable the
+//! corresponding feature flags on the [`kube-client`] crate, to configure which
+//! TLS implementation is used by the underlying Kubernetes API client.
 //!
 //! [`kube`]: https://github.com/kube-rs/kube-rs
 //! [Cargo features]: https://doc.rust-lang.org/cargo/reference/features.html
@@ -57,8 +61,8 @@
 //! [`clap::Parser`]: https://docs.rs/clap/4/clap/trait.Parser.html
 //! [`kube-client`]: https://crates.io/crates/kube-client
 //! [`rustls`]: https://crates.io/crates/rustls
-//! [BoringSSL]: https://github.com/google/boringssl
-//! [`boring`]: https://crates.io/crates/boring
+//! [OpenSSL]: https://www.openssl.org/
+//! [`openssl`]: https://crates.io/crates/openssl
 
 #![deny(warnings, rust_2018_idioms, missing_docs)]
 #![forbid(unsafe_code)]

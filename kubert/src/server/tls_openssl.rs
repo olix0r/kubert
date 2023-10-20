@@ -1,14 +1,37 @@
 use super::*;
-use boring::{
+use once_cell::sync::Lazy;
+use openssl::{
     error::ErrorStack,
     pkey::{PKey, Private},
-    ssl,
+    ssl::{self, Ssl},
     x509::X509,
 };
-use once_cell::sync::Lazy;
+use std::pin::Pin;
+use tokio_openssl::SslStream;
 
 pub(in crate::server) type TlsAcceptor = ssl::SslAcceptor;
-pub(in crate::server) use tokio_boring::accept;
+
+#[derive(Debug, thiserror::Error)]
+pub(in crate::server) enum AcceptError {
+    #[error("failed to construct SSL session from acceptor context: {0}")]
+    Ssl(#[source] ErrorStack),
+    #[error("failed to construct SslStream from SSL session: {0}")]
+    Stream(#[source] ErrorStack),
+    #[error("failed to accept TLS connection: {0}")]
+    Accept(#[from] ssl::Error),
+}
+
+pub(in crate::server) async fn accept(
+    acceptor: &TlsAcceptor,
+    sock: TcpStream,
+) -> Result<SslStream<TcpStream>, AcceptError> {
+    let ssl = Ssl::new(acceptor.context()).map_err(AcceptError::Ssl)?;
+
+    let mut stream = SslStream::new(ssl, sock).map_err(AcceptError::Stream)?;
+
+    Pin::new(&mut stream).accept().await?;
+    Ok(stream)
+}
 
 pub(in crate::server) async fn load_tls(
     pk: &TlsKeyPath,
@@ -93,7 +116,12 @@ impl TlsKeyPath {
         // Open keyfile.
         let pem = tokio::fs::read(&self.0).await?;
 
-        // Load and return a single private key.
-        Ok(PKey::private_key_from_pkcs8(&pem)?)
+        // Load and return a single private key. The keyfile should be
+        // PEM-encoded.
+        // TODO(eliza): Potentially, we may want to support both PEM-encoded and
+        // DER-encoded keyfiles, and decide whether to use
+        // `PKey::private_key_from_pem` or `PKey::private_key_from_pkcs8` based
+        // on the filename extension.
+        Ok(PKey::private_key_from_pem(&pem)?)
     }
 }
