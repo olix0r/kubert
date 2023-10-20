@@ -21,12 +21,14 @@ use tower::Service;
 use tracing::{debug, error, info, info_span, Instrument};
 
 #[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
-#[path = "./server/tls_rustls.rs"]
-mod tls;
+mod tls_rustls;
+#[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
+use tls_rustls as tls;
 
 #[cfg(feature = "openssl-tls")]
-#[path = "./server/tls_openssl.rs"]
-mod tls;
+mod tls_openssl;
+#[cfg(feature = "openssl-tls")]
+use tls_openssl as tls;
 
 #[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
 mod tls {
