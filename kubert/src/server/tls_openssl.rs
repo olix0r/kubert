@@ -12,10 +12,10 @@ use tokio_openssl::SslStream;
 pub(in crate::server) type TlsAcceptor = ssl::SslAcceptor;
 
 #[derive(Debug, thiserror::Error)]
-pub enum AcceptError {
-    #[error("failed to construct SSL from acceptor context: {0}")]
+pub(in crate::server) enum AcceptError {
+    #[error("failed to construct SSL session from acceptor context: {0}")]
     Ssl(#[source] ErrorStack),
-    #[error("failed to construct SslStream from SSL: {0}")]
+    #[error("failed to construct SslStream from SSL session: {0}")]
     Stream(#[source] ErrorStack),
     #[error("failed to accept TLS connection: {0}")]
     Accept(#[from] ssl::Error),
