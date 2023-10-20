@@ -26,9 +26,9 @@ jobs:
           - v1.21
           - v1.26
         tls:
-          - "openssl-tls"
-          - "rustls-tls"
-    name: "local (k8s ${{ matrix.k8s }}, ${{ matrix.tls }})"
+          - openssl-tls
+          - rustls-tls
+    name: local (k8s ${{ matrix.k8s }}, ${{ matrix.tls }})
     timeout-minutes: 15
     runs-on: ubuntu-latest
     env:
