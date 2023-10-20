@@ -66,11 +66,17 @@ pub struct ServerArgs {
     #[cfg_attr(feature = "clap", clap(long, default_value = "0.0.0.0:443"))]
     pub server_addr: SocketAddr,
 
-    /// The path to the server's TLS key.
+    /// The path to the server's TLS key file.
+    ///
+    /// This should be a PEM-encoded file containing a single PKCS#8 or RSA
+    /// private key.
     #[cfg_attr(feature = "clap", clap(long))]
     pub server_tls_key: Option<TlsKeyPath>,
 
-    /// The path to the server's TLS certificate
+    /// The path to the server's TLS certificate file.
+    ///
+    /// This should be a PEM-encoded file containing at least one TLS end-entity
+    /// certificate.
     #[cfg_attr(feature = "clap", clap(long))]
     pub server_tls_certs: Option<TlsCertPath>,
 }
