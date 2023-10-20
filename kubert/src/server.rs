@@ -39,17 +39,11 @@ mod tls {
     const PANIC_MESSAGE: &str = "using Kubert's `server` module requires one \
         of the \"rustls-tls\" or \"openssl-tls\" Cargo features to be enabled";
 
-    pub(super) async fn load_certs(
-        pk: &TlsKeyPath,
-        crts: &TlsCertPath,
-    ) -> Result<TlsAcceptor, Error> {
+    pub(super) async fn load_tls(_: &TlsKeyPath, _: &TlsCertPath) -> Result<TlsAcceptor, Error> {
         panic!("{PANIC_MESSAGE}")
     }
 
-    pub(super) async fn accept(
-        acceptor: &TlsAcceptor,
-        sock: TcpStream,
-    ) -> Result<TcpStream, std::io::Error> {
+    pub(super) async fn accept(_: &TlsAcceptor, _: TcpStream) -> Result<TcpStream, std::io::Error> {
         panic!("{PANIC_MESSAGE}")
     }
 }
