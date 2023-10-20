@@ -17,7 +17,7 @@ openssl-tls = ["kubert/openssl-tls", "openssl"]
 [dependencies.kubert]
 path = "../kubert"
 default-features = false
-features = ["clap", "lease", "runtime", ]
+features = ["clap", "lease", "runtime"]
 
 [dependencies.openssl]
 version = "0.10.57"
@@ -51,11 +51,6 @@ features = ["v1_27"]
 version = "0.85"
 default-features = false
 features = ["client", "derive", "rustls-tls", "runtime"]
-
-[dev-dependencies.kubert]
-path = "../kubert"
-default-features = false
-features = ["clap", "lease", "runtime", "rustls-tls"]
 
 [dev-dependencies.tokio]
 version = "1"
