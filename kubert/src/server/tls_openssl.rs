@@ -116,7 +116,12 @@ impl TlsKeyPath {
         // Open keyfile.
         let pem = tokio::fs::read(&self.0).await?;
 
-        // Load and return a single private key.
+        // Load and return a single private key. The keyfile should be
+        // PEM-encoded.
+        // TODO(eliza): Potentially, we may want to support both PEM-encoded and
+        // DER-encoded keyfiles, and decide whether to use
+        // `PKey::private_key_from_pem` or `PKey::private_key_from_pkcs8` based
+        // on the filename extension.
         Ok(PKey::private_key_from_pem(&pem)?)
     }
 }
