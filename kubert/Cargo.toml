@@ -172,7 +172,7 @@ tracing = { version = "0.1.31", optional = true }
 [dependencies.clap]
 # temporarily pin to the version before the MSRV became 1.70, since Rust 1.70 is
 # newer than what's in our devcontainer.
-version = "=4.3.24"
+version = "=4.4.7"
 optional = true
 default-features = false
 features = ["derive", "std"]
