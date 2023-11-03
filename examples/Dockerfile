@@ -1,4 +1,4 @@
-FROM ghcr.io/linkerd/dev:v40-rust as build
+FROM ghcr.io/linkerd/dev:v42-rust as build
 WORKDIR /kubert
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
@@ -9,6 +9,6 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --frozen --package=kubert-examples --examples \
     --no-default-features --features=${FEATURES}
 
-FROM gcr.io/distroless/cc
+FROM gcr.io/distroless/cc-debian12:debug
 COPY --from=build /kubert/target/debug/examples/watch-pods /watch-pods
 ENTRYPOINT ["/watch-pods"]

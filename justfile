@@ -7,7 +7,7 @@ _features := if features == "all" {
         "--no-default-features --features=" + features
     } else { "" }
 
-# Required to build boringssl (for dev:v40)
+# Required to build openssl
 export CXX := 'clang++-14'
 
 #
@@ -32,8 +32,8 @@ check *args:
 clippy *args:
     @just-cargo clippy --workspace --all-targets {{ _features }} {{ args }}
 
-doc *args:
-    @just-cargo doc --workspace --no-deps {{ _features }} {{ args }}
+doc:
+    @just-cargo doc -p kubert --no-deps --all-features --features=k8s-openapi/latest
 
 fmt:
     @just-cargo fmt
