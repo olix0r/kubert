@@ -322,10 +322,7 @@ mod tests {
                 .namespace()
                 .expect("resource must have a namespace");
             let name = resource.name_unchecked();
-            self.0
-                .entry(namespace)
-                .or_insert_with(HashSet::new)
-                .insert(name);
+            self.0.entry(namespace).or_default().insert(name);
         }
 
         fn delete(&mut self, namespace: String, name: String) {
