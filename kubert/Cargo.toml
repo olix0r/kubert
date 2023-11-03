@@ -130,10 +130,7 @@ features = ["k8s-openapi/v1_27"]
 
 [dependencies]
 ahash = { version = "0.8", optional = true }
-# dependency of clap, which we must take an explicit dep on to ensure that it's
-# pinned to the version before the MSRV became incompatible with what's in the
-# devcontainer.
-anstyle = { version = "=1.0.0", optional = true }
+anstyle = { version = "1", optional = true }
 backoff = { version = "0.4", features = ["tokio"], optional = true }
 bytes = { version = "1", optional = true }
 deflate = { version = "1", optional = true, default-features = false, features = [
@@ -141,10 +138,6 @@ deflate = { version = "1", optional = true, default-features = false, features =
 ] }
 drain = { version = "0.1.1", optional = true, default-features = false }
 chrono = { version = "0.4", optional = true, default-features = false }
-# dependency of clap, which we must take an explicit dep on to ensure that it's
-# pinned to the version before the MSRV became incompatible with what's in the
-# devcontainer.
-clap_lex = { version = "=0.5.0", optional = true }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
 hyper = { version = "0.14.17", optional = true, default-features = false }
@@ -170,9 +163,7 @@ tower = { version = "0.4", default-features = false, optional = true }
 tracing = { version = "0.1.31", optional = true }
 
 [dependencies.clap]
-# temporarily pin to the version before the MSRV became 1.70, since Rust 1.70 is
-# newer than what's in our devcontainer.
-version = "=4.3.24"
+version = "4"
 optional = true
 default-features = false
 features = ["derive", "std"]
