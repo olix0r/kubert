@@ -70,7 +70,7 @@ fn configure(key: PKey<Private>, certs: Vec<X509>) -> Result<TlsAcceptor, ErrorS
 
 /// ALPN protocols encoded as length-prefixed strings.
 ///
-/// `boring` requires that the list of protocols be encoded in the wire format.
+/// `openssl` requires that the list of protocols be encoded in the wire format.
 static ALPN_PROTOCOLS: Lazy<Vec<u8>> = Lazy::new(|| {
     let protocols: &[&[u8]] = &[b"h2", b"http/1.1"];
     // Allocate a buffer to hold the encoded protocols.
