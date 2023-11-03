@@ -119,9 +119,25 @@ shutdown = [
 ]
 
 [package.metadata.docs.rs]
+features = [
+    "rustls-tls",
+    "openssl-tls",
+    "admin",
+    "client",
+    "errors",
+    "gzip",
+    "index",
+    "initialized",
+    "lease",
+    "log",
+    "metrics",
+    "requeue",
+    "runtime",
+    "server",
+    "shutdown",
+    "k8s-openapi/latest",
+]
 rustdoc-args = ["--cfg", "docsrs"]
-all-features = true
-features = ["k8s-openapi/v1_27"]
 
 [dependencies]
 ahash = { version = "0.8", optional = true }
@@ -206,7 +222,7 @@ tempfile = "3.8"
 [dev-dependencies.k8s-openapi]
 version = "0.19"
 default-features = false
-features = ["v1_27"]
+features = ["latest"]
 
 [dev-dependencies.tokio]
 version = "1.18"

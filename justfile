@@ -32,8 +32,8 @@ check *args:
 clippy *args:
     @just-cargo clippy --workspace --all-targets {{ _features }} {{ args }}
 
-doc *args:
-    @just-cargo doc --workspace --no-deps {{ _features }} {{ args }}
+doc:
+    @just-cargo doc -p kubert --no-deps --all-features --features=k8s-openapi/latest
 
 fmt:
     @just-cargo fmt
