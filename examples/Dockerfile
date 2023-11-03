@@ -9,6 +9,6 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --frozen --package=kubert-examples --examples \
     --no-default-features --features=${FEATURES}
 
-FROM gcr.io/distroless/cc
+FROM docker.io/library/debian:bookworm-slim
 COPY --from=build /kubert/target/debug/examples/watch-pods /watch-pods
 ENTRYPOINT ["/watch-pods"]
