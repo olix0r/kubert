@@ -40,11 +40,6 @@ client = [
     "tower-http",
     "hyper",
 ]
-clap = [
-    "anstyle",
-    "clap_lex",
-    "dep:clap",
-]
 errors = [
     "futures-core",
     "futures-util",
@@ -130,7 +125,6 @@ features = ["k8s-openapi/v1_27"]
 
 [dependencies]
 ahash = { version = "0.8", optional = true }
-anstyle = { version = "1", optional = true }
 backoff = { version = "0.4", features = ["tokio"], optional = true }
 bytes = { version = "1", optional = true }
 deflate = { version = "1", optional = true, default-features = false, features = [
