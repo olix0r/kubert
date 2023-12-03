@@ -14,7 +14,7 @@ use std::{
 use tracing::{debug, info_span, Instrument};
 
 /// Results that may fail with a server error
-pub type Result<T> = hyper::Result<T>;
+pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 /// Server errors
 pub type Error = hyper::Error;
@@ -22,8 +22,8 @@ pub type Error = hyper::Error;
 /// A handler for a request path.
 type HandlerFn = Box<dyn Fn(Request<Body>) -> Response<Body> + Send + Sync + 'static>;
 
-#[cfg(feature = "metrics")]
-mod metrics;
+#[cfg(feature = "prometheus")]
+mod prom;
 
 /// Command-line arguments used to configure an admin server
 #[derive(Clone, Debug)]
@@ -122,44 +122,26 @@ impl Builder {
     /// Use the default `PrometheusBuilder` to configure a `/metrics` endpoint
     /// on the admin server. Process metrics are exposed by default.
     ///
-    /// This method is only available if the "metrics" feature is enabled.
-    #[cfg(feature = "metrics")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
+    /// This method is only available if the "prometheus" feature is enabled.
+    #[cfg(feature = "prometheus")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "prometheus")))]
     pub fn with_default_prometheus(&mut self) -> &mut Self {
-        let metrics = metrics::PrometheusBuilder::new()
-            .install_recorder()
-            .expect("failed to install Prometheus recorder");
-
-        let process = metrics_process::Collector::default();
-        process.describe();
-
-        self.add_prometheus_handler("/metrics", metrics, move || process.collect())
+        self.add_prometheus_handler("/metrics", prometheus::default_registry().clone())
     }
 
-    /// Use the given `PrometheusHandle` to add a metrics route to the admin
-    /// server.
+    /// Use the given [`prometheus::Registry`] to add a metrics route to the
+    /// admin server.
     ///
-    /// This method is only available if the "metrics" feature is enabled.
-    ///
-    /// **Note**: Builder methods that configure `metrics-exporter-prometheus`'s
-    /// built-in HTTP listener, such as
-    /// [`PrometheusBuilder::with_http_listener`][http] and
-    /// [`PrometheusBuilder::add_allowed_address`][allowed] will not have an
-    /// effect on the admin server's `/metrics` endpoint, since the HTTP
-    /// server is managed by `kubert` rather than by `metrics-exporter-prometheus`.
-    ///
-    /// [http]: https://docs.rs/metrics-exporter-prometheus/latest/metrics_exporter_prometheus/struct.PrometheusBuilder.html#method.with_http_listener
-    /// [allowed]: https://docs.rs/metrics-exporter-prometheus/latest/metrics_exporter_prometheus/struct.PrometheusBuilder.html#method.add_allowed_address
-    #[cfg(feature = "metrics")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
+    /// This method is only available if the "prometheus" feature is enabled.
+    #[cfg(feature = "prometheus")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "prometheus")))]
     pub fn add_prometheus_handler(
         &mut self,
         path: impl ToString,
-        metrics: metrics::PrometheusHandle,
-        collect: impl Fn() + Send + Sync + 'static,
+        reg: prometheus::Registry,
     ) -> &mut Self {
-        let prom = metrics::Prometheus::new(metrics, collect);
-        self.add_handler(path, move |req| prom.handle_metrics(req))
+        let prom = prom::Prometheus::from(reg);
+        self.add_handler(path, move |req| prom.respond(req))
     }
 
     /// Adds a request handler for `path` to the admin server.
