@@ -17,6 +17,16 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - uses: styfle/cancel-workflow-action@01ce38bf961b4e243a6342cbade0dbc8ba3f0432
+        with:
+          all_but_latest: true
+          access_token: ${{ github.token }}
+
   all-check:
     strategy:
       matrix:
@@ -40,7 +50,7 @@ jobs:
       matrix:
         feature:
           - admin
-          - admin,metrics
+          - admin,prometheus-client
           - client
           - "client rustls-tls"
           - "client openssl-tls"
@@ -50,7 +60,7 @@ jobs:
           - initialized
           - lease
           - log
-          - metrics
+          - prometheus-client
           - requeue
           - runtime
           - server

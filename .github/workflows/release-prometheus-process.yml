@@ -1,12 +1,12 @@
-name: Release kubert
+name: Release kubernetes-prometheus-process
 
 on:
   pull_request:
     paths:
-      - .github/workflows/release.yml
+      - .github/workflows/release-prometheus-process.yml
   push:
     tags:
-      - 'release/*'
+      - 'kubert-prometheus-process/*'
 
 env:
   CARGO_INCREMENTAL: 0
@@ -37,9 +37,9 @@ jobs:
         shell: bash
         run: |
           ref="${{ github.ref }}"
-          if [[ "$ref" == refs/tags/release/* ]]; then
-            version="${ref##refs/tags/release/}"
-            crate=$(just-cargo crate-version kubert)
+          if [[ "$ref" == refs/tags/kubert-prometheus-process/* ]]; then
+            version="${ref##refs/tags/kubert-prometheus-process/}"
+            crate=$(just-cargo crate-version kubert-prometheus-process)
             if [[ "$crate" != "$version" ]]; then
               echo "::error ::Crate version $crate does not match tag $version" >&2
               exit 1
@@ -49,7 +49,7 @@ jobs:
             ) >> "$GITHUB_OUTPUT"
           else
             sha="${{ github.sha }}"
-            ( echo version="$(just-cargo crate-version kubert)-git-${sha:0:7}"
+            ( echo version="$(just-cargo crate-version kubert-prometheus-process)-git-${sha:0:7}"
               echo mode=test
             ) >> "$GITHUB_OUTPUT"
           fi
@@ -78,6 +78,6 @@ jobs:
     container: ghcr.io/linkerd/dev:v42-rust
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
-      - run: cargo publish --package=kubert --dry-run
+      - run: cargo publish --package=kubert-prometheus-process --dry-run
       - if: needs.meta.outputs.mode == 'release'
-        run: cargo publish --package=kubert --token=${{ secrets.CRATESIO_TOKEN }}
+        run: cargo publish --package=kubert-prometheus-process --token=${{ secrets.CRATESIO_TOKEN }}

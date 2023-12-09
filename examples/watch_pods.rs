@@ -9,6 +9,7 @@ use kube::{
     runtime::watcher::{self, Event},
     ResourceExt,
 };
+use prometheus_client::metrics::{counter::Counter, family::Family, gauge::Gauge};
 use tokio::time;
 use tracing::Instrument;
 
@@ -46,6 +47,15 @@ struct Args {
     selector: Option<String>,
 }
 
+#[derive(Clone, Debug)]
+struct Metrics {
+    events_restart: Counter<u64>,
+    events_apply: Counter<u64>,
+    events_delete: Counter<u64>,
+    current_pods: Gauge<i64>,
+    total_pods: Counter<u64>,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let Args {
@@ -58,16 +68,21 @@ async fn main() -> Result<()> {
         selector,
     } = Args::parse();
 
-    let deadline = time::Instant::now() + timeout;
+    let mut prom = prometheus_client::registry::Registry::default();
+
+    // Register application metrics before configuring the admin server.
+    let metrics = Metrics::register(prom.sub_registry_with_prefix("watch_pods"));
 
     // Configure a runtime with:
     // - a Kubernetes client
-    // - an admin server with /live and /ready endpoints
+    // - an admin server with /live, /ready, and /metrics endpoints
     // - a tracing (logging) subscriber
     let rt = kubert::Runtime::builder()
         .with_log(log_level, log_format)
-        .with_admin(admin)
+        .with_admin(admin.into_builder().with_prometheus(prom))
         .with_client(client);
+
+    let deadline = time::Instant::now() + timeout;
     let mut runtime = match time::timeout_at(deadline, rt.build()).await {
         Ok(res) => res?,
         Err(_) => bail!("Timed out waiting for Kubernetes client to initialize"),
@@ -94,42 +109,50 @@ async fn main() -> Result<()> {
                 tracing::trace!(?ev);
                 match ev {
                     Event::Restarted(pods) => {
-                        tracing::debug!(pods = %pods.len(), "restarted");
-                        let mut new = std::collections::HashSet::new();
+                        metrics.events_restart.inc();
+                        tracing::debug!(pods = %pods.len(), "Restarted");
+
+                        let mut prior = std::mem::take(&mut known);
                         for pod in pods.into_iter() {
                             let namespace = pod.namespace().unwrap();
                             let name = pod.name_unchecked();
                             let k = (namespace.clone(), name.clone());
-                            if !known.contains(&k) {
-                                tracing::info!(%namespace, %name, "added")
+                            if prior.remove(&k) {
+                                tracing::debug!(%namespace, %name, "Already exists")
                             } else {
-                                tracing::debug!(%namespace, %name, "already exists")
+                                metrics.current_pods.inc();
+                                metrics.total_pods.inc();
+                                tracing::info!(%namespace, %name, "Added")
                             }
-                            new.insert(k);
+                            known.insert(k);
                         }
-                        for (namespace, name) in known.into_iter() {
-                            if !new.contains(&(namespace.clone(), name.clone())) {
-                                tracing::info!(%namespace, %name, "deleted")
-                            }
+                        for (namespace, name) in prior.into_iter() {
+                            metrics.current_pods.dec();
+                            tracing::info!(%namespace, %name, "Deleted")
                         }
-                        known = new;
                     }
 
                     Event::Applied(pod) => {
+                        metrics.events_apply.inc();
                         let namespace = pod.namespace().unwrap();
                         let name = pod.name_unchecked();
                         if known.insert((namespace.clone(), name.clone())) {
-                            tracing::info!(%namespace, %name, "added");
+                            metrics.current_pods.inc();
+                            metrics.total_pods.inc();
+                            tracing::info!(%namespace, %name, "Added");
                         } else {
-                            tracing::info!(%namespace, %name, "updated");
+                            tracing::info!(%namespace, %name, "Updated");
                         }
                     }
 
                     Event::Deleted(pod) => {
+                        metrics.events_delete.inc();
                         let namespace = pod.namespace().unwrap();
                         let name = pod.name_unchecked();
-                        tracing::info!(%namespace, %name, "deleted");
-                        known.remove(&(namespace, name));
+                        tracing::info!(%namespace, %name, "Deleted");
+                        if known.remove(&(namespace, name)) {
+                            metrics.current_pods.dec();
+                        }
                     }
                 }
 
@@ -197,4 +220,36 @@ async fn init_timeout<F: Future>(deadline: Option<time::Instant>, future: F) -> 
     }
 
     Ok(future.await)
+}
+
+impl Metrics {
+    fn register(prom: &mut prometheus_client::registry::Registry) -> Self {
+        let events = Family::<_, Counter<u64>>::default();
+        let events_restart = events.get_or_create(&[("op", "restart")]).clone();
+        let events_apply = events.get_or_create(&[("op", "apply")]).clone();
+        let events_delete = events.get_or_create(&[("op", "delete")]).clone();
+        prom.register("events", "Number of events observed", events.clone());
+
+        let current_pods = Gauge::<i64>::default();
+        prom.register(
+            "current_pods",
+            "Number of Pods being observed",
+            current_pods.clone(),
+        );
+
+        let total_pods = Counter::<u64>::default();
+        prom.register(
+            "pods",
+            "Total number of unique pods observed",
+            total_pods.clone(),
+        );
+
+        Self {
+            events_restart,
+            events_apply,
+            events_delete,
+            current_pods,
+            total_pods,
+        }
+    }
 }

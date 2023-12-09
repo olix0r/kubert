@@ -1,0 +1,18 @@
+[package]
+name = "kubert-prometheus-process"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "A prometheus-client process metrics collector"
+readme = "../README.md"
+repository = "https://github.com/olix0r/kubert"
+rust-version = "1.65"
+keywords = ["prometheus-client", "process", "metrics", "monitoring"]
+
+[dependencies]
+prometheus-client = "0.22.0"
+tracing = "0.1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+procfs = { version = "0.16", default-features = false }

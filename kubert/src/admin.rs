@@ -3,8 +3,10 @@ use ahash::AHashMap;
 use futures_util::future;
 use hyper::{Body, Request, Response};
 use std::{
+    convert::Infallible,
     fmt,
     net::SocketAddr,
+    pin::Pin,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -13,16 +15,13 @@ use std::{
 };
 use tracing::{debug, info_span, Instrument};
 
-/// Results that may fail with a server error
-pub type Result<T> = hyper::Result<T>;
-
 /// Server errors
 pub type Error = hyper::Error;
 
 /// A handler for a request path.
 type HandlerFn = Box<dyn Fn(Request<Body>) -> Response<Body> + Send + Sync + 'static>;
 
-#[cfg(feature = "metrics")]
+#[cfg(feature = "prometheus-client")]
 mod metrics;
 
 /// Command-line arguments used to configure an admin server
@@ -63,7 +62,7 @@ pub struct Readiness(Arc<AtomicBool>);
 pub struct Server {
     addr: SocketAddr,
     ready: Readiness,
-    task: tokio::task::JoinHandle<Result<()>>,
+    task: tokio::task::JoinHandle<Result<(), hyper::Error>>,
 }
 
 // === impl AdminArgs ===
@@ -119,47 +118,34 @@ impl Builder {
         self.ready.set(true);
     }
 
-    /// Use the default `PrometheusBuilder` to configure a `/metrics` endpoint
-    /// on the admin server. Process metrics are exposed by default.
+    /// Use the provided prometheus Registry to export a `/metrics` endpoint
+    /// on the admin server with process metrics.
     ///
-    /// This method is only available if the "metrics" feature is enabled.
-    #[cfg(feature = "metrics")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
-    pub fn with_default_prometheus(&mut self) -> &mut Self {
-        let metrics = metrics::PrometheusBuilder::new()
-            .install_recorder()
-            .expect("failed to install Prometheus recorder");
-
-        let process = metrics_process::Collector::default();
-        process.describe();
-
-        self.add_prometheus_handler("/metrics", metrics, move || process.collect())
+    /// This method is only available if the "prometheus-client" feature is enabled.
+    #[cfg(feature = "prometheus-client")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "prometheus-client")))]
+    pub fn with_prometheus(self, mut registry: prometheus_client::registry::Registry) -> Self {
+        if let Err(error) =
+            kubert_prometheus_process::register(registry.sub_registry_with_prefix("process"))
+        {
+            tracing::warn!(%error, "Process metrics cannot be monitored");
+        }
+        self.with_prometheus_handler("/metrics", registry)
     }
 
-    /// Use the given `PrometheusHandle` to add a metrics route to the admin
-    /// server.
+    /// Use the provided prometheus Registry to export an arbitrary metrics
+    /// endpoint.
     ///
-    /// This method is only available if the "metrics" feature is enabled.
-    ///
-    /// **Note**: Builder methods that configure `metrics-exporter-prometheus`'s
-    /// built-in HTTP listener, such as
-    /// [`PrometheusBuilder::with_http_listener`][http] and
-    /// [`PrometheusBuilder::add_allowed_address`][allowed] will not have an
-    /// effect on the admin server's `/metrics` endpoint, since the HTTP
-    /// server is managed by `kubert` rather than by `metrics-exporter-prometheus`.
-    ///
-    /// [http]: https://docs.rs/metrics-exporter-prometheus/latest/metrics_exporter_prometheus/struct.PrometheusBuilder.html#method.with_http_listener
-    /// [allowed]: https://docs.rs/metrics-exporter-prometheus/latest/metrics_exporter_prometheus/struct.PrometheusBuilder.html#method.add_allowed_address
-    #[cfg(feature = "metrics")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "metrics")))]
-    pub fn add_prometheus_handler(
-        &mut self,
+    /// This method is only available if the "prometheus-client" feature is enabled.
+    #[cfg(feature = "prometheus-client")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "prometheus-client")))]
+    pub fn with_prometheus_handler(
+        self,
         path: impl ToString,
-        metrics: metrics::PrometheusHandle,
-        collect: impl Fn() + Send + Sync + 'static,
-    ) -> &mut Self {
-        let prom = metrics::Prometheus::new(metrics, collect);
-        self.add_handler(path, move |req| prom.handle_metrics(req))
+        registry: prometheus_client::registry::Registry,
+    ) -> Self {
+        let prom = metrics::Prometheus::new(registry);
+        self.with_handler(path, move |req| prom.handle_metrics(req))
     }
 
     /// Adds a request handler for `path` to the admin server.
@@ -172,11 +158,11 @@ impl Builder {
     ///
     /// This method panics if called with the path `/ready` or `/live`, as these
     /// paths would conflict with the built-in readiness and liveness endpoints.
-    pub fn add_handler(
-        &mut self,
+    pub fn with_handler(
+        mut self,
         path: impl ToString,
         handler: impl Fn(Request<Body>) -> Response<Body> + Send + Sync + 'static,
-    ) -> &mut Self {
+    ) -> Self {
         let path = path.to_string();
         assert_ne!(
             path, "/ready",
@@ -191,7 +177,7 @@ impl Builder {
     }
 
     /// Binds the admin server without accepting connections
-    pub fn bind(self) -> Result<Bound> {
+    pub fn bind(self) -> Result<Bound, hyper::Error> {
         let Self {
             addr,
             ready,
@@ -239,39 +225,20 @@ impl Bound {
 
     /// Binds and runs the server on a background task, returning a handle
     pub fn spawn(self) -> Server {
-        let ready = self.ready.clone();
-        let routes = Arc::new(self.routes);
-
-        let server = {
-            self.server
-                .serve(hyper::service::make_service_fn(move |_conn| {
-                    let ready = ready.clone();
-                    let routes = routes.clone();
-
-                    future::ok::<_, hyper::Error>(hyper::service::service_fn(
-                        move |req: hyper::Request<hyper::Body>| {
-                            future::ok::<_, hyper::Error>(match req.uri().path() {
-                                "/live" => handle_live(req),
-                                "/ready" => handle_ready(&ready, req),
-                                path => routes
-                                    .get(path)
-                                    .map(|handler| handler(req))
-                                    .unwrap_or_else(|| {
-                                        Response::builder()
-                                            .status(hyper::StatusCode::NOT_FOUND)
-                                            .body(hyper::Body::default())
-                                            .unwrap()
-                                    }),
-                            })
-                        },
-                    ))
-                }))
+        let svc = {
+            let ready = self.ready.clone();
+            let routes = Arc::new(self.routes);
+            hyper::service::service_fn(move |req| handle(&ready, &routes, req))
         };
-
+        let serve = self
+            .server
+            .serve(hyper::service::make_service_fn(move |_conn| {
+                future::ok::<_, Infallible>(svc.clone())
+            }));
         let task = tokio::spawn(
             async move {
                 debug!("Serving");
-                server.await
+                serve.await
             }
             .instrument(info_span!("admin", port = %self.addr.port())),
         );
@@ -312,12 +279,51 @@ impl Server {
     }
 
     /// Returns the server tasks's join handle
-    pub fn into_join_handle(self) -> tokio::task::JoinHandle<Result<()>> {
+    pub fn into_join_handle(self) -> tokio::task::JoinHandle<Result<(), hyper::Error>> {
         self.task
     }
 }
 
 // === routes ===
+
+fn handle(
+    ready: &Readiness,
+    routes: &Arc<AHashMap<String, HandlerFn>>,
+    req: hyper::Request<hyper::Body>,
+) -> Pin<
+    Box<
+        dyn std::future::Future<
+                Output = Result<hyper::Response<hyper::Body>, tokio::task::JoinError>,
+            > + Send,
+    >,
+> {
+    // Fast path for probe handlers.
+    if req.uri().path() == "/live" {
+        Box::pin(future::ok(handle_live(req)))
+    } else if req.uri().path() == "/ready" {
+        Box::pin(future::ok(handle_ready(ready, req)))
+    } else if routes.contains_key(req.uri().path()) {
+        // User-provided handlers--especially metrics collectors--may perform
+        // blocking calls like stat. Prevent these tasks from blocking the
+        // runtime.
+        let routes = routes.clone();
+        let path = req.uri().path().to_string();
+        Box::pin(async move {
+            tokio::task::spawn_blocking(move || {
+                let handler = routes.get(&path).expect("routes must contain path");
+                handler(req)
+            })
+            .await
+        })
+    } else {
+        Box::pin(future::ok(
+            Response::builder()
+                .status(hyper::StatusCode::NOT_FOUND)
+                .body(hyper::Body::default())
+                .unwrap(),
+        ))
+    }
+}
 
 fn handle_live(req: Request<Body>) -> Response<Body> {
     match *req.method() {
