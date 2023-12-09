@@ -48,7 +48,7 @@ Other examples include:
 
 ## kubert-prometheus-process
 
-The `kubert-prometheus-process` crate provides a process metrics collector
+The `kubert-prometheus-process` crate provides [process metrics][pm] for
 prometheus-client. It has no dependencies on kubert, and can be used
 independently.
 
@@ -59,4 +59,5 @@ from Linkerd; and we plan to use it in Linkerd moving forward.
 
 [krs]: https://docs.rs/kube
 [pc]: https://docs.rs/prometheus-client
+[pm]: https://prometheus.io/docs/instrumenting/writing_clientlibs/#process-metrics
 [rt]: https://docs.rs/kubert/latest/kubert/runtime/struct.Runtime.html
