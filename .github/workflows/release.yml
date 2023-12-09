@@ -1,4 +1,4 @@
-name: Release
+name: Release kubert
 
 on:
   pull_request:

@@ -1,7 +1,20 @@
-//! Unsafe code for accessing system-level counters for memory & CPU usage.
+//! Process metrics for Prometheus.
 //!
-//! Based on linkerd2-proxy.
+//! This crate registers a collector that provides the standard set of [Process
+//! metrics][pm].
 //!
+//! ```
+//! let mut prom = prometheus_client::registry::Registry::default();
+//! if let Err(error) =
+//!     kubert_prometheus_process::register(prom.sub_registry_with_prefix("process"))
+//! {
+//!     tracing::warn!(%error, "Failed to register process metrics");
+//! }
+//! ```
+//!
+//! [pm]: https://prometheus.io/docs/instrumenting/writing_clientlibs/#process-metrics
+//
+// Based on linkerd2-proxy.
 //
 // Copyright The Linkerd Authors
 //
@@ -17,7 +30,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![deny(rust_2018_idioms, clippy::disallowed_methods, unsafe_code)]
+#![deny(
+    rust_2018_idioms,
+    clippy::disallowed_methods,
+    unsafe_code,
+    missing_docs
+)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use prometheus_client::{
     collector::Collector,
@@ -27,6 +46,8 @@ use prometheus_client::{
 };
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+/// Registers process metrics with the given registry. Note that the 'process_'
+/// prefix is NOT added and should be specified by the caller if desired.
 pub fn register(reg: &mut Registry) -> std::io::Result<()> {
     let start_time = Instant::now();
     let start_time_from_epoch = SystemTime::now()
