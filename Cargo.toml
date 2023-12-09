@@ -1,7 +1,8 @@
 [workspace]
 resolver = "2"
-default-members = ["kubert"]
+default-members = ["kubert", "kubert-prometheus-process"]
 members = [
     "kubert",
+    "kubert-prometheus-process",
     "examples",
 ]

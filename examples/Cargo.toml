@@ -17,7 +17,7 @@ openssl-tls = ["kubert/openssl-tls", "openssl"]
 [dependencies.kubert]
 path = "../kubert"
 default-features = false
-features = ["clap", "lease", "runtime"]
+features = ["clap", "lease", "prometheus-client", "runtime"]
 
 [dependencies.openssl]
 version = "0.10.57"
@@ -29,6 +29,7 @@ anyhow = "1"
 chrono = { version = "0.4", default-features = false }
 futures = { version = "0.3", default-features = false }
 maplit = "1"
+prometheus-client = "0.22"
 rand = "0.8"
 regex = "1"
 thiserror = "1"

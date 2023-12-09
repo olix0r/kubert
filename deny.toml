@@ -32,7 +32,9 @@ exceptions = [
         "Apache-2.0",
         "Unicode-DFS-2016",
     ], name = "unicode-ident" },
-    { allow = ["Zlib"], name = "adler32" },
+    { allow = [
+        "Zlib",
+    ], name = "adler32" },
 ]
 
 [[licenses.clarify]]
@@ -52,7 +54,7 @@ skip = [
     { name = "base64" },
     # the current versions of `hyper` and `tokio` depend on semver-incompatible
     # versions of `socket2` (0.4 and 0.5, respectively).
-    { name = "socket2" }
+    { name = "socket2" },
 ]
 skip-tree = [
     { name = "windows-sys" },
@@ -61,15 +63,8 @@ skip-tree = [
     { name = "windows_i686_msvc" },
     { name = "windows_x86_64_gnu" },
     { name = "windows_x86_64_msvc" },
-    # `metrics` and `kube-runtime` have conflicting versions of `ahash` and
-    # `wasi`.
-    # TODO(eliza): remove this skip when the conflicts are resolved.
-    { name = "metrics" },
-    # `metrics-process` has transitive deps on `hermit-abi` and `bitflags` that
-    # are incompatible with the transitive deps other crates have on those
-    # libraries.
-    # TODO(eliza): remove this skip when the conflicts are resolved.
-    { name = "metrics-process" },
+    # tracing-subscriber needs an older regex-automata.
+    { name = "regex-automata" },
     # `serde_json` and `serde_yaml` depend on incompatible versions of indexmap
     { name = "indexmap" },
     # the proc-macro ecosystem is still in the process of migrating from `syn`
