@@ -1,0 +1,83 @@
+name: Release kubernetes-prometheus-tokio
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/release-prometheus-tokio.yml
+  push:
+    tags:
+      - 'kubert-prometheus-tokio/*'
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - uses: styfle/cancel-workflow-action@01ce38bf961b4e243a6342cbade0dbc8ba3f0432
+        with:
+          all_but_latest: true
+          access_token: ${{ github.token }}
+
+  meta:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    container: ghcr.io/linkerd/dev:v42-rust
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+      - id: meta
+        shell: bash
+        run: |
+          ref="${{ github.ref }}"
+          if [[ "$ref" == refs/tags/kubert-prometheus-tokio/* ]]; then
+            version="${ref##refs/tags/kubert-prometheus-tokio/}"
+            crate=$(just-cargo crate-version kubert-prometheus-tokio)
+            if [[ "$crate" != "$version" ]]; then
+              echo "::error ::Crate version $crate does not match tag $version" >&2
+              exit 1
+            fi
+            ( echo version="$version"
+              echo mode=release
+            ) >> "$GITHUB_OUTPUT"
+          else
+            sha="${{ github.sha }}"
+            ( echo version="$(just-cargo crate-version kubert-prometheus-tokio)-git-${sha:0:7}"
+              echo mode=test
+            ) >> "$GITHUB_OUTPUT"
+          fi
+    outputs:
+      mode: ${{ steps.meta.outputs.mode }}
+      version: ${{ steps.meta.outputs.version }}
+
+  release:
+    needs: [meta]
+    permissions:
+      contents: write
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - if: needs.meta.outputs.mode == 'release'
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844
+        with:
+          name: kubert-prometheus-tokio ${{ needs.meta.outputs.version }}
+          generate_release_notes: true
+
+  crate:
+    # Only publish the crate after the rest of the release succeeds.
+    needs: [meta, release]
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    container: ghcr.io/linkerd/dev:v42-rust
+    steps:
+      - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+      - run: cargo publish --package=kubert-prometheus-tokio --dry-run
+      - if: needs.meta.outputs.mode == 'release'
+        run: cargo publish --package=kubert-prometheus-tokio --token=${{ secrets.CRATESIO_TOKEN }}
