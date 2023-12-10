@@ -4,6 +4,7 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     CARGO_NET_RETRY=10 just-cargo fetch
 ARG FEATURES="rustls-tls"
+ENV RUSTFLAGS="--cfg tokio_unstable"
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     CARGO_INCREMENTAL=0 just-cargo build \
     --frozen --package=kubert-examples --examples \

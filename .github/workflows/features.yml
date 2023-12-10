@@ -35,9 +35,6 @@ jobs:
           - "1.73"
     timeout-minutes: 10
     runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: '--cfg tokio_unstable'
-      RUSTDOCFLAGS: '--cfg tokio_unstable'
     steps:
       - uses: linkerd/dev/actions/setup-tools@v42
       - uses: linkerd/dev/actions/setup-rust@v42
@@ -71,9 +68,6 @@ jobs:
           - "server openssl-tls"
           - "server openssl-tls rustls-tls"
           - shutdown
-    env:
-      RUSTFLAGS: '--cfg tokio_unstable'
-      RUSTDOCFLAGS: '--cfg tokio_unstable'
     timeout-minutes: 10
     runs-on: ubuntu-latest
     container: ghcr.io/linkerd/dev:v42-rust
