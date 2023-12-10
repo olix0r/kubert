@@ -71,7 +71,7 @@ async fn main() -> Result<()> {
     let mut prom = prometheus_client::registry::Registry::default();
 
     // Register application metrics before configuring the admin server.
-    let metrics = Metrics::register(prom.sub_registry_with_prefix("watch_pods"));
+    let metrics = Metrics::register(prom.sub_registry_with_prefix("kubert_watch_pods"));
 
     // Configure a runtime with:
     // - a Kubernetes client
