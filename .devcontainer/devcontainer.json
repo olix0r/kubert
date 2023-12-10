@@ -1,14 +1,6 @@
 {
 	"name": "kubert",
 	"image": "ghcr.io/linkerd/dev:v42",
-	"extensions": [
-		"kokakiwi.vscode-just",
-		"NathanRidley.autotrim",
-		"rust-lang.rust-analyzer",
-		"ms-kubernetes-tools.vscode-kubernetes-tools",
-		"samverschueren.final-newline",
-		"tamasfe.even-better-toml"
-	],
 	"runArgs": [
 		"--init",
 		// Use the host network so we can access k3d, etc.
@@ -19,9 +11,6 @@
 	],
 	"overrideCommand": false,
 	"remoteUser": "code",
-	"containerEnv": {
-		"CXX": "clang++-14",
-	},
 	"mounts": [
 		{
 			"source": "/var/run/docker.sock",
@@ -33,5 +22,20 @@
 			"target": "/home/code/.docker",
 			"type": "bind"
 		}
-	]
+	],
+	"containerEnv": {
+		"CXX": "clang++-14",
+	},
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"kokakiwi.vscode-just",
+				"NathanRidley.autotrim",
+				"rust-lang.rust-analyzer",
+				"ms-kubernetes-tools.vscode-kubernetes-tools",
+				"samverschueren.final-newline",
+				"tamasfe.even-better-toml"
+			]
+		}
+	}
 }

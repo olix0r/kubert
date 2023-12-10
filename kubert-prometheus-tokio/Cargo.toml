@@ -9,8 +9,11 @@ repository = "https://github.com/olix0r/kubert"
 rust-version = "1.65"
 keywords = ["prometheus-client", "rokio", "metrics", "monitoring"]
 
+[features]
+rt = ["tokio/rt", "tokio/time", "tokio-metrics/rt"]
+
 [dependencies]
-prometheus-client = "0.22.0"
-tokio = { version = "1", features = ["rt", "time"] }
-tokio-metrics = { version = "0.3", features = ["rt"] }
+prometheus-client = "0.22"
+tokio = "1"
+tokio-metrics = "0.3"
 tracing = "0.1"

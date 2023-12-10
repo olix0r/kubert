@@ -125,16 +125,19 @@ impl Builder {
     #[cfg(feature = "prometheus-client")]
     #[cfg_attr(docsrs, doc(cfg(feature = "prometheus-client")))]
     pub fn with_prometheus(self, mut registry: prometheus_client::registry::Registry) -> Self {
-        #[cfg(tokio_unstable)]
-        kubert_prometheus_tokio::register_spawned_interval(
-            registry.sub_registry_with_prefix("tokio"),
-            &tokio::runtime::Handle::current(),
-            Duration::from_secs(1),
-        );
         #[cfg(not(tokio_unstable))]
-        tracing::debug!(
-            "Tokio runtime metrics cannot be monitored without the tokio_unstable feature"
-        );
+        tracing::debug!("Tokio runtime metrics cannot be monitored without the tokio_unstable cfg");
+        #[cfg(tokio_unstable)]
+        {
+            let reg = registry.sub_registry_with_prefix("tokio_rt");
+            let metrics = kubert_prometheus_tokio::rt::Metrics::register(reg);
+            let rt = tokio::runtime::Handle::current();
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            tokio::spawn(
+                async move { metrics.updated(&rt, &mut interval).await }
+                    .instrument(tracing::info_span!("tokio-rt-metrics")),
+            );
+        }
 
         if let Err(error) =
             kubert_prometheus_process::register(registry.sub_registry_with_prefix("process"))

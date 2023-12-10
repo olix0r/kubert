@@ -212,8 +212,11 @@ optional = true
 default-features = false
 features = ["env-filter", "fmt", "json", "smallvec", "tracing-log"]
 
-[target.'cfg(tokio_unstable)'.dependencies]
-kubert-prometheus-tokio = { version = "0.1.0", path = "../kubert-prometheus-tokio", optional = true }
+[target.'cfg(tokio_unstable)'.dependencies.kubert-prometheus-tokio]
+version = "0.1.0"
+path = "../kubert-prometheus-tokio"
+optional = true
+features = ["rt"]
 
 # === Dev ===
 
