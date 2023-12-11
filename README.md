@@ -19,7 +19,8 @@ Rust Kubernetes runtime helpers. Based on [`kube-rs`][krs].
 
 * [`clap`](https://docs.rs/clap) command-line interface support;
 * A basic admin server with `/ready` and `/live` probe endpoints;
-* Optional [`prometheus-client`][pc] integration;
+* Optional [`prometheus-client`][pc] integration, with process and Tokio Runtime
+  metrics;
 * A default Kubernetes client;
 * Graceful shutdown on `SIGTERM` or `SIGINT` signals;
 * An HTTPS server (for admission controllers and API extensions) with
@@ -54,6 +55,15 @@ The `kubert-prometheus-process` crate provides [process metrics][pm] for
 prometheus-client. It has no dependencies on kubert, and can be used
 independently.
 
+## kubert-prometheus-tokio
+
+The `kubert-prometheus-tokio` crate exposes [Tokio runtime metrics][tm] for
+prometheus-client. It also has no dependencies on kubert, and can be used
+independently.
+
+Note that tokio runtime metrics require `RUSTFLAGS="--cfg tokio_unstable"` to be
+set at compile-time.
+
 ## Status
 
 This crate is still fairly experimental, though it's based on production code
@@ -62,4 +72,5 @@ from Linkerd; and we plan to use it in Linkerd moving forward.
 [krs]: https://docs.rs/kube
 [pc]: https://docs.rs/prometheus-client
 [pm]: https://prometheus.io/docs/instrumenting/writing_clientlibs/#process-metrics
+[tm]: https://docs.rs/tokio-metrics
 [rt]: https://docs.rs/kubert/latest/kubert/runtime/struct.Runtime.html
