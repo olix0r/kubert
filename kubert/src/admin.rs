@@ -130,13 +130,14 @@ impl Builder {
         tracing::debug!("Tokio runtime metrics cannot be monitored without the tokio_unstable cfg");
         #[cfg(tokio_unstable)]
         {
-            let reg = registry.sub_registry_with_prefix("tokio_rt");
-            let metrics = kubert_prometheus_tokio::rt::Metrics::register(reg);
-            let rt = tokio::runtime::Handle::current();
+            let metrics = kubert_prometheus_tokio::Runtime::register(
+                registry.sub_registry_with_prefix("tokio_rt"),
+                tokio::runtime::Handle::current(),
+            );
             let mut interval = tokio::time::interval(Duration::from_secs(1));
             tokio::spawn(
-                async move { metrics.updated(&rt, &mut interval).await }
-                    .instrument(tracing::info_span!("tokio-rt-metrics")),
+                async move { metrics.updated(&mut interval).await }
+                    .instrument(tracing::info_span!("kubert-prom-tokio-rt")),
             );
         }
 

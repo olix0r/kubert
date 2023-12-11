@@ -7,15 +7,11 @@
 #[cfg(all(feature = "rt", not(tokio_unstable)))]
 compile_error!("RUSTFLAGS='--cfg tokio_unstable' must be set to use `tokio-metrics/rt`");
 
-/// Tokio runtime metrics.
-///
-/// NOTE that this module requires unstable tokio functionality that must be
-/// enabled via the `tokio_unstable` feature. When it is not enabled, no metrics
-/// will be registered.
-///
-/// `RUSTFLAGS="--cfg tokio_unstable"` must be set at build-time to use this feature
 #[cfg(all(feature = "rt", tokio_unstable))]
-pub mod rt {
+pub use self::rt::Runtime;
+
+#[cfg(all(feature = "rt", tokio_unstable))]
+mod rt {
     use prometheus_client::{
         metrics::{counter::Counter, gauge::Gauge},
         registry::{Registry, Unit},
@@ -23,9 +19,21 @@ pub mod rt {
     use tokio::time;
     use tokio_metrics::{RuntimeIntervals, RuntimeMonitor};
 
-    /// Holds a set of registered metrics for a Tokio runtime.
+    /// Tokio runtime metrics.
+    ///
+    /// NOTE that this module requires unstable tokio functionality that must be
+    /// enabled via the `tokio_unstable` feature. When it is not enabled, no metrics
+    /// will be registered.
+    ///
+    /// `RUSTFLAGS="--cfg tokio_unstable"` must be set at build-time to use this featur
+    #[derive(Debug)]
+    pub struct Runtime {
+        runtime: tokio::runtime::Handle,
+        metrics: Metrics,
+    }
+
     #[derive(Debug, Default)]
-    pub struct Metrics {
+    struct Metrics {
         workers: Gauge,
         park: Counter,
         noop: Counter,
@@ -43,11 +51,11 @@ pub mod rt {
         // TODO poll_count_histogram requires configuration
     }
 
-    impl Metrics {
+    impl Runtime {
         /// Registers Tokio runtime metrics with the given registry. Note that
         /// metrics are NOT prefixed.
-        pub fn register(reg: &mut Registry) -> Self {
-            let metrics = Self::default();
+        pub fn register(reg: &mut Registry, runtime: tokio::runtime::Handle) -> Self {
+            let metrics = Metrics::default();
 
             reg.register(
                 "workers",
@@ -126,22 +134,20 @@ pub mod rt {
                 metrics.io_driver_ready.clone(),
             );
 
-            metrics
+            Self { runtime, metrics }
         }
 
         /// Drives metrics updates for a runtime according to a fixed interval.
-        pub async fn updated(
-            &self,
-            rt: &tokio::runtime::Handle,
-            interval: &mut time::Interval,
-        ) -> ! {
-            let mut probes = RuntimeMonitor::new(rt).intervals();
+        pub async fn updated(&self, interval: &mut time::Interval) -> ! {
+            let mut probes = RuntimeMonitor::new(&self.runtime).intervals();
             loop {
                 interval.tick().await;
-                self.probe(&mut probes);
+                self.metrics.probe(&mut probes);
             }
         }
+    }
 
+    impl Metrics {
         #[tracing::instrument(skip_all, ret, level = tracing::Level::TRACE)]
         fn probe(&self, probes: &mut RuntimeIntervals) {
             let probe = probes.next().expect("runtime metrics stream must not end");
