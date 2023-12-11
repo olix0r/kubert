@@ -1,0 +1,19 @@
+[package]
+name = "kubert-prometheus-tokio"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+description = "A prometheus-client tokio runtime metrics collector"
+readme = "../README.md"
+repository = "https://github.com/olix0r/kubert"
+rust-version = "1.65"
+keywords = ["prometheus-client", "rokio", "metrics", "monitoring"]
+
+[features]
+rt = ["tokio/rt", "tokio/time", "tokio-metrics/rt"]
+
+[dependencies]
+prometheus-client = "0.22"
+tokio = "1"
+tokio-metrics = "0.3"
+tracing = "0.1"

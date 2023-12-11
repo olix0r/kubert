@@ -119,17 +119,34 @@ impl Builder {
     }
 
     /// Use the provided prometheus Registry to export a `/metrics` endpoint
-    /// on the admin server with process metrics.
+    /// on the admin server with process metrics. When the `tokio_unstable` cfg
+    /// is set, tokio runtime metrics are also exported.
     ///
     /// This method is only available if the "prometheus-client" feature is enabled.
     #[cfg(feature = "prometheus-client")]
     #[cfg_attr(docsrs, doc(cfg(feature = "prometheus-client")))]
     pub fn with_prometheus(self, mut registry: prometheus_client::registry::Registry) -> Self {
+        #[cfg(not(tokio_unstable))]
+        tracing::debug!("Tokio runtime metrics cannot be monitored without the tokio_unstable cfg");
+        #[cfg(tokio_unstable)]
+        {
+            let metrics = kubert_prometheus_tokio::Runtime::register(
+                registry.sub_registry_with_prefix("tokio_rt"),
+                tokio::runtime::Handle::current(),
+            );
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            tokio::spawn(
+                async move { metrics.updated(&mut interval).await }
+                    .instrument(tracing::info_span!("kubert-prom-tokio-rt")),
+            );
+        }
+
         if let Err(error) =
             kubert_prometheus_process::register(registry.sub_registry_with_prefix("process"))
         {
             tracing::warn!(%error, "Process metrics cannot be monitored");
         }
+
         self.with_prometheus_handler("/metrics", registry)
     }
 
