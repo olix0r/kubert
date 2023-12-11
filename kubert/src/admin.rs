@@ -119,7 +119,8 @@ impl Builder {
     }
 
     /// Use the provided prometheus Registry to export a `/metrics` endpoint
-    /// on the admin server with process metrics.
+    /// on the admin server with process metrics. When the `tokio_unstable` cfg
+    /// is set, tokio runtime metrics are also exported.
     ///
     /// This method is only available if the "prometheus-client" feature is enabled.
     #[cfg(feature = "prometheus-client")]
