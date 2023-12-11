@@ -1,14 +1,14 @@
-//! A `tokio-metrics` exporter for `prometheus-client`.
+//! A `prometheus-client` exporter for `tokio-metrics`.
 
 #![deny(rust_2018_idioms, missing_docs, warnings)]
 #![forbid(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-#[cfg(all(feature = "rt", not(tokio_unstable)))]
-compile_error!("RUSTFLAGS='--cfg tokio_unstable' must be set to use `tokio-metrics/rt`");
-
 #[cfg(all(feature = "rt", tokio_unstable))]
 pub use self::rt::Runtime;
+
+#[cfg(all(feature = "rt", not(tokio_unstable)))]
+compile_error!("RUSTFLAGS='--cfg tokio_unstable' must be set to use `tokio-metrics/rt`");
 
 #[cfg(all(feature = "rt", tokio_unstable))]
 mod rt {
