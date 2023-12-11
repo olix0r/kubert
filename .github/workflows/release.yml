@@ -3,10 +3,10 @@ name: Release kubert
 on:
   pull_request:
     paths:
-      - .github/workflows/release.yml
+      - .github/workflows/release-kubert.yml
   push:
     tags:
-      - 'release/*'
+      - 'kubert/*'
 
 env:
   CARGO_INCREMENTAL: 0
@@ -37,8 +37,8 @@ jobs:
         shell: bash
         run: |
           ref="${{ github.ref }}"
-          if [[ "$ref" == refs/tags/release/* ]]; then
-            version="${ref##refs/tags/release/}"
+          if [[ "$ref" == refs/tags/kubert/* ]]; then
+            version="${ref##refs/tags/kubert/}"
             crate=$(just-cargo crate-version kubert)
             if [[ "$crate" != "$version" ]]; then
               echo "::error ::Crate version $crate does not match tag $version" >&2
