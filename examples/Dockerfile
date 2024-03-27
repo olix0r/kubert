@@ -1,4 +1,4 @@
-FROM ghcr.io/linkerd/dev:v42-rust as build
+FROM ghcr.io/linkerd/dev:v43-rust as build
 WORKDIR /kubert
 COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \

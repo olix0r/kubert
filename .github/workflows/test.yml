@@ -30,9 +30,10 @@ jobs:
   test:
     timeout-minutes: 10
     runs-on: ubuntu-latest
-    container: ghcr.io/linkerd/dev:v42-rust
+    container: ghcr.io/linkerd/dev:v43-rust
     steps:
       - uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+      - uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84
       - run: just fetch
       - run: just test-build
       - run: just test

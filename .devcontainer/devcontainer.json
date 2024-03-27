@@ -1,6 +1,6 @@
 {
 	"name": "kubert",
-	"image": "ghcr.io/linkerd/dev:v42",
+	"image": "ghcr.io/linkerd/dev:v43",
 	"runArgs": [
 		"--init",
 		// Use the host network so we can access k3d, etc.
@@ -25,6 +25,9 @@
 	],
 	"containerEnv": {
 		"CXX": "clang++-14",
+	},
+	"features": {
+		"ghcr.io/devcontainers/features/github-cli:1": {}
 	},
 	"customizations": {
 		"vscode": {
