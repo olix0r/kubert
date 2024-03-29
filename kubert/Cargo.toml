@@ -226,7 +226,7 @@ tokio-stream = "0.1"
 tokio-test = "0.4"
 tracing-subscriber = { version = "0.3", features = ["ansi"] }
 # used for generating TLS certificates in the server tests.
-rcgen = { version = "0.12.0" }
+rcgen = { version = "0.13.0" }
 # used for creating temporary dirs for TLS certificates in the server tests.
 tempfile = "3.8"
 
