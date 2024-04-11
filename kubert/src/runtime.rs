@@ -43,7 +43,7 @@ pub struct Builder<S = NoServer> {
     server: std::marker::PhantomData<S>,
 
     #[cfg(feature = "prometheus-client")]
-    registry: Option<Registry>,
+    metrics: Option<ResourceWatchMetrics>,
 }
 
 /// Provides infrastructure for running:
@@ -96,7 +96,7 @@ struct ResourceWatchErrorLabels {
 }
 
 #[cfg(feature = "prometheus-client")]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct ResourceWatchMetrics {
     watch_applies: Family<ResourceWatchLabels, Counter>,
     watch_restarts: Family<ResourceWatchLabels, Counter>,
@@ -206,14 +206,14 @@ impl<S> Builder<S> {
     }
 
     /// Configures the runtime to record watch metrics with the given registry
-    pub fn with_metrics(mut self, registry: Registry) -> Self {
-        self.registry = Some(registry);
+    pub fn with_metrics(mut self, registry: &mut Registry) -> Self {
+        self.metrics = Some(ResourceWatchMetrics::new(registry));
         self
     }
 
     #[inline]
     async fn build_inner<F>(
-        mut self,
+        self,
         mk_client: impl FnOnce(ClientArgs) -> F,
     ) -> Result<Runtime<S>, BuildError>
     where
@@ -233,7 +233,7 @@ impl<S> Builder<S> {
             // Server must be built by `Builder::build`
             server: self.server,
             #[cfg(feature = "prometheus-client")]
-            metrics: self.registry.as_mut().map(ResourceWatchMetrics::new),
+            metrics: self.metrics,
         })
     }
 }
@@ -249,7 +249,7 @@ impl Builder<NoServer> {
             client: self.client,
             error_delay: self.error_delay,
             log: self.log,
-            registry: self.registry,
+            metrics: self.metrics,
         }
     }
 
@@ -265,7 +265,7 @@ impl Builder<NoServer> {
             client: self.client,
             error_delay: self.error_delay,
             log: self.log,
-            registry: self.registry,
+            metrics: self.metrics,
         }
     }
 }
