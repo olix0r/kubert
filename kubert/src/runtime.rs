@@ -95,9 +95,10 @@ struct ResourceWatchErrorLabels {
     error: String,
 }
 
+/// Metrics for tracking resource watch events.
 #[cfg(feature = "prometheus-client")]
 #[derive(Clone, Debug)]
-struct ResourceWatchMetrics {
+pub struct ResourceWatchMetrics {
     watch_applies: Family<ResourceWatchLabels, Counter>,
     watch_restarts: Family<ResourceWatchLabels, Counter>,
     watch_deletes: Family<ResourceWatchLabels, Counter>,
@@ -138,31 +139,32 @@ struct LogSettings {
 
 #[cfg(feature = "prometheus-client")]
 impl ResourceWatchMetrics {
-    fn new(registry: &mut Registry) -> Self {
+    /// Creates a new set of metrics and registers them.
+    pub fn new(registry: &mut Registry) -> Self {
         let watch_applies = Family::default();
         registry.register(
-            "resource_watch_applies",
+            "applies",
             "Count of apply events for a resource watch",
             watch_applies.clone(),
         );
 
         let watch_restarts = Family::default();
         registry.register(
-            "resource_watch_restarts",
+            "restarts",
             "Count of restart events for a resource watch",
             watch_restarts.clone(),
         );
 
         let watch_deletes = Family::default();
         registry.register(
-            "resource_watch_deletes",
+            "deletes",
             "Count of delete events for a resource watch",
             watch_deletes.clone(),
         );
 
         let watch_errors = Family::default();
         registry.register(
-            "resource_watch_errors",
+            "errors",
             "Count of errors for a resource watch",
             watch_errors.clone(),
         );
@@ -206,8 +208,8 @@ impl<S> Builder<S> {
     }
 
     /// Configures the runtime to record watch metrics with the given registry
-    pub fn with_metrics(mut self, registry: &mut Registry) -> Self {
-        self.metrics = Some(ResourceWatchMetrics::new(registry));
+    pub fn with_metrics(mut self, metrics: ResourceWatchMetrics) -> Self {
+        self.metrics = Some(metrics);
         self
     }
 
@@ -421,11 +423,19 @@ impl<S> Runtime<S> {
                         metrics.watch_deletes.get_or_create(&labels).inc();
                     }
                     Err(ref e) => {
+                        let error = match e {
+                            watcher::Error::InitialListFailed(_) => "InitialListFailed",
+                            watcher::Error::WatchStartFailed(_) => "WatchStartFailed",
+                            watcher::Error::WatchError(_) => "WatchError",
+                            watcher::Error::WatchFailed(_) => "WatchFailed",
+                            watcher::Error::NoResourceVersion => "NoResourceVersion",
+                            watcher::Error::TooManyObjects => "TooManyObjects",
+                        };
                         let error_labels = ResourceWatchErrorLabels {
                             kind: labels.kind.clone(),
                             group: labels.group.clone(),
                             version: labels.version.clone(),
-                            error: e.to_string(),
+                            error: error.to_string(),
                         };
                         metrics.watch_errors.get_or_create(&error_labels).inc();
                     }
