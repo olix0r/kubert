@@ -9,7 +9,7 @@ use kube::{
     runtime::watcher::{self, Event},
     ResourceExt,
 };
-use kubert::runtime::RuntimeMetrics;
+use kubert::RuntimeMetrics;
 use prometheus_client::metrics::{counter::Counter, family::Family, gauge::Gauge};
 use tokio::time;
 use tracing::Instrument;
