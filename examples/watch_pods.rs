@@ -9,7 +9,6 @@ use kube::{
     runtime::watcher::{self, Event},
     ResourceExt,
 };
-use kubert::RuntimeMetrics;
 use prometheus_client::metrics::{counter::Counter, family::Family, gauge::Gauge};
 use tokio::time;
 use tracing::Instrument;
@@ -72,9 +71,8 @@ async fn main() -> Result<()> {
     let mut prom = prometheus_client::registry::Registry::default();
 
     // Register application metrics before configuring the admin server.
-    let metrics = Metrics::register(prom.sub_registry_with_prefix("pods"));
-    let runtime_metrics =
-        RuntimeMetrics::new(prom.sub_registry_with_prefix("kubert_resource_watch"));
+    let metrics = Metrics::register(prom.sub_registry_with_prefix("example_watch_pods"));
+    let runtime_metrics = kubert::RuntimeMetrics::register(prom.sub_registry_with_prefix("kubert"));
 
     // Configure a runtime with:
     // - a Kubernetes client

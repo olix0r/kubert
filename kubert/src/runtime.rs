@@ -80,6 +80,7 @@ pub struct NoServer(());
 
 /// Holds metrics for the runtime.
 #[cfg(feature = "prometheus-client")]
+#[must_use = "RuntimeMetrics must be passed to `Builder::with_metrics`"]
 #[derive(Debug)]
 pub struct RuntimeMetrics {
     watch: ResourceWatchMetrics,
@@ -592,11 +593,14 @@ impl LogSettings {
 
 // === impl RuntimeMetrics ===
 
+#[cfg(feature = "prometheus-client")]
 impl RuntimeMetrics {
     /// Creates a new set of metrics and registers them.
-    #[cfg(feature = "prometheus-client")]
-    pub fn new(registry: &mut Registry) -> Self {
-        let watch = ResourceWatchMetrics::new(registry);
+    ///
+    /// The returned metrics must be passed to [`Builder::with_metrics`] to
+    /// receive updates at runtime.
+    pub fn register(registry: &mut Registry) -> Self {
+        let watch = ResourceWatchMetrics::register(registry.sub_registry_with_prefix("watch"));
         Self { watch }
     }
 }

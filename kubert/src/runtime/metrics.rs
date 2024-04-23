@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use futures_core::Stream;
 use futures_util::StreamExt;
 use kube_core::Resource;
@@ -10,7 +8,17 @@ use prometheus_client::{
     registry::Registry,
 };
 use serde::de::DeserializeOwned;
+use std::borrow::Cow;
 use std::fmt::Debug;
+
+/// Metrics for tracking resource watch events.
+#[derive(Clone, Debug)]
+pub(super) struct ResourceWatchMetrics {
+    watch_applies: Family<ResourceWatchLabels, Counter>,
+    watch_restarts: Family<ResourceWatchLabels, Counter>,
+    watch_deletes: Family<ResourceWatchLabels, Counter>,
+    watch_errors: Family<ResourceWatchErrorLabels, Counter>,
+}
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
 struct ResourceWatchLabels {
@@ -27,20 +35,9 @@ struct ResourceWatchErrorLabels {
     error: Cow<'static, str>,
 }
 
-/// Metrics for tracking resource watch events.
-#[cfg(feature = "prometheus-client")]
-#[derive(Clone, Debug)]
-pub(super) struct ResourceWatchMetrics {
-    watch_applies: Family<ResourceWatchLabels, Counter>,
-    watch_restarts: Family<ResourceWatchLabels, Counter>,
-    watch_deletes: Family<ResourceWatchLabels, Counter>,
-    watch_errors: Family<ResourceWatchErrorLabels, Counter>,
-}
-
-#[cfg(feature = "prometheus-client")]
 impl ResourceWatchMetrics {
     /// Creates a new set of metrics and registers them.
-    pub(super) fn new(registry: &mut Registry) -> Self {
+    pub(super) fn register(registry: &mut Registry) -> Self {
         let watch_applies = Family::default();
         registry.register(
             "applies",
