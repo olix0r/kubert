@@ -10,15 +10,12 @@ use crate::{
     shutdown, LogFilter, LogFormat, LogInitError,
 };
 use futures_core::Stream;
-use futures_util::StreamExt;
 use kube_core::{NamespaceResourceScope, Resource};
 use kube_runtime::{reflector, watcher};
+use metrics::ResourceWatchMetrics;
 #[cfg(feature = "prometheus-client")]
-use prometheus_client::{
-    encoding::EncodeLabelSet,
-    metrics::{counter::Counter, family::Family},
-    registry::Registry,
-};
+use prometheus_client::registry::Registry;
+#[cfg(feature = "prometheus-client")]
 use serde::de::DeserializeOwned;
 use std::{fmt::Debug, future::Future, hash::Hash, time::Duration};
 #[cfg(feature = "server")]
@@ -26,6 +23,9 @@ use tower::Service;
 
 pub use kube_client::Api;
 pub use reflector::Store;
+
+#[cfg(feature = "prometheus-client")]
+mod metrics;
 
 /// Configures a controller [`Runtime`]
 #[derive(Debug, Default)]
@@ -43,7 +43,7 @@ pub struct Builder<S = NoServer> {
     server: std::marker::PhantomData<S>,
 
     #[cfg(feature = "prometheus-client")]
-    metrics: Option<ResourceWatchMetrics>,
+    metrics: Option<RuntimeMetrics>,
 }
 
 /// Provides infrastructure for running:
@@ -71,38 +71,18 @@ pub struct Runtime<S = NoServer> {
     server: std::marker::PhantomData<S>,
 
     #[cfg(feature = "prometheus-client")]
-    metrics: Option<ResourceWatchMetrics>,
+    metrics: Option<RuntimeMetrics>,
 }
 
 /// Indicates that no HTTPS server is configured
 #[derive(Debug, Default)]
 pub struct NoServer(());
 
+/// Holds metrics for the runtime.
 #[cfg(feature = "prometheus-client")]
-#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
-struct ResourceWatchLabels {
-    kind: String,
-    group: String,
-    version: String,
-}
-
-#[cfg(feature = "prometheus-client")]
-#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
-struct ResourceWatchErrorLabels {
-    kind: String,
-    group: String,
-    version: String,
-    error: String,
-}
-
-/// Metrics for tracking resource watch events.
-#[cfg(feature = "prometheus-client")]
-#[derive(Clone, Debug)]
-pub struct ResourceWatchMetrics {
-    watch_applies: Family<ResourceWatchLabels, Counter>,
-    watch_restarts: Family<ResourceWatchLabels, Counter>,
-    watch_deletes: Family<ResourceWatchLabels, Counter>,
-    watch_errors: Family<ResourceWatchErrorLabels, Counter>,
+#[derive(Debug)]
+pub struct RuntimeMetrics {
+    watch: ResourceWatchMetrics,
 }
 
 /// Indicates that the [`Builder`] could not configure a [`Runtime`]
@@ -137,47 +117,6 @@ struct LogSettings {
     format: LogFormat,
 }
 
-#[cfg(feature = "prometheus-client")]
-impl ResourceWatchMetrics {
-    /// Creates a new set of metrics and registers them.
-    pub fn new(registry: &mut Registry) -> Self {
-        let watch_applies = Family::default();
-        registry.register(
-            "applies",
-            "Count of apply events for a resource watch",
-            watch_applies.clone(),
-        );
-
-        let watch_restarts = Family::default();
-        registry.register(
-            "restarts",
-            "Count of restart events for a resource watch",
-            watch_restarts.clone(),
-        );
-
-        let watch_deletes = Family::default();
-        registry.register(
-            "deletes",
-            "Count of delete events for a resource watch",
-            watch_deletes.clone(),
-        );
-
-        let watch_errors = Family::default();
-        registry.register(
-            "errors",
-            "Count of errors for a resource watch",
-            watch_errors.clone(),
-        );
-
-        Self {
-            watch_applies,
-            watch_restarts,
-            watch_deletes,
-            watch_errors,
-        }
-    }
-}
-
 // === impl Builder ===
 
 impl<S> Builder<S> {
@@ -208,7 +147,7 @@ impl<S> Builder<S> {
     }
 
     /// Configures the runtime to record watch metrics with the given registry
-    pub fn with_metrics(mut self, metrics: ResourceWatchMetrics) -> Self {
+    pub fn with_metrics(mut self, metrics: RuntimeMetrics) -> Self {
         self.metrics = Some(metrics);
         self
     }
@@ -382,67 +321,17 @@ impl<S> Runtime<S> {
         watcher_config: watcher::Config,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
-        T::DynamicType: Default,
+        T: Resource<DynamicType = ()> + DeserializeOwned + Clone + Debug + Send + 'static,
     {
         let watch = watcher::watcher(api, watcher_config);
         #[cfg(feature = "prometheus-client")]
-        let watch = self.instrument_watch(watch);
+        let watch = metrics::ResourceWatchMetrics::instrument_watch(
+            self.metrics.as_ref().map(|m| m.watch.clone()),
+            watch,
+        );
         let successful = errors::LogAndSleep::fixed_delay(self.error_delay, watch);
         let initialized = self.initialized.add_handle().release_on_ready(successful);
         shutdown::CancelOnShutdown::new(self.shutdown_rx.clone(), initialized)
-    }
-
-    #[cfg(feature = "prometheus-client")]
-    fn instrument_watch<T>(
-        &self,
-        watch: impl Stream<Item = watcher::Result<watcher::Event<T>>> + Send,
-    ) -> impl Stream<Item = watcher::Result<watcher::Event<T>>> + Send
-    where
-        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
-        T::DynamicType: Default,
-    {
-        let dt = Default::default();
-        let labels = ResourceWatchLabels {
-            kind: T::kind(&dt).to_string(),
-            group: T::group(&dt).to_string(),
-            version: T::version(&dt).to_string(),
-        };
-        let metrics = self.metrics.clone();
-
-        watch.map(move |event| {
-            if let Some(metrics) = &metrics {
-                match event {
-                    Ok(watcher::Event::Applied(_)) => {
-                        metrics.watch_applies.get_or_create(&labels).inc();
-                    }
-                    Ok(watcher::Event::Restarted(_)) => {
-                        metrics.watch_restarts.get_or_create(&labels).inc();
-                    }
-                    Ok(watcher::Event::Deleted(_)) => {
-                        metrics.watch_deletes.get_or_create(&labels).inc();
-                    }
-                    Err(ref e) => {
-                        let error = match e {
-                            watcher::Error::InitialListFailed(_) => "InitialListFailed",
-                            watcher::Error::WatchStartFailed(_) => "WatchStartFailed",
-                            watcher::Error::WatchError(_) => "WatchError",
-                            watcher::Error::WatchFailed(_) => "WatchFailed",
-                            watcher::Error::NoResourceVersion => "NoResourceVersion",
-                            watcher::Error::TooManyObjects => "TooManyObjects",
-                        };
-                        let error_labels = ResourceWatchErrorLabels {
-                            kind: labels.kind.clone(),
-                            group: labels.group.clone(),
-                            version: labels.version.clone(),
-                            error: error.to_string(),
-                        };
-                        metrics.watch_errors.get_or_create(&error_labels).inc();
-                    }
-                };
-            }
-            event
-        })
     }
 
     /// Creates a cluster-level watch on the default Kubernetes client
@@ -454,7 +343,7 @@ impl<S> Runtime<S> {
         watcher_config: watcher::Config,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
+        T: Resource<DynamicType = ()> + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
         self.watch(Api::all(self.client()), watcher_config)
@@ -470,7 +359,7 @@ impl<S> Runtime<S> {
         watcher_config: watcher::Config,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource<Scope = NamespaceResourceScope>,
+        T: Resource<Scope = NamespaceResourceScope, DynamicType = ()>,
         T: DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
@@ -698,5 +587,16 @@ impl Default for LogSettings {
 impl LogSettings {
     fn try_init(self) -> Result<(), LogInitError> {
         self.format.try_init(self.filter)
+    }
+}
+
+// === impl RuntimeMetrics ===
+
+impl RuntimeMetrics {
+    /// Creates a new set of metrics and registers them.
+    #[cfg(feature = "prometheus-client")]
+    pub fn new(registry: &mut Registry) -> Self {
+        let watch = ResourceWatchMetrics::new(registry);
+        Self { watch }
     }
 }
