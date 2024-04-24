@@ -30,7 +30,7 @@ struct ResourceWatchErrorLabels {
     kind: String,
     group: String,
     version: String,
-    error: String,
+    error: &'static str,
 }
 
 impl ResourceWatchMetrics {
@@ -117,7 +117,7 @@ impl ResourceWatchMetrics {
                             kind: labels.kind.clone(),
                             group: labels.group.clone(),
                             version: labels.version.clone(),
-                            error: error.into(),
+                            error,
                         };
                         metrics.watch_errors.get_or_create(&error_labels).inc();
                     }
