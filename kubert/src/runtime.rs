@@ -322,7 +322,8 @@ impl<S> Runtime<S> {
         watcher_config: watcher::Config,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource<DynamicType = ()> + DeserializeOwned + Clone + Debug + Send + 'static,
+        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
+        T::DynamicType: Default,
     {
         let watch = watcher::watcher(api, watcher_config);
         #[cfg(feature = "prometheus-client")]
@@ -344,7 +345,7 @@ impl<S> Runtime<S> {
         watcher_config: watcher::Config,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource<DynamicType = ()> + DeserializeOwned + Clone + Debug + Send + 'static,
+        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
         self.watch(Api::all(self.client()), watcher_config)
@@ -360,7 +361,7 @@ impl<S> Runtime<S> {
         watcher_config: watcher::Config,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource<Scope = NamespaceResourceScope, DynamicType = ()>,
+        T: Resource<Scope = NamespaceResourceScope>,
         T: DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {

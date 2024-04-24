@@ -7,8 +7,6 @@ use prometheus_client::{
     metrics::{counter::Counter, family::Family},
     registry::Registry,
 };
-use serde::de::DeserializeOwned;
-use std::borrow::Cow;
 use std::fmt::Debug;
 
 /// Metrics for tracking resource watch events.
@@ -22,17 +20,17 @@ pub(super) struct ResourceWatchMetrics {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
 struct ResourceWatchLabels {
-    kind: Cow<'static, str>,
-    group: Cow<'static, str>,
-    version: Cow<'static, str>,
+    kind: String,
+    group: String,
+    version: String,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
 struct ResourceWatchErrorLabels {
-    kind: Cow<'static, str>,
-    group: Cow<'static, str>,
-    version: Cow<'static, str>,
-    error: Cow<'static, str>,
+    kind: String,
+    group: String,
+    version: String,
+    error: String,
 }
 
 impl ResourceWatchMetrics {
@@ -81,11 +79,13 @@ impl ResourceWatchMetrics {
         watch: S,
     ) -> impl Stream<Item = watcher::Result<watcher::Event<T>>> + Send
     where
-        T: Resource<DynamicType = ()> + DeserializeOwned + Clone + Debug + Send + 'static,
+        T: Resource + Send,
+        T::DynamicType: Default,
     {
-        let kind = T::kind(&());
-        let group = T::group(&());
-        let version = T::version(&());
+        let dt = Default::default();
+        let kind = T::kind(&dt).to_string();
+        let group = T::group(&dt).to_string();
+        let version = T::version(&dt).to_string();
         let labels = ResourceWatchLabels {
             kind,
             group,
