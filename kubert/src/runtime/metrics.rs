@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use futures_core::Stream;
 use futures_util::StreamExt;
 use kube_core::Resource;
@@ -9,26 +7,9 @@ use prometheus_client::{
     metrics::{counter::Counter, family::Family},
     registry::Registry,
 };
-use serde::de::DeserializeOwned;
 use std::fmt::Debug;
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
-struct ResourceWatchLabels {
-    kind: Cow<'static, str>,
-    group: Cow<'static, str>,
-    version: Cow<'static, str>,
-}
-
-#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
-struct ResourceWatchErrorLabels {
-    kind: Cow<'static, str>,
-    group: Cow<'static, str>,
-    version: Cow<'static, str>,
-    error: Cow<'static, str>,
-}
-
 /// Metrics for tracking resource watch events.
-#[cfg(feature = "prometheus-client")]
 #[derive(Clone, Debug)]
 pub(super) struct ResourceWatchMetrics {
     watch_applies: Family<ResourceWatchLabels, Counter>,
@@ -37,10 +18,24 @@ pub(super) struct ResourceWatchMetrics {
     watch_errors: Family<ResourceWatchErrorLabels, Counter>,
 }
 
-#[cfg(feature = "prometheus-client")]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
+struct ResourceWatchLabels {
+    kind: String,
+    group: String,
+    version: String,
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
+struct ResourceWatchErrorLabels {
+    kind: String,
+    group: String,
+    version: String,
+    error: &'static str,
+}
+
 impl ResourceWatchMetrics {
     /// Creates a new set of metrics and registers them.
-    pub(super) fn new(registry: &mut Registry) -> Self {
+    pub(super) fn register(registry: &mut Registry) -> Self {
         let watch_applies = Family::default();
         registry.register(
             "applies",
@@ -84,11 +79,13 @@ impl ResourceWatchMetrics {
         watch: S,
     ) -> impl Stream<Item = watcher::Result<watcher::Event<T>>> + Send
     where
-        T: Resource<DynamicType = ()> + DeserializeOwned + Clone + Debug + Send + 'static,
+        T: Resource + Send,
+        T::DynamicType: Default,
     {
-        let kind = T::kind(&());
-        let group = T::group(&());
-        let version = T::version(&());
+        let dt = Default::default();
+        let kind = T::kind(&dt).into_owned();
+        let group = T::group(&dt).into_owned();
+        let version = T::version(&dt).into_owned();
         let labels = ResourceWatchLabels {
             kind,
             group,
@@ -120,7 +117,7 @@ impl ResourceWatchMetrics {
                             kind: labels.kind.clone(),
                             group: labels.group.clone(),
                             version: labels.version.clone(),
-                            error: error.into(),
+                            error,
                         };
                         metrics.watch_errors.get_or_create(&error_labels).inc();
                     }

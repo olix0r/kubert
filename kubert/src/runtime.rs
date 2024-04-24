@@ -12,6 +12,7 @@ use crate::{
 use futures_core::Stream;
 use kube_core::{NamespaceResourceScope, Resource};
 use kube_runtime::{reflector, watcher};
+#[cfg(feature = "prometheus-client")]
 use metrics::ResourceWatchMetrics;
 #[cfg(feature = "prometheus-client")]
 use prometheus_client::registry::Registry;
@@ -80,6 +81,7 @@ pub struct NoServer(());
 
 /// Holds metrics for the runtime.
 #[cfg(feature = "prometheus-client")]
+#[must_use = "RuntimeMetrics must be passed to `Builder::with_metrics`"]
 #[derive(Debug)]
 pub struct RuntimeMetrics {
     watch: ResourceWatchMetrics,
@@ -147,6 +149,7 @@ impl<S> Builder<S> {
     }
 
     /// Configures the runtime to record watch metrics with the given registry
+    #[cfg(feature = "prometheus-client")]
     pub fn with_metrics(mut self, metrics: RuntimeMetrics) -> Self {
         self.metrics = Some(metrics);
         self
@@ -321,7 +324,8 @@ impl<S> Runtime<S> {
         watcher_config: watcher::Config,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource<DynamicType = ()> + DeserializeOwned + Clone + Debug + Send + 'static,
+        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
+        T::DynamicType: Default,
     {
         let watch = watcher::watcher(api, watcher_config);
         #[cfg(feature = "prometheus-client")]
@@ -343,7 +347,7 @@ impl<S> Runtime<S> {
         watcher_config: watcher::Config,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource<DynamicType = ()> + DeserializeOwned + Clone + Debug + Send + 'static,
+        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
         self.watch(Api::all(self.client()), watcher_config)
@@ -359,7 +363,7 @@ impl<S> Runtime<S> {
         watcher_config: watcher::Config,
     ) -> impl Stream<Item = watcher::Event<T>>
     where
-        T: Resource<Scope = NamespaceResourceScope, DynamicType = ()>,
+        T: Resource<Scope = NamespaceResourceScope>,
         T: DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
@@ -595,8 +599,8 @@ impl LogSettings {
 impl RuntimeMetrics {
     /// Creates a new set of metrics and registers them.
     #[cfg(feature = "prometheus-client")]
-    pub fn new(registry: &mut Registry) -> Self {
-        let watch = ResourceWatchMetrics::new(registry);
+    pub fn register(registry: &mut Registry) -> Self {
+        let watch = ResourceWatchMetrics::register(registry);
         Self { watch }
     }
 }

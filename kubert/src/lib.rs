@@ -130,5 +130,8 @@ pub use self::log::{LogFilter, LogFormat, LogInitError};
 #[cfg(feature = "runtime")]
 pub use self::runtime::Runtime;
 
+#[cfg(all(feature = "runtime", feature = "prometheus-client"))]
+pub use self::runtime::RuntimeMetrics;
+
 #[cfg(feature = "server")]
 pub use self::server::ServerArgs;
