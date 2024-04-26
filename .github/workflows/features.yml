@@ -64,6 +64,7 @@ jobs:
           - prometheus-client
           - requeue
           - runtime
+          - runtime,prometheus-client
           - server
           - "server rustls-tls"
           - "server openssl-tls"

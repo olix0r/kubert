@@ -71,7 +71,8 @@ async fn main() -> Result<()> {
     let mut prom = prometheus_client::registry::Registry::default();
 
     // Register application metrics before configuring the admin server.
-    let metrics = Metrics::register(prom.sub_registry_with_prefix("kubert_watch_pods"));
+    let metrics = Metrics::register(prom.sub_registry_with_prefix("example_watch_pods"));
+    let runtime_metrics = kubert::RuntimeMetrics::register(prom.sub_registry_with_prefix("kubert"));
 
     // Configure a runtime with:
     // - a Kubernetes client
@@ -80,6 +81,7 @@ async fn main() -> Result<()> {
     let rt = kubert::Runtime::builder()
         .with_log(log_level, log_format)
         .with_admin(admin.into_builder().with_prometheus(prom))
+        .with_metrics(runtime_metrics)
         .with_client(client);
 
     let deadline = time::Instant::now() + timeout;

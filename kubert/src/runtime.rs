@@ -20,6 +20,9 @@ use tower::Service;
 pub use kube_client::Api;
 pub use reflector::Store;
 
+#[cfg(feature = "prometheus-client")]
+mod metrics;
+
 /// Configures a controller [`Runtime`]
 #[derive(Debug, Default)]
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
@@ -34,6 +37,9 @@ pub struct Builder<S = NoServer> {
     server: S,
     #[cfg(not(feature = "server"))]
     server: std::marker::PhantomData<S>,
+
+    #[cfg(feature = "prometheus-client")]
+    metrics: Option<RuntimeMetrics>,
 }
 
 /// Provides infrastructure for running:
@@ -59,11 +65,22 @@ pub struct Runtime<S = NoServer> {
     server: S,
     #[cfg(not(feature = "server"))]
     server: std::marker::PhantomData<S>,
+
+    #[cfg(feature = "prometheus-client")]
+    metrics: Option<RuntimeMetrics>,
 }
 
 /// Indicates that no HTTPS server is configured
 #[derive(Debug, Default)]
 pub struct NoServer(());
+
+/// Holds metrics for the runtime.
+#[cfg(feature = "prometheus-client")]
+#[must_use = "RuntimeMetrics must be passed to `Builder::with_metrics`"]
+#[derive(Debug)]
+pub struct RuntimeMetrics {
+    watch: metrics::ResourceWatchMetrics,
+}
 
 /// Indicates that the [`Builder`] could not configure a [`Runtime`]
 #[derive(Debug, thiserror::Error)]
@@ -126,6 +143,13 @@ impl<S> Builder<S> {
         self
     }
 
+    /// Configures the runtime to record watch metrics with the given registry
+    #[cfg(feature = "prometheus-client")]
+    pub fn with_metrics(mut self, metrics: RuntimeMetrics) -> Self {
+        self.metrics = Some(metrics);
+        self
+    }
+
     #[inline]
     async fn build_inner<F>(
         self,
@@ -147,6 +171,8 @@ impl<S> Builder<S> {
             initialized: Initialized::default(),
             // Server must be built by `Builder::build`
             server: self.server,
+            #[cfg(feature = "prometheus-client")]
+            metrics: self.metrics,
         })
     }
 }
@@ -162,6 +188,7 @@ impl Builder<NoServer> {
             client: self.client,
             error_delay: self.error_delay,
             log: self.log,
+            metrics: self.metrics,
         }
     }
 
@@ -177,6 +204,7 @@ impl Builder<NoServer> {
             client: self.client,
             error_delay: self.error_delay,
             log: self.log,
+            metrics: self.metrics,
         }
     }
 }
@@ -295,6 +323,11 @@ impl<S> Runtime<S> {
         T::DynamicType: Default,
     {
         let watch = watcher::watcher(api, watcher_config);
+        #[cfg(feature = "prometheus-client")]
+        let watch = metrics::ResourceWatchMetrics::instrument_watch(
+            self.metrics.as_ref().map(|m| m.watch.clone()),
+            watch,
+        );
         let successful = errors::LogAndSleep::fixed_delay(self.error_delay, watch);
         let initialized = self.initialized.add_handle().release_on_ready(successful);
         shutdown::CancelOnShutdown::new(self.shutdown_rx.clone(), initialized)
@@ -410,6 +443,7 @@ impl<S> Runtime<S> {
             initialized: self.initialized,
             shutdown_rx: self.shutdown_rx,
             shutdown: self.shutdown,
+            metrics: self.metrics,
         })
     }
 
@@ -424,6 +458,7 @@ impl<S> Runtime<S> {
             initialized: self.initialized,
             shutdown_rx: self.shutdown_rx,
             shutdown: self.shutdown,
+            metrics: self.metrics,
         }
     }
 }
@@ -551,5 +586,17 @@ impl Default for LogSettings {
 impl LogSettings {
     fn try_init(self) -> Result<(), LogInitError> {
         self.format.try_init(self.filter)
+    }
+}
+
+// === impl RuntimeMetrics ===
+
+#[cfg(feature = "prometheus-client")]
+impl RuntimeMetrics {
+    /// Creates a new set of metrics and registers them.
+    pub fn register(registry: &mut prometheus_client::registry::Registry) -> Self {
+        let watch =
+            metrics::ResourceWatchMetrics::register(registry.sub_registry_with_prefix("watch"));
+        Self { watch }
     }
 }
