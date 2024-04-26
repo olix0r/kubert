@@ -12,11 +12,6 @@ use crate::{
 use futures_core::Stream;
 use kube_core::{NamespaceResourceScope, Resource};
 use kube_runtime::{reflector, watcher};
-#[cfg(feature = "prometheus-client")]
-use metrics::ResourceWatchMetrics;
-#[cfg(feature = "prometheus-client")]
-use prometheus_client::registry::Registry;
-#[cfg(feature = "prometheus-client")]
 use serde::de::DeserializeOwned;
 use std::{fmt::Debug, future::Future, hash::Hash, time::Duration};
 #[cfg(feature = "server")]
@@ -84,7 +79,7 @@ pub struct NoServer(());
 #[must_use = "RuntimeMetrics must be passed to `Builder::with_metrics`"]
 #[derive(Debug)]
 pub struct RuntimeMetrics {
-    watch: ResourceWatchMetrics,
+    watch: metrics::ResourceWatchMetrics,
 }
 
 /// Indicates that the [`Builder`] could not configure a [`Runtime`]
@@ -596,11 +591,11 @@ impl LogSettings {
 
 // === impl RuntimeMetrics ===
 
+#[cfg(feature = "prometheus-client")]
 impl RuntimeMetrics {
     /// Creates a new set of metrics and registers them.
-    #[cfg(feature = "prometheus-client")]
-    pub fn register(registry: &mut Registry) -> Self {
-        let watch = ResourceWatchMetrics::register(registry);
+    pub fn register(registry: &mut prometheus_client::registry::Registry) -> Self {
+        let watch = metrics::ResourceWatchMetrics::register(registry);
         Self { watch }
     }
 }
