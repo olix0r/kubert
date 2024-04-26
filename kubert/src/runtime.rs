@@ -595,7 +595,8 @@ impl LogSettings {
 impl RuntimeMetrics {
     /// Creates a new set of metrics and registers them.
     pub fn register(registry: &mut prometheus_client::registry::Registry) -> Self {
-        let watch = metrics::ResourceWatchMetrics::register(registry);
+        let watch =
+            metrics::ResourceWatchMetrics::register(registry.sub_registry_with_prefix("watch"));
         Self { watch }
     }
 }
