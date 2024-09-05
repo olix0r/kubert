@@ -144,6 +144,9 @@ features = [
 ]
 rustdoc-args = ["--cfg", "docsrs"]
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
+
 [dependencies]
 ahash = { version = "0.8", optional = true }
 backoff = { version = "0.4", features = ["tokio"], optional = true }

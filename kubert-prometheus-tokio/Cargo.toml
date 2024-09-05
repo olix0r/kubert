@@ -12,6 +12,9 @@ keywords = ["prometheus-client", "tokio", "metrics", "monitoring"]
 [features]
 rt = ["tokio/rt", "tokio/time", "tokio-metrics/rt"]
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
+
 [dependencies]
 prometheus-client = "0.22"
 tokio = "1"
