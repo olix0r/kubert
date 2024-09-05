@@ -25,7 +25,7 @@ mod rt {
     /// enabled via the `tokio_unstable` feature. When it is not enabled, no metrics
     /// will be registered.
     ///
-    /// `RUSTFLAGS="--cfg tokio_unstable"` must be set at build-time to use this featur
+    /// `RUSTFLAGS="--cfg tokio_unstable"` must be set at build-time to use this feature.
     #[derive(Debug)]
     pub struct Runtime {
         runtime: tokio::runtime::Handle,
