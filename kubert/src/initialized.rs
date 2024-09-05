@@ -22,7 +22,7 @@ pub struct Initialized {
 /// Signals a component has been initialized
 #[derive(Debug)]
 #[must_use]
-pub struct Handle(OwnedSemaphorePermit);
+pub struct Handle(#[allow(dead_code)] OwnedSemaphorePermit);
 
 pin_project_lite::pin_project! {
     /// A wrapper that releases a `Handle` when the underlying `Future` or `Stream` becomes ready
