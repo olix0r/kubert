@@ -42,7 +42,7 @@ jobs:
           version: ${{ matrix.rust }}
           components: clippy
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
-      - uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84
+      - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab
       - run: just fetch
       - run: just features=all clippy
 
@@ -75,6 +75,6 @@ jobs:
     container: ghcr.io/linkerd/dev:v43-rust
     steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
-      - uses: Swatinem/rust-cache@23bce251a8cd2ffc3c1075eaa2367cf899916d84
+      - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab
       - run: just fetch
       - run: just "features=${{ matrix.feature }}" clippy
