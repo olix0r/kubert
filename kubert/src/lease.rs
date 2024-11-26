@@ -10,7 +10,7 @@
 use futures_util::TryFutureExt;
 use k8s_openapi::{api::coordination::v1 as coordv1, apimachinery::pkg::apis::meta::v1 as metav1};
 use std::{borrow::Cow, sync::Arc};
-use tokio::time::Duration;
+use tokio::time::{self, Duration};
 
 /// Manages a Kubernetes `Lease`
 #[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
@@ -59,6 +59,10 @@ pub enum Error {
     /// Lease resource does not have a spec
     #[error("lease does not have a spec")]
     MissingSpec,
+
+    /// A Kubernetes API call timed out
+    #[error("timed out")]
+    Timeout,
 }
 
 #[derive(Clone, Debug)]
@@ -128,6 +132,7 @@ impl LeaseManager {
     const DEFAULT_FIELD_MANAGER: &'static str = "kubert";
     const DEFAULT_MIN_BACKOFF: Duration = Duration::from_millis(5);
     const DEFAULT_BACKOFF_JITTER: f64 = 0.5; // up to 50% of the backoff duration
+    const API_TIMEOUT: Duration = Duration::from_secs(10);
 
     /// Initialize a lease's state from the Kubernetes API.
     ///
@@ -434,10 +439,7 @@ impl LeaseManager {
         Ok((claim.into(), meta))
     }
 
-    async fn patch<P>(
-        &self,
-        patch: &kube_client::api::Patch<P>,
-    ) -> Result<coordv1::Lease, kube_client::Error>
+    async fn patch<P>(&self, patch: &kube_client::api::Patch<P>) -> Result<coordv1::Lease, Error>
     where
         P: serde::Serialize + std::fmt::Debug,
     {
@@ -450,11 +452,19 @@ impl LeaseManager {
             force: matches!(patch, kube_client::api::Patch::Apply(_)),
             ..Default::default()
         };
-        self.api.patch(&self.name, &params, patch).await
+        time::timeout(
+            Self::API_TIMEOUT,
+            self.api.patch(&self.name, &params, patch),
+        )
+        .await
+        .map_err(|_| Error::Timeout)?
+        .map_err(Into::into)
     }
 
     async fn get(api: Api, name: &str) -> Result<State, Error> {
-        let lease = api.get(name).await?;
+        let lease = time::timeout(Self::API_TIMEOUT, api.get(name))
+            .await
+            .map_err(|_| Error::Timeout)??;
         let spec = lease.spec.ok_or(Error::MissingSpec)?;
 
         let version = lease
