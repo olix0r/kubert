@@ -452,22 +452,19 @@ impl LeaseManager {
             force: matches!(patch, kube_client::api::Patch::Apply(_)),
             ..Default::default()
         };
-        match time::timeout(
+        time::timeout(
             Self::API_TIMEOUT,
             self.api.patch(&self.name, &params, patch),
         )
         .await
-        {
-            Ok(res) => Ok(res?),
-            Err(_) => Err(Error::Timeout),
-        }
+        .map_err(|_| Error::Timeout)?
+        .map_err(Into::into)
     }
 
     async fn get(api: Api, name: &str) -> Result<State, Error> {
-        let lease = match time::timeout(Self::API_TIMEOUT, api.get(name)).await {
-            Ok(res) => res?,
-            Err(_) => return Err(Error::Timeout),
-        };
+        let lease = time::timeout(Self::API_TIMEOUT, api.get(name))
+            .await
+            .map_err(|_| Error::Timeout)??;
         let spec = lease.spec.ok_or(Error::MissingSpec)?;
 
         let version = lease
