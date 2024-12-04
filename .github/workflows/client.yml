@@ -43,8 +43,8 @@ jobs:
     env:
       KUBERT_TEST_CLUSTER_VERSION: ${{ matrix.k8s }}
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v43
-      - uses: linkerd/dev/actions/setup-rust@v43
+      - uses: linkerd/dev/actions/setup-tools@v44
+      - uses: linkerd/dev/actions/setup-rust@v44
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
       - uses: Swatinem/rust-cache@82a92a6e8fbeee089604da2575dc567ae9ddeaab
       - run: just fetch
@@ -78,8 +78,8 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       KUBERT_TEST_CLUSTER_VERSION: ${{ matrix.k8s }}
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v43
-      - uses: linkerd/dev/actions/setup-rust@v43
+      - uses: linkerd/dev/actions/setup-tools@v44
+      - uses: linkerd/dev/actions/setup-rust@v44
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
       - run: just --set features ${{ matrix.tls }} build-examples-image
       - run: just --set features ${{ matrix.tls }} test-cluster-create

@@ -1,14 +1,13 @@
 [advisories]
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
-vulnerability = "deny"
-unmaintained = "warn"
-yanked = "deny"
-notice = "warn"
-ignore = []
+ignore = [
+    # Pending kube update
+    "RUSTSEC-2024-0384",
+    "RUSTSEC-2024-0388",
+]
 
 [licenses]
-unlicensed = "deny"
 allow = [
     "Apache-2.0",
     "BSD-2-Clause",
@@ -17,10 +16,6 @@ allow = [
     "MIT",
     "Unicode-3.0",
 ]
-deny = []
-copyleft = "deny"
-allow-osi-fsf-free = "neither"
-default = "deny"
 confidence-threshold = 0.8
 exceptions = [
     { allow = [
@@ -59,9 +54,6 @@ skip = [
     # `rustls-pemfile` and `k8s-openapi` depend on versions of `base64` that
     # have diverged significantly.
     { name = "base64" },
-    # the current versions of `hyper` and `tokio` depend on semver-incompatible
-    # versions of `socket2` (0.4 and 0.5, respectively).
-    { name = "socket2" },
 ]
 skip-tree = [
     { name = "windows-sys" },

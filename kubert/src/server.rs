@@ -14,6 +14,11 @@
 //! which does not require either particular TLS implementation, so that the
 //! top-level binary crate may choose which TLS implementation is used.
 
+#![cfg_attr(
+    not(any(feature = "rustls-tls", feature = "openssl-tls")),
+    allow(dead_code)
+)]
+
 use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use thiserror::Error;
 use tokio::net::{TcpListener, TcpStream};
@@ -135,10 +140,6 @@ pub struct TlsCertPath(PathBuf);
 
 #[derive(Clone, Debug)]
 // TLS paths may not be used if TLS is not enabled.
-#[cfg_attr(
-    not(any(feature = "rustls-tls", feature = "openssl-tls")),
-    allow(dead_code)
-)]
 struct TlsPaths {
     key: TlsKeyPath,
     certs: TlsCertPath,

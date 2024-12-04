@@ -48,7 +48,7 @@ impl Prometheus {
     fn encode_body(&self, gzip: bool) -> std::result::Result<hyper::Body, std::fmt::Error> {
         if gzip {
             struct GzFmt<'a>(&'a mut deflate::write::GzEncoder<Vec<u8>>);
-            impl<'a> std::fmt::Write for GzFmt<'a> {
+            impl std::fmt::Write for GzFmt<'_> {
                 fn write_str(&mut self, s: &str) -> std::fmt::Result {
                     use std::io::Write as _;
                     self.0.write_all(s.as_bytes()).map_err(|_| std::fmt::Error)
