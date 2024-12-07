@@ -21,7 +21,7 @@ export RUSTDOCFLAGS := env_var_or_default('RUSTDOCFLAGS', '--cfg tokio_unstable'
 # Run all tests and build the proxy
 default: fetch test build
 
-lint: md-lint fmt-check clippy doc
+lint: md-lint fmt-check clippy doc deny
 
 md-lint:
     just-md lint '**/*.md' '!**/target'
@@ -38,6 +38,9 @@ clippy *args:
 
 doc:
     @just-cargo doc -p kubert --no-deps --all-features --features=k8s-openapi/latest
+
+deny:
+    cargo-deny {{ _features }} check
 
 fmt:
     @just-cargo fmt
