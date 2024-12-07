@@ -33,7 +33,7 @@ jobs:
       matrix:
         k8s:
           - v1.21
-          - v1.26
+          - v1.31
         tls:
           - openssl-tls
           - rustls-tls
@@ -67,7 +67,7 @@ jobs:
       matrix:
         k8s:
           - v1.21
-          - v1.26
+          - v1.31
         tls:
           - openssl-tls
           - rustls-tls
