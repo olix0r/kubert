@@ -51,8 +51,6 @@ skip-tree = [
     { name = "redox_syscall" },
     # Until thiserror v2 is widely used.
     { name = "thiserror", version = "1" },
-    # TODO(ver): hyper upgrade
-    { name = "hyper", version = "0.14" },
 ]
 
 [sources]

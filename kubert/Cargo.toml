@@ -24,10 +24,12 @@ openssl-tls = [
 ]
 admin = [
     "ahash",
+    "bytes",
     "futures-util",
+    "http-body-util",
     "hyper/http1",
-    "hyper/runtime",
     "hyper/server",
+    "hyper-util/server",
     "tokio/sync",
     "tracing",
 ]
@@ -103,8 +105,11 @@ server = [
     "drain",
     "hyper/http1",
     "hyper/http2",
-    "hyper/runtime",
     "hyper/server",
+    "hyper-util/server",
+    "hyper-util/server-auto",
+    "hyper-util/server-graceful",
+    "hyper-util/service",
     "rustls-pemfile",
     "thiserror",
     "tokio/fs",
@@ -158,8 +163,10 @@ drain = { version = "0.1.1", optional = true, default-features = false }
 chrono = { version = "0.4", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
+http-body-util = { version = "0.1", optional = true }
 hyper = { workspace = true, optional = true, default-features = false }
 hyper-openssl = { workspace = true, optional = true }
+hyper-util = { workspace = true, optional = true, default-features = false }
 once_cell = { version = "1", optional = true }
 openssl = { version = "0.10.57", optional = true, default-features = false }
 parking_lot = { version = "0.12", optional = true }
