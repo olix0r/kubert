@@ -5,7 +5,7 @@ use futures_util::StreamExt;
 use kube_core::{Resource, ResourceExt};
 use kube_runtime::watcher::Event;
 use parking_lot::RwLock;
-use std::{collections::hash_map::Entry, sync::Arc};
+use std::{collections::hash_map::Entry, mem, sync::Arc};
 
 /// A set of the names of cluster-level resources that have been removed.
 pub type ClusterRemoved = HashSet<String>;
@@ -70,10 +70,14 @@ pub async fn namespaced<T, R>(
     tokio::pin!(events);
 
     let mut keys = HashMap::new();
+
+    let mut reset_added = vec![];
+    let mut reset_removed = HashMap::new();
+
     while let Some(event) = events.next().await {
         tracing::trace!(?event);
         match event {
-            Event::Applied(resource) => {
+            Event::Apply(resource) => {
                 let namespace = resource
                     .namespace()
                     .expect("resource must have a namespace");
@@ -86,7 +90,7 @@ pub async fn namespaced<T, R>(
                 index.write().apply(resource);
             }
 
-            Event::Deleted(resource) => {
+            Event::Delete(resource) => {
                 let namespace = resource
                     .namespace()
                     .expect("resource must have a namespace");
@@ -102,37 +106,25 @@ pub async fn namespaced<T, R>(
                 index.write().delete(namespace, name);
             }
 
-            Event::Restarted(resources) => {
-                // Iterate through all the resources in the restarted event and add/update them in
-                // the index, keeping track of which resources need to be removed from the index.
-                let mut removed = keys.clone();
-                for resource in resources.iter() {
-                    let namespace = resource
-                        .namespace()
-                        .expect("resource must have a namespace");
-                    let name = resource.name_unchecked();
+            Event::Init => {
+                reset_removed = mem::take(&mut keys);
+            }
+            Event::InitApply(resource) => {
+                let namespace = resource
+                    .namespace()
+                    .expect("resource must have a namespace");
+                let name = resource.name_unchecked();
 
-                    if let Some(names) = removed.get_mut(&namespace) {
-                        names.remove(&name);
-                    }
-
-                    keys.entry(namespace).or_default().insert(name);
+                if let Some(ns) = reset_removed.get_mut(&namespace) {
+                    ns.remove(&name);
                 }
-
-                // Remove all resources that were in the index but are no longer in the cluster
-                // following a restart.
-                for (namespace, names) in removed.iter() {
-                    if let Entry::Occupied(mut entry) = keys.entry(namespace.clone()) {
-                        for name in names.iter() {
-                            entry.get_mut().remove(name);
-                        }
-                        if entry.get().is_empty() {
-                            entry.remove();
-                        }
-                    }
-                }
-
-                index.write().reset(resources, removed);
+                keys.entry(namespace).or_default().insert(name);
+                reset_added.push(resource);
+            }
+            Event::InitDone => {
+                let added = mem::take(&mut reset_added);
+                let removed = mem::take(&mut reset_removed);
+                index.write().reset(added, removed);
             }
         }
     }
@@ -149,37 +141,40 @@ pub async fn cluster<T, R>(
     tokio::pin!(events);
 
     let mut keys = HashSet::new();
+
+    let mut reset_added = vec![];
+    let mut reset_removed = HashSet::new();
+
     while let Some(event) = events.next().await {
         tracing::trace!(?event);
         match event {
-            Event::Applied(resource) => {
+            Event::Apply(resource) => {
                 keys.insert(resource.name_unchecked());
                 index.write().apply(resource);
             }
 
-            Event::Deleted(resource) => {
+            Event::Delete(resource) => {
                 let name = resource.name_unchecked();
                 keys.remove(&name);
                 index.write().delete(name);
             }
 
-            Event::Restarted(resources) => {
-                // Iterate through all the resources in the restarted event and add/update them in
-                // the index, keeping track of which resources need to be removed from the index.
-                let mut removed = keys.clone();
-                for resource in resources.iter() {
-                    let name = resource.name_unchecked();
-                    removed.remove(&name);
-                    keys.insert(name);
-                }
-
-                // Remove all resources that were in the index but are no longer in the cluster
-                // following a restart.
-                for name in removed.iter() {
-                    keys.remove(name);
-                }
-
-                index.write().reset(resources, removed);
+            Event::Init => {
+                reset_removed = mem::take(&mut keys);
+            }
+            Event::InitApply(resource) => {
+                // Iterate through all the resources in the InitApply event and
+                // add/update them in the index, keeping track of which
+                // resources need to be removed from the index.
+                let name = resource.name_unchecked();
+                reset_added.push(resource);
+                reset_removed.remove(&name);
+                keys.insert(name);
+            }
+            Event::InitDone => {
+                let added = mem::take(&mut reset_added);
+                let removed = mem::take(&mut reset_removed);
+                index.write().reset(added, removed);
             }
         }
     }
@@ -188,6 +183,7 @@ pub async fn cluster<T, R>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use k8s_openapi::{api::core::v1 as corev1, apimachinery::pkg::apis::meta::v1 as metav1};
     use parking_lot::RwLock;
     use std::sync::Arc;
     use tokio::sync::mpsc;
@@ -197,22 +193,23 @@ mod tests {
     #[test]
     fn namespaced_restart() {
         let state = Arc::new(RwLock::new(NsCache(HashMap::new())));
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(10);
         let mut task = task::spawn(namespaced(state.clone(), ReceiverStream::new(rx)));
 
-        tx.try_send(kube::runtime::watcher::Event::Restarted(
-            (0..2)
-                .map(|i| k8s_openapi::api::core::v1::Pod {
-                    metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
-                        namespace: Some("default".to_string()),
-                        name: Some(format!("pod-{}", i)),
-                        ..Default::default()
-                    },
+        tx.try_send(kube::runtime::watcher::Event::Init).unwrap();
+        for i in 0..2 {
+            tx.try_send(kube::runtime::watcher::Event::InitApply(corev1::Pod {
+                metadata: metav1::ObjectMeta {
+                    namespace: Some("default".to_string()),
+                    name: Some(format!("pod-{}", i)),
                     ..Default::default()
-                })
-                .collect(),
-        ))
-        .unwrap();
+                },
+                ..Default::default()
+            }))
+            .unwrap();
+        }
+        tx.try_send(kube::runtime::watcher::Event::InitDone)
+            .unwrap();
         assert_pending!(task.poll());
         assert_eq!(
             state.read().0,
@@ -226,19 +223,20 @@ mod tests {
             .collect()
         );
 
-        tx.try_send(kube::runtime::watcher::Event::Restarted(
-            (1..3)
-                .map(|i| k8s_openapi::api::core::v1::Pod {
-                    metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
-                        namespace: Some("default".to_string()),
-                        name: Some(format!("pod-{}", i)),
-                        ..Default::default()
-                    },
+        tx.try_send(kube::runtime::watcher::Event::Init).unwrap();
+        for i in 1..3 {
+            tx.try_send(kube::runtime::watcher::Event::InitApply(corev1::Pod {
+                metadata: metav1::ObjectMeta {
+                    namespace: Some("default".to_string()),
+                    name: Some(format!("pod-{}", i)),
                     ..Default::default()
-                })
-                .collect(),
-        ))
-        .unwrap();
+                },
+                ..Default::default()
+            }))
+            .unwrap();
+        }
+        tx.try_send(kube::runtime::watcher::Event::InitDone)
+            .unwrap();
         assert_pending!(task.poll());
         assert_eq!(
             state.read().0,
@@ -256,47 +254,53 @@ mod tests {
     #[test]
     fn clustered_restart() {
         let state = Arc::new(RwLock::new(ClusterCache(HashSet::new())));
-        let (tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(10);
         let mut task = task::spawn(cluster(state.clone(), ReceiverStream::new(rx)));
 
-        tx.try_send(kube::runtime::watcher::Event::Restarted(
-            (0..2)
-                .map(|i| k8s_openapi::api::core::v1::Namespace {
-                    metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+        tx.try_send(kube::runtime::watcher::Event::Init).unwrap();
+        for i in 0..2 {
+            tx.try_send(kube::runtime::watcher::Event::InitApply(
+                corev1::Namespace {
+                    metadata: metav1::ObjectMeta {
                         namespace: Some("default".to_string()),
-                        name: Some(format!("ns-{}", i)),
+                        name: Some(format!("pod-{}", i)),
                         ..Default::default()
                     },
                     ..Default::default()
-                })
-                .collect(),
-        ))
-        .unwrap();
+                },
+            ))
+            .unwrap();
+        }
+        tx.try_send(kube::runtime::watcher::Event::InitDone)
+            .unwrap();
         assert_pending!(task.poll());
         assert_eq!(
             state.read().0,
-            vec!["ns-0".to_string(), "ns-1".to_string()]
+            vec!["pod-0".to_string(), "pod-1".to_string()]
                 .into_iter()
                 .collect()
         );
 
-        tx.try_send(kube::runtime::watcher::Event::Restarted(
-            (1..3)
-                .map(|i| k8s_openapi::api::core::v1::Namespace {
-                    metadata: k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta {
+        tx.try_send(kube::runtime::watcher::Event::Init).unwrap();
+        for i in 1..3 {
+            tx.try_send(kube::runtime::watcher::Event::InitApply(
+                corev1::Namespace {
+                    metadata: metav1::ObjectMeta {
                         namespace: Some("default".to_string()),
-                        name: Some(format!("ns-{}", i)),
+                        name: Some(format!("pod-{}", i)),
                         ..Default::default()
                     },
                     ..Default::default()
-                })
-                .collect(),
-        ))
-        .unwrap();
+                },
+            ))
+            .unwrap();
+        }
+        tx.try_send(kube::runtime::watcher::Event::InitDone)
+            .unwrap();
         assert_pending!(task.poll());
         assert_eq!(
             state.read().0,
-            vec!["ns-1".to_string(), "ns-2".to_string()]
+            vec!["pod-1".to_string(), "pod-2".to_string()]
                 .into_iter()
                 .collect(),
         );

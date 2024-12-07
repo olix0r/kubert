@@ -100,13 +100,14 @@ impl ResourceWatchMetrics {
         watch.map(move |event| {
             if let Some(metrics) = &metrics {
                 match event {
-                    Ok(watcher::Event::Restarted(_)) => {
+                    Ok(watcher::Event::Init | watcher::Event::InitApply(_)) => {}
+                    Ok(watcher::Event::InitDone) => {
                         metrics.watch_events.get_or_create(&restart_labels).inc();
                     }
-                    Ok(watcher::Event::Applied(_)) => {
+                    Ok(watcher::Event::Apply(_)) => {
                         metrics.watch_events.get_or_create(&apply_labels).inc();
                     }
-                    Ok(watcher::Event::Deleted(_)) => {
+                    Ok(watcher::Event::Delete(_)) => {
                         metrics.watch_events.get_or_create(&delete_labels).inc();
                     }
                     Err(ref e) => {
@@ -117,7 +118,6 @@ impl ResourceWatchMetrics {
                                 watcher::Error::WatchError(_) => "WatchError",
                                 watcher::Error::WatchFailed(_) => "WatchFailed",
                                 watcher::Error::NoResourceVersion => "NoResourceVersion",
-                                watcher::Error::TooManyObjects => "TooManyObjects",
                             },
                             ..error_labels.clone()
                         };

@@ -107,34 +107,37 @@ async fn main() -> Result<()> {
             // Keep a list of all known pods so we can identify new and deleted pods on restart.
             // The watch will restart roughly every 5 minutes.
             let mut known = std::collections::HashSet::<(String, String)>::new();
+            let mut prior = Default::default();
             while let Some(ev) = init_timeout(deadline.take(), pods.next()).await? {
                 tracing::trace!(?ev);
                 match ev {
-                    Event::Restarted(pods) => {
+                    Event::Init => {
+                        prior = std::mem::take(&mut known);
+                    }
+                    Event::InitApply(pod) => {
                         metrics.events_restart.inc();
-                        tracing::debug!(pods = %pods.len(), "Restarted");
 
-                        let mut prior = std::mem::take(&mut known);
-                        for pod in pods.into_iter() {
-                            let namespace = pod.namespace().unwrap();
-                            let name = pod.name_unchecked();
-                            let k = (namespace.clone(), name.clone());
-                            if prior.remove(&k) {
-                                tracing::debug!(%namespace, %name, "Already exists")
-                            } else {
-                                metrics.current_pods.inc();
-                                metrics.total_pods.inc();
-                                tracing::info!(%namespace, %name, "Added")
-                            }
-                            known.insert(k);
+                        let namespace = pod.namespace().unwrap();
+                        let name = pod.name_unchecked();
+                        let k = (namespace.clone(), name.clone());
+                        if prior.remove(&k) {
+                            tracing::debug!(%namespace, %name, "Already exists")
+                        } else {
+                            metrics.current_pods.inc();
+                            metrics.total_pods.inc();
+                            tracing::info!(%namespace, %name, "Added")
                         }
-                        for (namespace, name) in prior.into_iter() {
+                        known.insert(k);
+                    }
+                    Event::InitDone => {
+                        tracing::debug!(pods = %known.len(), "Restarted");
+                        for (namespace, name) in std::mem::take(&mut prior).into_iter() {
                             metrics.current_pods.dec();
                             tracing::info!(%namespace, %name, "Deleted")
                         }
                     }
 
-                    Event::Applied(pod) => {
+                    Event::Apply(pod) => {
                         metrics.events_apply.inc();
                         let namespace = pod.namespace().unwrap();
                         let name = pod.name_unchecked();
@@ -147,7 +150,7 @@ async fn main() -> Result<()> {
                         }
                     }
 
-                    Event::Deleted(pod) => {
+                    Event::Delete(pod) => {
                         metrics.events_delete.inc();
                         let namespace = pod.namespace().unwrap();
                         let name = pod.name_unchecked();
