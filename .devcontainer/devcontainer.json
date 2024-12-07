@@ -32,6 +32,7 @@
 	"customizations": {
 		"vscode": {
 			"extensions": [
+				"github.vscode-github-actions",
 				"kokakiwi.vscode-just",
 				"NathanRidley.autotrim",
 				"rust-lang.rust-analyzer",
