@@ -2,9 +2,8 @@
 db-path = "~/.cargo/advisory-db"
 db-urls = ["https://github.com/rustsec/advisory-db"]
 ignore = [
-    # Pending kube update
+    # kube-runtime uses backoff uses instant which is unmaintained.
     "RUSTSEC-2024-0384",
-    "RUSTSEC-2024-0388",
 ]
 
 [licenses]
@@ -15,6 +14,7 @@ allow = [
     "ISC",
     "MIT",
     "Unicode-3.0",
+    "Zlib",
 ]
 confidence-threshold = 0.8
 exceptions = [
@@ -23,20 +23,6 @@ exceptions = [
         "MIT",
         "OpenSSL",
     ], name = "ring", version = "*" },
-
-    # The Unicode-DFS--2016 license is necessary for unicode-ident because they
-    # use data from the unicode tables to generate the tables which are
-    # included in the application. We do not distribute those data files so
-    # this is not a problem for us. See https://github.com/dtolnay/unicode-ident/pull/9/files
-    # for more details.
-    { allow = [
-        "MIT",
-        "Apache-2.0",
-        "Unicode-DFS-2016",
-    ], name = "unicode-ident" },
-    { allow = [
-        "Zlib",
-    ], name = "adler32" },
 ]
 
 [[licenses.clarify]]
@@ -46,15 +32,6 @@ expression = "MIT AND ISC AND OpenSSL"
 license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
 [bans]
-multiple-versions = "deny"
-wildcards = "allow"
-highlight = "all"
-deny = []
-skip = [
-    # `rustls-pemfile` and `k8s-openapi` depend on versions of `base64` that
-    # have diverged significantly.
-    { name = "base64" },
-]
 skip-tree = [
     { name = "windows-sys" },
     { name = "windows_aarch64_msvc" },
@@ -80,6 +57,11 @@ skip-tree = [
     { name = "rcgen" },
     # Until thiserror v2 is widely used.
     { name = "thiserror", version = "1" },
+    # TODO(ver): Rustls upgrade
+    { name = "tokio-rustls", version = "0.24" },
+    { name = "rustls-pemfile", version = "1" },
+    # TODO(ver): hyper upgrade
+    { name = "hyper", version = "0.14" },
 ]
 
 [sources]

@@ -173,10 +173,10 @@ tokio = { workspace = true, optional = false, default-features = false }
 tokio-rustls = { version = "0.24.1", optional = true, default-features = false }
 tokio-openssl = { version = "0.6.3", optional = true }
 tokio-util = { version = "0.7", optional = true, default-features = false }
-tower-http = { version = "0.4.0", optional = true, default-features = false, features = [
+tower-http = { version = "0.6.0", optional = true, default-features = false, features = [
     "map-response-body",
 ] }
-tower = { version = "0.4", default-features = false, optional = true }
+tower = { version = "0.5", default-features = false, optional = true }
 tracing = { version = "0.1.31", optional = true }
 
 kubert-prometheus-process = { version = "0.1.0", path = "../kubert-prometheus-process", optional = true }
@@ -203,7 +203,7 @@ workspace = true
 optional = true
 
 [dependencies.kube-runtime]
-version = "0.87.1"
+workspace = true
 optional = true
 
 [dependencies.tracing-subscriber]
@@ -222,20 +222,16 @@ features = ["rt"]
 
 [dev-dependencies]
 kube = { workspace = true, features = ["runtime"] }
+rcgen = { version = "0.12.0" }
+tempfile = "3.8"
 tokio-stream = "0.1"
 tokio-test = "0.4"
 tracing-subscriber = { version = "0.3", features = ["ansi"] }
-# used for generating TLS certificates in the server tests.
-rcgen = { version = "0.12.0" }
-# used for creating temporary dirs for TLS certificates in the server tests.
-tempfile = "3.8"
 
 [dev-dependencies.k8s-openapi]
-version = "0.20"
-default-features = false
+workspace = true
 features = ["latest"]
 
 [dev-dependencies.tokio]
-version = "1.18"
-default-features = false
+workspace = true
 features = ["macros", "test-util"]
