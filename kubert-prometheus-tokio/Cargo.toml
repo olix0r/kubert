@@ -16,7 +16,7 @@ rt = ["tokio/rt", "tokio/time", "tokio-metrics/rt"]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
 
 [dependencies]
-prometheus-client = "0.22"
-tokio = "1"
+prometheus-client = { workspace = true }
+tokio = { workspace = true }
 tokio-metrics = "0.3"
 tracing = "0.1"

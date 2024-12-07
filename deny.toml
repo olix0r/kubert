@@ -78,6 +78,8 @@ skip-tree = [
     # `rcgen` is a test-only dependency, it's not a huge deal if it introduces
     # duplicate deps, as they won't be present in real life.
     { name = "rcgen" },
+    # Until thiserror v2 is widely used.
+    { name = "thiserror", version = "1" },
 ]
 
 [sources]

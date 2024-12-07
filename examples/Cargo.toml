@@ -37,22 +37,19 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["ansi", "env-filter"] }
 
 [dev-dependencies.clap]
-version = "4"
-default-features = false
+workspace = true
 features = ["derive", "help", "env", "std"]
 
 [dev-dependencies.k8s-openapi]
-version = "0.20"
-default-features = false
+workspace = true
 features = ["latest"]
 
 [dev-dependencies.kube]
-version = "0.87.1"
-default-features = false
+workspace = true
 features = ["client", "derive", "rustls-tls", "runtime"]
 
 [dev-dependencies.tokio]
-version = "1"
+workspace = true
 features = ["macros", "parking_lot", "rt", "rt-multi-thread", "time"]
 
 [[example]]
