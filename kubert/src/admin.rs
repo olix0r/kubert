@@ -1,9 +1,8 @@
 //! Admin server utilities.
 use ahash::AHashMap;
 use futures_util::future;
-use hyper::{Body, Request, Response};
+use hyper::{Request, Response};
 use std::{
-    convert::Infallible,
     fmt,
     net::SocketAddr,
     pin::Pin,
@@ -15,11 +14,16 @@ use std::{
 };
 use tracing::{debug, info_span, Instrument};
 
-/// Server errors
-pub type Error = hyper::Error;
+/// An error binding an admin server.
+#[derive(Debug, thiserror::Error)]
+#[error("failed to bind admin server: {0}")]
+pub struct BindError(#[from] std::io::Error);
+
+type Body = http_body_util::Full<bytes::Bytes>;
 
 /// A handler for a request path.
-type HandlerFn = Box<dyn Fn(Request<Body>) -> Response<Body> + Send + Sync + 'static>;
+type HandlerFn =
+    Box<dyn Fn(Request<hyper::body::Incoming>) -> Response<Body> + Send + Sync + 'static>;
 
 #[cfg(feature = "prometheus-client")]
 mod metrics;
@@ -47,7 +51,8 @@ pub struct Builder {
 pub struct Bound {
     addr: SocketAddr,
     ready: Readiness,
-    server: hyper::server::Builder<hyper::server::conn::AddrIncoming>,
+    listener: tokio::net::TcpListener,
+    server: hyper::server::conn::http1::Builder,
     routes: AHashMap<String, HandlerFn>,
 }
 
@@ -178,7 +183,7 @@ impl Builder {
     pub fn with_handler(
         mut self,
         path: impl ToString,
-        handler: impl Fn(Request<Body>) -> Response<Body> + Send + Sync + 'static,
+        handler: impl Fn(Request<hyper::body::Incoming>) -> Response<Body> + Send + Sync + 'static,
     ) -> Self {
         let path = path.to_string();
         assert_ne!(
@@ -194,25 +199,29 @@ impl Builder {
     }
 
     /// Binds the admin server without accepting connections
-    pub fn bind(self) -> Result<Bound, hyper::Error> {
+    pub fn bind(self) -> Result<Bound, BindError> {
         let Self {
             addr,
             ready,
             routes,
         } = self;
 
-        let server = hyper::server::Server::try_bind(&addr)?
+        let listener = tokio::net::TcpListener::from_std(std::net::TcpListener::bind(addr)?)?;
+
+        let mut server = hyper::server::conn::http1::Builder::new();
+        server
             // Allow weird clients (like netcat).
-            .http1_half_close(true)
+            .half_close(true)
             // Prevent port scanners, etc, from holding connections open.
-            .http1_header_read_timeout(Duration::from_secs(2))
+            .header_read_timeout(Duration::from_secs(2))
             // Use a small buffer, since we don't really transfer much data.
-            .http1_max_buf_size(8 * 1024);
+            .max_buf_size(8 * 1024);
 
         Ok(Bound {
             addr,
             ready,
             server,
+            listener,
             routes,
         })
     }
@@ -242,29 +251,48 @@ impl Bound {
 
     /// Binds and runs the server on a background task, returning a handle
     pub fn spawn(self) -> Server {
+        let Self {
+            ready,
+            server,
+            listener,
+            routes,
+            addr,
+        } = self;
+
         let svc = {
-            let ready = self.ready.clone();
-            let routes = Arc::new(self.routes);
+            let ready = ready.clone();
+            let routes = Arc::new(routes);
             hyper::service::service_fn(move |req| handle(&ready, &routes, req))
         };
-        let serve = self
-            .server
-            .serve(hyper::service::make_service_fn(move |_conn| {
-                future::ok::<_, Infallible>(svc.clone())
-            }));
         let task = tokio::spawn(
             async move {
-                debug!("Serving");
-                serve.await
+                loop {
+                    let (stream, client_addr) = match listener.accept().await {
+                        Ok(socket) => socket,
+                        Err(error) => {
+                            tracing::warn!(%error, "Failed to accept connection");
+                            continue;
+                        }
+                    };
+                    tracing::trace!(client.addr = ?client_addr, "Accepted connection");
+
+                    let serve =
+                        server.serve_connection(hyper_util::rt::TokioIo::new(stream), svc.clone());
+                    tokio::spawn(
+                        async move {
+                            debug!("Serving");
+                            serve.await
+                        }
+                        .instrument(
+                            tracing::debug_span!("conn", client.addr = %client_addr).or_current(),
+                        ),
+                    );
+                }
             }
             .instrument(info_span!("admin", port = %self.addr.port())),
         );
 
-        Server {
-            task,
-            addr: self.addr,
-            ready: self.ready,
-        }
+        Server { task, addr, ready }
     }
 }
 
@@ -306,12 +334,11 @@ impl Server {
 fn handle(
     ready: &Readiness,
     routes: &Arc<AHashMap<String, HandlerFn>>,
-    req: hyper::Request<hyper::Body>,
+    req: hyper::Request<hyper::body::Incoming>,
 ) -> Pin<
     Box<
-        dyn std::future::Future<
-                Output = Result<hyper::Response<hyper::Body>, tokio::task::JoinError>,
-            > + Send,
+        dyn std::future::Future<Output = Result<hyper::Response<Body>, tokio::task::JoinError>>
+            + Send,
     >,
 > {
     // Fast path for probe handlers.
@@ -336,13 +363,13 @@ fn handle(
         Box::pin(future::ok(
             Response::builder()
                 .status(hyper::StatusCode::NOT_FOUND)
-                .body(hyper::Body::default())
+                .body(Body::default())
                 .unwrap(),
         ))
     }
 }
 
-fn handle_live(req: Request<Body>) -> Response<Body> {
+fn handle_live(req: Request<hyper::body::Incoming>) -> Response<Body> {
     match *req.method() {
         hyper::Method::GET | hyper::Method::HEAD => Response::builder()
             .status(hyper::StatusCode::OK)
@@ -357,7 +384,10 @@ fn handle_live(req: Request<Body>) -> Response<Body> {
     }
 }
 
-fn handle_ready(Readiness(ready): &Readiness, req: Request<Body>) -> Response<Body> {
+fn handle_ready(
+    Readiness(ready): &Readiness,
+    req: Request<hyper::body::Incoming>,
+) -> Response<Body> {
     match *req.method() {
         hyper::Method::GET | hyper::Method::HEAD => {
             if ready.load(Ordering::Acquire) {

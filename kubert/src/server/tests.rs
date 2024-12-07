@@ -12,9 +12,7 @@ fn gen_keys() -> (TempDir, TlsPaths) {
     let certs = {
         let path = dir.path().join("cert.pem");
         let mut file = File::create(&path).expect("failed to create cert file");
-        let pem = cert
-            .serialize_pem()
-            .expect("failed to serializez certs PEM");
+        let pem = cert.cert.pem();
         file.write_all(pem.as_bytes())
             .expect("failed to write certs PEM to tempfile");
         TlsCertPath(path)
@@ -23,7 +21,7 @@ fn gen_keys() -> (TempDir, TlsPaths) {
     let key = {
         let path = dir.path().join("key.pem");
         let mut file = File::create(&path).expect("failed to create private key file");
-        let pem = cert.serialize_private_key_pem();
+        let pem = cert.key_pair.serialize_pem();
         file.write_all(pem.as_bytes())
             .expect("failed to write private key PEM to tempfile");
         TlsKeyPath(path)

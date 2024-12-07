@@ -1,12 +1,12 @@
 [package]
 name = "kubert"
-version = "0.22.0"
+version = "0.23.0-alpha1"
 edition = "2021"
 license = "Apache-2.0"
 description = "Kubernetes runtime helpers. Based on kube-rs."
 readme = "../README.md"
 repository = "https://github.com/olix0r/kubert"
-rust-version = "1.74"
+rust-version = "1.77"
 keywords = ["kubernetes", "client", "runtime", "server"]
 
 [features]
@@ -24,10 +24,12 @@ openssl-tls = [
 ]
 admin = [
     "ahash",
+    "bytes",
     "futures-util",
+    "http-body-util",
     "hyper/http1",
-    "hyper/runtime",
     "hyper/server",
+    "hyper-util/server",
     "tokio/sync",
     "tracing",
 ]
@@ -103,8 +105,11 @@ server = [
     "drain",
     "hyper/http1",
     "hyper/http2",
-    "hyper/runtime",
     "hyper/server",
+    "hyper-util/server",
+    "hyper-util/server-auto",
+    "hyper-util/server-graceful",
+    "hyper-util/service",
     "rustls-pemfile",
     "thiserror",
     "tokio/fs",
@@ -158,8 +163,10 @@ drain = { version = "0.1.1", optional = true, default-features = false }
 chrono = { version = "0.4", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
+http-body-util = { version = "0.1", optional = true }
 hyper = { workspace = true, optional = true, default-features = false }
 hyper-openssl = { workspace = true, optional = true }
+hyper-util = { workspace = true, optional = true, default-features = false }
 once_cell = { version = "1", optional = true }
 openssl = { version = "0.10.57", optional = true, default-features = false }
 parking_lot = { version = "0.12", optional = true }
@@ -222,7 +229,7 @@ features = ["rt"]
 
 [dev-dependencies]
 kube = { workspace = true, features = ["runtime"] }
-rcgen = { version = "0.12.0" }
+rcgen = { version = "0.13.0" }
 tempfile = "3.8"
 tokio-stream = "0.1"
 tokio-test = "0.4"
