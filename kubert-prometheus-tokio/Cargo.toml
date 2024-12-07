@@ -18,5 +18,5 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
 [dependencies]
 prometheus-client = { workspace = true }
 tokio = { workspace = true }
-tokio-metrics = "0.3"
+tokio-metrics = "0.4"
 tracing = "0.1"
