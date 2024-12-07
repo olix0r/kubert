@@ -14,7 +14,7 @@ impl Prometheus {
         }
     }
 
-    pub(super) fn handle_metrics(&self, req: Request<Body>) -> Response<Body> {
+    pub(super) fn handle_metrics(&self, req: Request<hyper::body::Incoming>) -> Response<Body> {
         if !matches!(*req.method(), hyper::Method::GET | hyper::Method::HEAD) {
             return Response::builder()
                 .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
@@ -45,7 +45,7 @@ impl Prometheus {
         rsp.body(body).expect("response must be valid")
     }
 
-    fn encode_body(&self, gzip: bool) -> std::result::Result<hyper::Body, std::fmt::Error> {
+    fn encode_body(&self, gzip: bool) -> std::result::Result<super::Body, std::fmt::Error> {
         if gzip {
             struct GzFmt<'a>(&'a mut deflate::write::GzEncoder<Vec<u8>>);
             impl std::fmt::Write for GzFmt<'_> {
@@ -58,12 +58,12 @@ impl Prometheus {
             let mut gz = deflate::write::GzEncoder::new(vec![], deflate::Compression::Fast);
             prometheus_client::encoding::text::encode(&mut GzFmt(&mut gz), &self.registry)?;
             let buf = gz.finish().map_err(|_| std::fmt::Error)?;
-            return Ok(hyper::Body::from(buf));
+            return Ok(super::Body::new(buf.into()));
         }
 
         let mut buf = String::new();
         prometheus_client::encoding::text::encode(&mut buf, &self.registry)?;
-        Ok(hyper::Body::from(buf))
+        Ok(super::Body::new(buf.into()))
     }
 }
 

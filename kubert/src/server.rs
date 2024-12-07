@@ -196,13 +196,13 @@ impl Bound {
     /// kubernetes admission controllers.
     pub fn spawn<S, B>(self, service: S, drain: drain::Watch) -> SpawnedServer
     where
-        S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
+        S: Service<hyper::Request<hyper::body::Incoming>, Response = hyper::Response<B>>
             + Clone
             + Send
             + 'static,
         S::Error: std::error::Error + Send + Sync,
         S::Future: Send,
-        B: hyper::body::HttpBody + Send + 'static,
+        B: hyper::body::Body + Send + 'static,
         B::Data: Send,
         B::Error: std::error::Error + Send + Sync,
     {
@@ -242,10 +242,13 @@ impl SpawnedServer {
 
 async fn accept_loop<S, B>(tcp: TcpListener, drain: drain::Watch, service: S, tls: Arc<TlsPaths>)
 where
-    S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>> + Clone + Send + 'static,
+    S: Service<hyper::Request<hyper::body::Incoming>, Response = hyper::Response<B>>
+        + Clone
+        + Send
+        + 'static,
     S::Error: std::error::Error + Send + Sync,
     S::Future: Send,
-    B: hyper::body::HttpBody + Send + 'static,
+    B: hyper::body::Body + Send + 'static,
     B::Data: Send,
     B::Error: std::error::Error + Send + Sync,
 {
@@ -290,10 +293,13 @@ where
 
 async fn serve_conn<S, B>(socket: TcpStream, drain: drain::Watch, service: S, tls: Arc<TlsPaths>)
 where
-    S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>> + Send + 'static,
+    S: Service<hyper::Request<hyper::body::Incoming>, Response = hyper::Response<B>>
+        + Clone
+        + Send
+        + 'static,
     S::Error: std::error::Error + Send + Sync,
     S::Future: Send,
-    B: hyper::body::HttpBody + Send + 'static,
+    B: hyper::body::Body + Send + 'static,
     B::Data: Send,
     B::Error: std::error::Error + Send + Sync,
 {
@@ -322,25 +328,47 @@ where
         socket
     };
 
+    #[derive(Copy, Clone, Debug)]
+    struct Executor;
+    impl<F> hyper::rt::Executor<F> for Executor
+    where
+        F: std::future::Future + Send + 'static,
+        F::Output: Send + 'static,
+    {
+        fn execute(&self, fut: F) {
+            tokio::spawn(fut.in_current_span());
+        }
+    }
+
     // Serve the HTTP connection and wait for the drain signal. If a drain is
     // signaled, tell the HTTP connection to terminate gracefully when in-flight
     // requests have completed.
-    let mut conn = hyper::server::conn::Http::new()
-        // Prevent port scanners, etc, from holding connections open.
-        .http1_header_read_timeout(std::time::Duration::from_secs(2))
-        .serve_connection(socket, service);
-    let res = tokio::select! {
-        biased;
-        res = &mut conn => res,
-        release = drain.signaled() => {
-            Pin::new(&mut conn).graceful_shutdown();
-            release.release_after(conn).await
+    let mut builder = hyper_util::server::conn::auto::Builder::new(Executor);
+    // Prevent port scanners, etc, from holding connections open.
+    builder
+        .http1()
+        .header_read_timeout(std::time::Duration::from_secs(2));
+    let graceful = hyper_util::server::graceful::GracefulShutdown::new();
+    let conn = graceful.watch(
+        builder
+            .serve_connection(
+                hyper_util::rt::TokioIo::new(socket),
+                hyper_util::service::TowerToHyperService::new(service),
+            )
+            .into_owned(),
+    );
+    tokio::spawn(
+        async move {
+            match conn.await {
+                Ok(()) => debug!("Connection closed"),
+                Err(error) => info!(%error, "Connection lost"),
+            }
         }
-    };
-    match res {
-        Ok(()) => debug!("Connection closed"),
-        Err(error) => info!(%error, "Connection lost"),
-    }
+        .in_current_span(),
+    );
+
+    let latch = drain.signaled().await;
+    latch.release_after(graceful.shutdown()).await;
 }
 
 // === impl TlsCertPath ===

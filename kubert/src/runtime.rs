@@ -92,7 +92,7 @@ pub enum BuildError {
 
     /// Indicates that the admin server could not be bound
     #[error(transparent)]
-    Admin(#[from] admin::Error),
+    Admin(#[from] admin::BindError),
 
     /// Indicates that the Kubernetes client could not be iniialized.
     #[error(transparent)]
@@ -476,13 +476,13 @@ impl Runtime<server::Bound> {
     /// The server shuts down gracefully when the runtime is shutdown.
     pub fn spawn_server<S, B>(self, service: S) -> Runtime<NoServer>
     where
-        S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
+        S: Service<hyper::Request<hyper::body::Incoming>, Response = hyper::Response<B>>
             + Clone
             + Send
             + 'static,
         S::Error: std::error::Error + Send + Sync,
         S::Future: Send,
-        B: hyper::body::HttpBody + Send + 'static,
+        B: hyper::body::Body + Send + 'static,
         B::Data: Send,
         B::Error: std::error::Error + Send + Sync,
     {
@@ -507,13 +507,13 @@ impl Runtime<Option<server::Bound>> {
     pub fn spawn_server<S, B, F>(self, mk: F) -> Runtime<NoServer>
     where
         F: FnOnce() -> S,
-        S: Service<hyper::Request<hyper::Body>, Response = hyper::Response<B>>
+        S: Service<hyper::Request<hyper::body::Incoming>, Response = hyper::Response<B>>
             + Clone
             + Send
             + 'static,
         S::Error: std::error::Error + Send + Sync,
         S::Future: Send,
-        B: hyper::body::HttpBody + Send + 'static,
+        B: hyper::body::Body + Send + 'static,
         B::Data: Send,
         B::Error: std::error::Error + Send + Sync,
     {
