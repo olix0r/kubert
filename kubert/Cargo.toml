@@ -168,7 +168,7 @@ prometheus-client = { workspace = true, optional = true }
 rustls-pemfile = { version = "1", optional = true }
 serde = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
-thiserror = { version = "1.0.30", optional = true }
+thiserror = { version = "2", optional = true }
 tokio = { workspace = true, optional = false, default-features = false }
 tokio-rustls = { version = "0.26.1", optional = true, default-features = false }
 tokio-openssl = { version = "0.6.3", optional = true }
