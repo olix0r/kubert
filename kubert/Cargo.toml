@@ -222,7 +222,7 @@ features = ["rt"]
 
 [dev-dependencies]
 kube = { workspace = true, features = ["runtime"] }
-rcgen = { version = "0.12.0" }
+rcgen = { version = "0.13.0" }
 tempfile = "3.8"
 tokio-stream = "0.1"
 tokio-test = "0.4"
