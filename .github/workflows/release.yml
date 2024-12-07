@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     container: ghcr.io/linkerd/dev:v44-rust
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - id: meta
         shell: bash
         run: |
@@ -80,7 +80,7 @@ jobs:
       RUSTFLAGS: '--cfg tokio_unstable'
       RUSTDOCFLAGS: '--cfg tokio_unstable'
     steps:
-      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - run: cargo publish --package=kubert --dry-run
       - if: needs.meta.outputs.mode == 'release'
         run: cargo publish --package=kubert --token=${{ secrets.CRATESIO_TOKEN }}
