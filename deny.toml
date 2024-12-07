@@ -32,6 +32,11 @@ expression = "MIT AND ISC AND OpenSSL"
 license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
 
 [bans]
+multiple-versions = "deny"
+wildcards = "allow"
+highlight = "all"
+deny = []
+skip = []
 skip-tree = [
     { name = "windows-sys" },
     { name = "windows_aarch64_msvc" },
@@ -57,9 +62,6 @@ skip-tree = [
     { name = "rcgen" },
     # Until thiserror v2 is widely used.
     { name = "thiserror", version = "1" },
-    # TODO(ver): Rustls upgrade
-    { name = "tokio-rustls", version = "0.24" },
-    { name = "rustls-pemfile", version = "1" },
     # TODO(ver): hyper upgrade
     { name = "hyper", version = "0.14" },
 ]
