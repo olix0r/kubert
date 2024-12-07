@@ -158,19 +158,18 @@ drain = { version = "0.1.1", optional = true, default-features = false }
 chrono = { version = "0.4", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
-hyper = { version = "0.14.17", optional = true, default-features = false }
+hyper = { workspace = true, optional = true, default-features = false }
 hyper-openssl = { version = "0.9.2", optional = true }
-kubert-prometheus-process = { version = "0.1.0", path = "../kubert-prometheus-process", optional = true }
 once_cell = { version = "1", optional = true }
 openssl = { version = "0.10.57", optional = true, default-features = false }
 parking_lot = { version = "0.12", optional = true }
 pin-project-lite = { version = "0.2", optional = true }
-prometheus-client = { version = "0.22.0", optional = true, default-features = false }
+prometheus-client = { workspace = true, optional = true }
 rustls-pemfile = { version = "1", optional = true }
 thiserror = { version = "1.0.30", optional = true }
 serde = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
-tokio = { version = "1.17.0", optional = false, default-features = false }
+tokio = { workspace = true, optional = false, default-features = false }
 tokio-rustls = { version = "0.24.1", optional = true, default-features = false }
 tokio-openssl = { version = "0.6.3", optional = true }
 tokio-util = { version = "0.7", optional = true, default-features = false }
@@ -179,6 +178,8 @@ tower-http = { version = "0.4.0", optional = true, default-features = false, fea
 ] }
 tower = { version = "0.4", default-features = false, optional = true }
 tracing = { version = "0.1.31", optional = true }
+
+kubert-prometheus-process = { version = "0.1.0", path = "../kubert-prometheus-process", optional = true }
 
 [dependencies.clap]
 version = "4"
@@ -189,25 +190,21 @@ features = ["derive", "std"]
 # Not used directly, but required to ensure that the k8s-openapi dependency is considered part of
 # the "deps" graph rather than just the "dev-deps" graph
 [dependencies.k8s-openapi]
-version = "0.20"
+workspace = true
 optional = true
-default-features = false
 
 [dependencies.kube-client]
-version = "0.87.1"
+workspace = true
 optional = true
-default-features = false
 features = ["client", "config"]
 
 [dependencies.kube-core]
-version = "0.87.1"
+workspace = true
 optional = true
-default-features = false
 
 [dependencies.kube-runtime]
 version = "0.87.1"
 optional = true
-default-features = false
 
 [dependencies.tracing-subscriber]
 version = "0.3.9"
@@ -224,7 +221,7 @@ features = ["rt"]
 # === Dev ===
 
 [dev-dependencies]
-kube = { version = "0.87.1", default-features = false, features = ["runtime"] }
+kube = { workspace = true, features = ["runtime"] }
 tokio-stream = "0.1"
 tokio-test = "0.4"
 tracing-subscriber = { version = "0.3", features = ["ansi"] }
