@@ -57,8 +57,7 @@ skip-tree = [
     { name = "rcgen" },
     # Until thiserror v2 is widely used.
     { name = "thiserror", version = "1" },
-    # TODO(ver): Rustls upgrade
-    { name = "tokio-rustls", version = "0.24" },
+    # TODO(ver): Rustls-pemfile upgrade
     { name = "rustls-pemfile", version = "1" },
     # TODO(ver): hyper upgrade
     { name = "hyper", version = "0.14" },
