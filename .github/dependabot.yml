@@ -3,18 +3,24 @@ updates:
   - package-ecosystem: cargo
     directory: "/"
     schedule:
-      interval: daily
+      interval: weekly
+      day: friday
       time: "03:30"
-      timezone: "UTC"
+      timezone: Etc/UTC
     allow:
-      - dependency-type: "all"
-    ignore:
-      # We need to update all of these together, so we'll do it manually.
-      - dependency-name: "kube*"
+      - dependency-type: all
+    groups:
+      kube:
+        patterns:
+          - k8s-openapi
+          - kube
+          - kube-*
+        update-types: [major, minor]
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "daily"
-      time: "04:00"
-      timezone: "UTC"
+      interval: "weekly"
+      day: friday
+      time: "03:00"
+      timezone: Etc/UTC
