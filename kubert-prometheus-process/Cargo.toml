@@ -6,7 +6,7 @@ license = "Apache-2.0"
 description = "A prometheus-client process metrics collector"
 readme = "../README.md"
 repository = "https://github.com/olix0r/kubert"
-rust-version = "1.77"
+rust-version = "1.81"
 keywords = ["prometheus-client", "process", "metrics", "monitoring"]
 
 [dependencies]

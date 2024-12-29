@@ -161,7 +161,7 @@ jobs:
     strategy:
       matrix:
         rust:
-          - "1.77"
+          - "1.81"
           - "1.83"
     timeout-minutes: 10
     runs-on: ubuntu-latest
@@ -281,7 +281,7 @@ jobs:
     strategy:
       matrix:
         rust:
-          - "1.77"
+          - "1.81"
           - "1.83"
     timeout-minutes: 10
     runs-on: ubuntu-latest
@@ -303,7 +303,7 @@ jobs:
     strategy:
       matrix:
         rust:
-          - "1.77"
+          - "1.81"
           - "1.83"
     timeout-minutes: 10
     runs-on: ubuntu-latest
