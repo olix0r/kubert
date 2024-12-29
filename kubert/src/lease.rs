@@ -362,8 +362,8 @@ impl LeaseManager {
         claimant: &str,
         params: &ClaimParams,
     ) -> Result<(Arc<Claim>, Meta), Error> {
-        let lease_duration = chrono::Duration::from_std(params.lease_duration)
-            .unwrap_or_else(|_| chrono::Duration::max_value());
+        let lease_duration =
+            chrono::Duration::from_std(params.lease_duration).unwrap_or(chrono::Duration::MAX);
         let now = chrono::Utc::now();
         let lease = self
             .patch(&kube_client::api::Patch::Apply(serde_json::json!({
@@ -408,8 +408,8 @@ impl LeaseManager {
         claimant: &str,
         params: &ClaimParams,
     ) -> Result<(Arc<Claim>, Meta), Error> {
-        let lease_duration = chrono::Duration::from_std(params.lease_duration)
-            .unwrap_or_else(|_| chrono::Duration::max_value());
+        let lease_duration =
+            chrono::Duration::from_std(params.lease_duration).unwrap_or(chrono::Duration::MAX);
         let now = chrono::Utc::now();
         let lease = self
             .patch(&kube_client::api::Patch::Strategic(serde_json::json!({
