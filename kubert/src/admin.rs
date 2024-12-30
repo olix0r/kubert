@@ -22,8 +22,13 @@ pub struct BindError(#[from] std::io::Error);
 type Body = http_body_util::Full<bytes::Bytes>;
 
 /// A handler for a request path.
-type HandlerFn =
+type RouteFn =
     Box<dyn Fn(Request<hyper::body::Incoming>) -> Response<Body> + Send + Sync + 'static>;
+
+struct Route {
+    call: RouteFn,
+    require_loopback: bool,
+}
 
 #[cfg(feature = "prometheus-client")]
 mod metrics;
@@ -43,7 +48,7 @@ pub struct AdminArgs {
 pub struct Builder {
     addr: SocketAddr,
     ready: Readiness,
-    routes: AHashMap<String, HandlerFn>,
+    routes: AHashMap<String, Route>,
 }
 
 /// Supports spawning an admin server
@@ -53,7 +58,7 @@ pub struct Bound {
     ready: Readiness,
     listener: tokio::net::TcpListener,
     server: hyper::server::conn::http1::Builder,
-    routes: AHashMap<String, HandlerFn>,
+    routes: AHashMap<String, Route>,
 }
 
 /// Controls how the admin server advertises readiness
@@ -170,6 +175,22 @@ impl Builder {
         self.with_handler(path, move |req| prom.handle_metrics(req))
     }
 
+    #[cfg(feature = "runtime-diagnostics")]
+    pub(crate) fn with_runtime_diagnostics(self, diagnostics: crate::runtime::Diagnostics) -> Self {
+        self.with_loopback_handler("/kubert.json", move |req| {
+            let with_resources = req.uri().query() == Some("resources");
+            let summary = diagnostics.summarize(with_resources);
+
+            let mut bytes = Vec::with_capacity(8 * 1024);
+            serde_json::to_writer_pretty(&mut bytes, &summary)
+                .expect("json serialization must succeed");
+            hyper::Response::builder()
+                .header(hyper::header::CONTENT_TYPE, "application/json")
+                .body(Body::from(bytes))
+                .expect("response must succeed")
+        })
+    }
+
     /// Adds a request handler for `path` to the admin server.
     ///
     /// Requests to `path` will be handled by invoking the provided `handler`
@@ -186,6 +207,40 @@ impl Builder {
         handler: impl Fn(Request<hyper::body::Incoming>) -> Response<Body> + Send + Sync + 'static,
     ) -> Self {
         let path = path.to_string();
+        let route = Self::new_route(&path, handler);
+        self.routes.insert(path, route);
+        self
+    }
+    /// Adds a request handler for `path` to the admin server that only accepts
+    /// requests from the loopback interface.
+    ///
+    /// Requests to `path` will be handled by invoking the provided `handler`
+    /// function with each request. This can be used to add additional
+    /// functionality to the admin server. The handler will only be invoked for
+    /// requests that originate from the loopback interface. All other requests
+    /// will receive a `403 Forbidden` response.
+    ///
+    /// # Panics
+    ///
+    /// This method panics if called with the path `/ready` or `/live`, as these
+    /// paths would conflict with the built-in readiness and liveness endpoints.
+    pub fn with_loopback_handler(
+        mut self,
+        path: impl ToString,
+        handler: impl Fn(Request<hyper::body::Incoming>) -> Response<Body> + Send + Sync + 'static,
+    ) -> Self {
+        let path = path.to_string();
+        let mut route = Self::new_route(&path, handler);
+        route.require_loopback = true;
+        self.routes.insert(path, route);
+        self
+    }
+
+    fn new_route(
+        path: &str,
+        handler: impl Fn(Request<hyper::body::Incoming>) -> Response<Body> + Send + Sync + 'static,
+    ) -> Route {
+        let path = path.to_string();
         assert_ne!(
             path, "/ready",
             "the built-in `/ready` handler cannot be overridden"
@@ -194,8 +249,10 @@ impl Builder {
             path, "/live",
             "the built-in `/live` handler cannot be overridden"
         );
-        self.routes.insert(path, Box::new(handler));
-        self
+        Route {
+            call: Box::new(handler),
+            require_loopback: false,
+        }
     }
 
     /// Binds the admin server without accepting connections
@@ -262,18 +319,9 @@ impl Bound {
             addr,
         } = self;
 
-        let svc = {
-            use tower::ServiceExt;
+        let task = tokio::spawn({
             let ready = ready.clone();
             let routes = Arc::new(routes);
-            let svc = tower::service_fn(move |req: hyper::Request<hyper::body::Incoming>| {
-                handle(&ready, &routes, req)
-            });
-            #[cfg(any(feature = "admin-brotli", feature = "admin-gzip"))]
-            let svc = tower_http::compression::Compression::new(svc);
-            hyper::service::service_fn(move |req| svc.clone().oneshot(req))
-        };
-        let task = tokio::spawn(
             async move {
                 loop {
                     let (stream, client_addr) = match listener.accept().await {
@@ -288,6 +336,19 @@ impl Bound {
                     }
                     tracing::trace!(client.addr = ?client_addr, "Accepted connection");
 
+                    let svc = {
+                        use tower::ServiceExt;
+                        let ready = ready.clone();
+                        let routes = routes.clone();
+                        let svc =
+                            tower::service_fn(move |req: hyper::Request<hyper::body::Incoming>| {
+                                handle(client_addr, &ready, &routes, req)
+                            });
+                        #[cfg(any(feature = "admin-brotli", feature = "admin-gzip"))]
+                        let svc = tower_http::compression::Compression::new(svc);
+                        hyper::service::service_fn(move |req| svc.clone().oneshot(req))
+                    };
+
                     let serve =
                         server.serve_connection(hyper_util::rt::TokioIo::new(stream), svc.clone());
                     tokio::spawn(
@@ -301,8 +362,8 @@ impl Bound {
                     );
                 }
             }
-            .instrument(info_span!("admin", port = %self.addr.port())),
-        );
+            .instrument(info_span!("admin", port = %self.addr.port()))
+        });
 
         Server { task, addr, ready }
     }
@@ -344,8 +405,9 @@ impl Server {
 // === routes ===
 
 fn handle(
+    client_addr: SocketAddr,
     ready: &Readiness,
-    routes: &Arc<AHashMap<String, HandlerFn>>,
+    routes: &Arc<AHashMap<String, Route>>,
     req: hyper::Request<hyper::body::Incoming>,
 ) -> Pin<
     Box<
@@ -364,10 +426,17 @@ fn handle(
         // runtime.
         let routes = routes.clone();
         let path = req.uri().path().to_string();
+        let is_loopback = client_addr.ip().is_loopback();
         Box::pin(async move {
             tokio::task::spawn_blocking(move || {
-                let handler = routes.get(&path).expect("routes must contain path");
-                handler(req)
+                let route = routes.get(&path).expect("routes must contain path");
+                if route.require_loopback && !is_loopback {
+                    return Response::builder()
+                        .status(hyper::StatusCode::FORBIDDEN)
+                        .body(Body::default())
+                        .unwrap();
+                }
+                (route.call)(req)
             })
             .await
         })
