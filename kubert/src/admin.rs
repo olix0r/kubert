@@ -337,6 +337,11 @@ impl Bound {
 
         Server { task, addr, ready }
     }
+
+    #[cfg(feature = "runtime-diagnostics")]
+    pub(crate) fn diagnostics(&self) -> &Diagnostics {
+        &self.diagnostics
+    }
 }
 
 // === impl Readiness ===

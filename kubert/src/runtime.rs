@@ -161,6 +161,7 @@ impl<S> Builder<S> {
         self.log.unwrap_or_default().try_init()?;
         let client = mk_client(self.client.unwrap_or_default()).await?;
         let (shutdown, shutdown_rx) = shutdown::sigint_or_sigterm()?;
+
         let admin = self.admin.bind()?;
         Ok(Runtime {
             client,
@@ -433,7 +434,16 @@ impl<S> Runtime<S> {
         T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
+        #[cfg(feature = "runtime-diagnostics")]
+        let diagnostics = self
+            .admin
+            .diagnostics()
+            .register_watch(&api, watcher_config.label_selector.as_deref());
+
         let watch = watcher::watcher(api, watcher_config);
+
+        #[cfg(feature = "runtime-diagnostics")]
+        let watch = futures_util::StreamExt::inspect(watch, move |ev| diagnostics.inspect(ev));
 
         #[cfg(feature = "prometheus-client")]
         let watch = metrics::ResourceWatchMetrics::instrument_watch(

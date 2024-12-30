@@ -23,6 +23,7 @@ features = [
     "prometheus-client",
     "runtime",
     "runtime-brotli",
+    "runtime-diagnostics",
 ]
 
 [dependencies.openssl]
