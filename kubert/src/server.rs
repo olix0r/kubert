@@ -273,6 +273,11 @@ where
             },
         };
 
+        if let Err(error) = socket.set_nodelay(true) {
+            error!(%error, "Failed to set TCP_NODELAY");
+            continue;
+        }
+
         let client_addr = match socket.peer_addr() {
             Ok(addr) => addr,
             Err(error) => {
@@ -347,7 +352,8 @@ where
     // Prevent port scanners, etc, from holding connections open.
     builder
         .http1()
-        .header_read_timeout(std::time::Duration::from_secs(2));
+        .header_read_timeout(std::time::Duration::from_secs(2))
+        .timer(hyper_util::rt::TokioTimer::default());
     let graceful = hyper_util::server::graceful::GracefulShutdown::new();
     let conn = graceful.watch(
         builder

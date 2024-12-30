@@ -214,6 +214,7 @@ impl Builder {
         server
             // Allow weird clients (like netcat).
             .half_close(true)
+            .timer(hyper_util::rt::TokioTimer::default())
             // Prevent port scanners, etc, from holding connections open.
             .header_read_timeout(Duration::from_secs(2))
             // Use a small buffer, since we don't really transfer much data.
@@ -276,6 +277,9 @@ impl Bound {
                             continue;
                         }
                     };
+                    if let Err(error) = stream.set_nodelay(true) {
+                        tracing::warn!(%error, "Failed to set TCP_NODELAY");
+                    }
                     tracing::trace!(client.addr = ?client_addr, "Accepted connection");
 
                     let serve =
