@@ -206,7 +206,9 @@ impl Builder {
             routes,
         } = self;
 
-        let listener = tokio::net::TcpListener::from_std(std::net::TcpListener::bind(addr)?)?;
+        let lis = std::net::TcpListener::bind(addr)?;
+        lis.set_nonblocking(true)?;
+        let listener = tokio::net::TcpListener::from_std(lis)?;
 
         let mut server = hyper::server::conn::http1::Builder::new();
         server
