@@ -81,7 +81,6 @@ lease = [
 ]
 log = ["thiserror", "tracing", "tracing-subscriber"]
 prometheus-client = [
-    "dep:deflate",
     "dep:prometheus-client",
     "dep:kubert-prometheus-process",
     "dep:kubert-prometheus-tokio",
@@ -167,9 +166,6 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
 ahash = { version = "0.8", optional = true }
 backoff = { version = "0.4", features = ["tokio"], optional = true }
 bytes = { version = "1", optional = true }
-deflate = { version = "1", optional = true, default-features = false, features = [
-    "gzip",
-] }
 drain = { version = "0.1.1", optional = true, default-features = false }
 chrono = { version = "0.4", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
