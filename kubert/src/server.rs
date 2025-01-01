@@ -345,6 +345,11 @@ where
         }
     }
 
+    #[cfg(any(feature = "server-brotli", feature = "server-gzip"))]
+    let service = tower_http::decompression::Decompression::new(
+        tower_http::compression::Compression::new(service),
+    );
+
     // Serve the HTTP connection and wait for the drain signal. If a drain is
     // signaled, tell the HTTP connection to terminate gracefully when in-flight
     // requests have completed.
