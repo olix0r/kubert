@@ -263,9 +263,15 @@ impl Bound {
         } = self;
 
         let svc = {
+            use tower::ServiceExt;
             let ready = ready.clone();
             let routes = Arc::new(routes);
-            hyper::service::service_fn(move |req| handle(&ready, &routes, req))
+            let svc = tower::service_fn(move |req: hyper::Request<hyper::body::Incoming>| {
+                handle(&ready, &routes, req)
+            });
+            #[cfg(any(feature = "admin-brotli", feature = "admin-gzip"))]
+            let svc = tower_http::compression::Compression::new(svc);
+            hyper::service::service_fn(move |req| svc.clone().oneshot(req))
         };
         let task = tokio::spawn(
             async move {

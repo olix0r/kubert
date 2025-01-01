@@ -17,7 +17,13 @@ openssl-tls = ["kubert/openssl-tls", "openssl"]
 [dependencies.kubert]
 path = "../kubert"
 default-features = false
-features = ["clap", "lease", "prometheus-client", "runtime"]
+features = [
+    "clap",
+    "lease",
+    "prometheus-client",
+    "runtime",
+    "runtime-brotli",
+]
 
 [dependencies.openssl]
 version = "0.10.57"
