@@ -322,12 +322,7 @@ impl<S> Runtime<S> {
         T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
-        let watch = watcher::watcher(api, watcher_config);
-        #[cfg(feature = "prometheus-client")]
-        let watch = metrics::ResourceWatchMetrics::instrument_watch(
-            self.metrics.as_ref().map(|m| m.watch.clone()),
-            watch,
-        );
+        let watch = self.watch_inner(api, watcher_config);
         let successful = errors::LogAndSleep::fixed_delay(self.error_delay, watch);
         let initialized = self.initialized.add_handle().release_on_ready(successful);
         shutdown::CancelOnShutdown::new(self.shutdown_rx.clone(), initialized)
@@ -387,7 +382,7 @@ impl<S> Runtime<S> {
         let writer = reflector::store::Writer::<T>::default();
         let store = writer.as_reader();
 
-        let watch = watcher::watcher(api, watcher_config);
+        let watch = self.watch_inner(api, watcher_config);
         let cached = reflector::reflector(writer, watch);
         let successful = errors::LogAndSleep::fixed_delay(self.error_delay, cached);
         let initialized = self.initialized.add_handle().release_on_ready(successful);
@@ -427,6 +422,26 @@ impl<S> Runtime<S> {
     {
         let api = Api::namespaced(self.client(), ns.as_ref());
         self.cache(api, watcher_config)
+    }
+
+    fn watch_inner<T>(
+        &mut self,
+        api: Api<T>,
+        watcher_config: watcher::Config,
+    ) -> impl Stream<Item = watcher::Result<watcher::Event<T>>>
+    where
+        T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
+        T::DynamicType: Default,
+    {
+        let watch = watcher::watcher(api, watcher_config);
+
+        #[cfg(feature = "prometheus-client")]
+        let watch = metrics::ResourceWatchMetrics::instrument_watch(
+            self.metrics.as_ref().map(|m| m.watch.clone()),
+            watch,
+        );
+
+        watch
     }
 
     #[cfg(feature = "server")]
