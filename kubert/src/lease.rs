@@ -12,6 +12,9 @@ use k8s_openapi::{api::coordination::v1 as coordv1, apimachinery::pkg::apis::met
 use std::{borrow::Cow, sync::Arc};
 use tokio::time::{self, Duration};
 
+#[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+use crate::runtime::LeaseDiagnostics;
+
 /// Manages a Kubernetes `Lease`
 #[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
 pub struct LeaseManager {
@@ -19,6 +22,33 @@ pub struct LeaseManager {
     name: String,
     field_manager: Cow<'static, str>,
     state: tokio::sync::Mutex<State>,
+
+    #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+    diagnostics: Option<LeaseDiagnostics>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
+/// Configures a Lease.
+pub struct LeaseParams {
+    /// Lease name.
+    pub name: String,
+
+    /// Lease namespace.
+    pub namespace: String,
+
+    /// The identity of the claimant.
+    pub claimant: String,
+
+    /// The duration of the lease
+    pub lease_duration: Duration,
+
+    /// The amount of time before the lease expiration that the lease holder
+    /// should renew the lease
+    pub renew_grace_period: Duration,
+
+    /// The field manager used when updating the Lease.
+    pub field_manager: Option<Cow<'static, str>>,
 }
 
 /// Configuration used when obtaining a lease.
@@ -35,6 +65,7 @@ pub struct ClaimParams {
 
 /// Describes the state of a lease
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "runtime-diagnostics", derive(serde::Serialize))]
 #[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
 pub struct Claim {
     /// The identity of the claim holder.
@@ -77,9 +108,9 @@ struct Meta {
     transitions: u16,
 }
 
-type Api = kube_client::Api<coordv1::Lease>;
+pub(crate) type Api = kube_client::Api<coordv1::Lease>;
 
-type Spawned = (
+pub(crate) type Spawned = (
     tokio::sync::watch::Receiver<Arc<Claim>>,
     tokio::task::JoinHandle<Result<(), Error>>,
 );
@@ -129,7 +160,7 @@ impl Claim {
 // === impl LeaseManager ===
 
 impl LeaseManager {
-    const DEFAULT_FIELD_MANAGER: &'static str = "kubert";
+    pub(crate) const DEFAULT_FIELD_MANAGER: &'static str = "kubert";
     const DEFAULT_MIN_BACKOFF: Duration = Duration::from_millis(5);
     const DEFAULT_BACKOFF_JITTER: f64 = 0.5; // up to 50% of the backoff duration
     const API_TIMEOUT: Duration = Duration::from_secs(10);
@@ -146,6 +177,7 @@ impl LeaseManager {
             name,
             field_manager: Self::DEFAULT_FIELD_MANAGER.into(),
             state: tokio::sync::Mutex::new(state),
+            diagnostics: None,
         })
     }
 
@@ -158,6 +190,12 @@ impl LeaseManager {
         self
     }
 
+    #[cfg(feature = "runtime-diagnostics")]
+    pub(crate) fn with_diagnostics(mut self, diagnostics: LeaseDiagnostics) -> Self {
+        self.diagnostics = Some(diagnostics);
+        self
+    }
+
     /// Return the state of the claim without updating it from the API.
     pub async fn claimed(&self) -> Option<Arc<Claim>> {
         self.state.lock().await.claim.clone()
@@ -167,6 +205,10 @@ impl LeaseManager {
     pub async fn sync(&self) -> Result<Option<Arc<Claim>>, Error> {
         let mut state = self.state.lock().await;
         *state = Self::get(self.api.clone(), &self.name).await?;
+        #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+        if let Some(diagnostics) = self.diagnostics.as_ref() {
+            diagnostics.update(state.claim.clone(), state.meta.version.clone());
+        }
         Ok(state.claim.clone())
     }
 
@@ -195,18 +237,29 @@ impl LeaseManager {
 
                     let (claim, meta) = match self.renew(&state.meta, claimant, params).await {
                         Ok(renew) => renew,
+
                         Err(e) if Self::is_conflict(&e) => {
                             // Another process updated the claim's resource version, so
                             // re-sync the state and try again.
                             *state = Self::get(self.api.clone(), &self.name).await?;
+                            #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+                            if let Some(diagnostics) = self.diagnostics.as_ref() {
+                                diagnostics.update(state.claim.clone(), state.meta.version.clone());
+                            }
                             continue;
                         }
+
                         Err(e) => return Err(e),
                     };
+
                     *state = State {
                         claim: Some(claim.clone()),
                         meta,
                     };
+                    #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+                    if let Some(diagnostics) = self.diagnostics.as_ref() {
+                        diagnostics.update(state.claim.clone(), state.meta.version.clone());
+                    }
                     return Ok(claim);
                 }
 
@@ -219,18 +272,30 @@ impl LeaseManager {
             // There's no current claim, so try to acquire it.
             let (claim, meta) = match self.acquire(&state.meta, claimant, params).await {
                 Ok(acquire) => acquire,
+
                 Err(e) if Self::is_conflict(&e) => {
                     // Another process updated the claim's resource version, so
                     // re-sync the state and try again.
                     *state = Self::get(self.api.clone(), &self.name).await?;
+                    #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+                    if let Some(diagnostics) = self.diagnostics.as_ref() {
+                        diagnostics.update(state.claim.clone(), state.meta.version.clone());
+                    }
                     continue;
                 }
+
                 Err(e) => return Err(e),
             };
+
             *state = State {
                 claim: Some(claim.clone()),
                 meta,
             };
+            #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+            if let Some(diagnostics) = self.diagnostics.as_ref() {
+                diagnostics.update(state.claim.clone(), state.meta.version.clone());
+            }
+
             return Ok(claim);
         }
     }
@@ -242,32 +307,40 @@ impl LeaseManager {
     /// can potentially claim the lease before the prior lease duration expires.
     pub async fn vacate(&self, claimant: &str) -> Result<bool, Error> {
         let mut state = self.state.lock().await;
-        if let Some(claim) = state.claim.take() {
-            if claim.is_current() {
-                if claim.holder == claimant {
-                    self.patch(&kube_client::api::Patch::Strategic(serde_json::json!({
-                        "apiVersion": "coordination.k8s.io/v1",
-                        "kind": "Lease",
-                        "metadata": {
-                            "resourceVersion": state.meta.version,
-                        },
-                        "spec": {
-                            "acquireTime": Option::<()>::None,
-                            "renewTime": Option::<()>::None,
-                            "holderIdentity": Option::<()>::None,
-                            "leaseDurationSeconds": Option::<()>::None,
-                            // leaseTransitions is preserved by strategic patch
-                        },
-                    })))
-                    .await?;
-                    return Ok(true);
-                } else {
-                    state.claim = Some(claim);
-                }
-            }
+        let Some(claim) = state.claim.take() else {
+            return Ok(false);
+        };
+
+        if !claim.is_current() {
+            return Ok(false);
         }
 
-        Ok(false)
+        if claim.holder != claimant {
+            state.claim = Some(claim);
+            return Ok(false);
+        }
+
+        self.patch(&kube_client::api::Patch::Strategic(serde_json::json!({
+            "apiVersion": "coordination.k8s.io/v1",
+            "kind": "Lease",
+            "metadata": {
+                "resourceVersion": state.meta.version,
+            },
+            "spec": {
+                "acquireTime": Option::<()>::None,
+                "renewTime": Option::<()>::None,
+                "holderIdentity": Option::<()>::None,
+                "leaseDurationSeconds": Option::<()>::None,
+                // leaseTransitions is preserved by strategic patch
+            },
+        })))
+        .await?;
+
+        if let Some(diagnostics) = self.diagnostics.as_ref() {
+            diagnostics.update(None, state.meta.version.clone());
+        }
+
+        Ok(true)
     }
 
     /// Spawn a task that ensures the lease is claimed.
