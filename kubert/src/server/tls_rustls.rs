@@ -1,6 +1,13 @@
 use super::*;
 use std::sync::Arc;
-use tokio_rustls::{rustls, server::TlsStream, TlsAcceptor};
+use tokio_rustls::{
+    rustls::{
+        self,
+        pki_types::{CertificateDer, PrivateKeyDer},
+    },
+    server::TlsStream,
+    TlsAcceptor,
+};
 
 pub(in crate::server) async fn load_tls(
     pk: &TlsKeyPath,
@@ -14,7 +21,6 @@ pub(in crate::server) async fn load_tls(
     let certs = crts.load_certs().await.map_err(Error::TlsCertsReadError)?;
 
     let mut cfg = rustls::ServerConfig::builder()
-        .with_safe_defaults()
         .with_no_client_auth()
         .with_single_cert(certs, key)
         .map_err(|err| Error::InvalidTlsCredentials(Box::new(err)))?;
@@ -34,44 +40,38 @@ pub(in crate::server) async fn accept(
 
 impl TlsCertPath {
     // Load public certificate from file
-    async fn load_certs(&self) -> std::io::Result<Vec<rustls::Certificate>> {
-        // Open certificate file.
+    async fn load_certs(&self) -> std::io::Result<Vec<CertificateDer<'static>>> {
         let pem = tokio::fs::read(&self.0).await?;
-
-        // Load and return certificate.
-        let certs = rustls_pemfile::certs(&mut pem.as_slice())?;
-        Ok(certs.into_iter().map(rustls::Certificate).collect())
+        rustls_pemfile::certs(&mut pem.as_slice())
+            .map(|res| res.map(CertificateDer::from))
+            .collect()
     }
 }
 
 // === impl TlsKeyPath ===
 
 impl TlsKeyPath {
-    async fn load_private_key(&self) -> std::io::Result<rustls::PrivateKey> {
-        // Open keyfile.
+    async fn load_private_key(&self) -> std::io::Result<PrivateKeyDer<'static>> {
         let pem = tokio::fs::read(&self.0).await?;
 
-        // Load and return a single private key.
-        let mut keys = rustls_pemfile::pkcs8_private_keys(&mut pem.as_slice())?;
-
+        let mut keys = rustls_pemfile::pkcs8_private_keys(&mut pem.as_slice())
+            .map(|res| res.map(PrivateKeyDer::from))
+            .collect::<Result<Vec<_>, _>>()?;
         if keys.is_empty() {
-            keys = rustls_pemfile::rsa_private_keys(&mut pem.as_slice())?;
-
-            if keys.is_empty() {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "could not load private key",
-                ));
-            }
+            keys = rustls_pemfile::rsa_private_keys(&mut pem.as_slice())
+                .map(|res| res.map(PrivateKeyDer::from))
+                .collect::<Result<Vec<_>, _>>()?;
         }
 
-        if keys.len() > 1 {
+        let key = keys.pop().ok_or_else(|| {
+            std::io::Error::new(std::io::ErrorKind::Other, "could not load private key")
+        })?;
+        if !keys.is_empty() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "too many private keys",
             ));
         }
-
-        Ok(rustls::PrivateKey(keys[0].clone()))
+        Ok(key)
     }
 }
