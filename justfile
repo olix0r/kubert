@@ -7,9 +7,6 @@ _features := if features == "all" {
         "--no-default-features --features=" + features
     } else { "" }
 
-# Required to build openssl
-export CXX := 'clang++-14'
-
 # Enable tokio-metrics
 export RUSTFLAGS := env_var_or_default('RUSTFLAGS', '--cfg tokio_unstable')
 export RUSTDOCFLAGS := env_var_or_default('RUSTDOCFLAGS', '--cfg tokio_unstable')

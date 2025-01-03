@@ -10,9 +10,6 @@ rust-version = "1.77"
 release = false
 
 [features]
-default = ["rustls-tls"]
-rustls-tls = ["kubert/rustls-tls"]
-openssl-tls = ["kubert/openssl-tls", "openssl"]
 
 [dependencies.kubert]
 path = "../kubert"
@@ -24,11 +21,6 @@ features = [
     "runtime",
     "runtime-brotli",
 ]
-
-[dependencies.openssl]
-version = "0.10.57"
-optional = true
-features = ["vendored"]
 
 [dev-dependencies]
 anyhow = "1"
