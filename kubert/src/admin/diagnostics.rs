@@ -32,7 +32,7 @@ pub(super) struct Summary {
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
-pub(super) struct WatchSummary {
+struct WatchSummary {
     api_url: String,
     label_selector: String,
     #[serde(flatten)]
@@ -44,7 +44,7 @@ pub(super) struct WatchSummary {
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
-pub(super) struct WatchStats {
+struct WatchStats {
     creation_timestamp: Time,
 
     errors: u64,
@@ -65,7 +65,7 @@ pub(super) struct WatchStats {
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
-pub(super) struct WatchError {
+struct WatchError {
     message: String,
     timestamp: Time,
 }
@@ -116,7 +116,12 @@ impl Diagnostics {
         }
 
         let with_resources = req.uri().query() == Some("resources");
-        let summary = self.summarize(with_resources);
+        let watches = self.summarize_watches(with_resources);
+        let summary = Summary {
+            initial_timestamp: Time(self.initial_time),
+            current_timestamp: Time(chrono::Utc::now()),
+            watches,
+        };
 
         let mut bytes = Vec::with_capacity(8 * 1024);
         if let Err(error) = serde_json::to_writer_pretty(&mut bytes, &summary) {
@@ -133,49 +138,40 @@ impl Diagnostics {
             .unwrap()
     }
 
-    fn summarize(&self, with_resources: bool) -> Summary {
-        // Collect the summaries of the remaining watches, with their resources
-        // sorted by creation.
-        let watches = {
-            let mut refs = self.watches.lock();
-            // Clean up any dead weak refs, i.e. of watches that have been dropped.
-            refs.retain(|w| w.upgrade().is_some());
-            refs.iter()
-                .filter_map(|wref| {
-                    let watch = wref.upgrade()?;
-                    let state = watch.read();
+    /// Collect the summaries of the remaining watches, with their resources
+    /// sorted by creation.
+    fn summarize_watches(&self, with_resources: bool) -> Vec<WatchSummary> {
+        let mut refs = self.watches.lock();
+        // Clean up any dead weak refs, i.e. of watches that have been dropped.
+        refs.retain(|w| w.upgrade().is_some());
+        refs.iter()
+            .filter_map(|wref| {
+                let watch = wref.upgrade()?;
+                let state = watch.read();
 
-                    let mut resources = state.known.values().cloned().collect::<Vec<_>>();
-                    resources
-                        .sort_by_key(|meta| meta.creation_timestamp.as_ref().map(|Time(t)| *t));
+                let mut resources = state.known.values().cloned().collect::<Vec<_>>();
+                resources.sort_by_key(|meta| meta.creation_timestamp.as_ref().map(|Time(t)| *t));
 
-                    let checksum = if resources.is_empty() {
-                        None
-                    } else {
-                        Some(checksum(&resources))
-                    };
-                    let resources = if with_resources {
-                        Some(resources)
-                    } else {
-                        None
-                    };
+                let checksum = if resources.is_empty() {
+                    None
+                } else {
+                    Some(checksum(&resources))
+                };
+                let resources = if with_resources {
+                    Some(resources)
+                } else {
+                    None
+                };
 
-                    Some(WatchSummary {
-                        api_url: state.api_url.clone(),
-                        label_selector: state.label_selector.clone(),
-                        stats: state.stats.clone(),
-                        resources,
-                        checksum,
-                    })
+                Some(WatchSummary {
+                    api_url: state.api_url.clone(),
+                    label_selector: state.label_selector.clone(),
+                    stats: state.stats.clone(),
+                    resources,
+                    checksum,
                 })
-                .collect()
-        };
-
-        Summary {
-            initial_timestamp: Time(self.initial_time),
-            current_timestamp: Time(chrono::Utc::now()),
-            watches,
-        }
+            })
+            .collect()
     }
 
     pub(crate) fn register_watch<T>(

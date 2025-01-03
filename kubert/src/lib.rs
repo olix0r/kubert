@@ -22,6 +22,7 @@
 //! - **runtime**: Enables the [`runtime`] module. Enabling this feature flag
 //!   also enables the **admin**, **client**, **initialized**, and **log**
 //!   features.
+//! - **runtime-diagnostics**: Enables the /kubert.json local admin endpoint.
 //! - **server**: Enables the [`server`] module, and server-related
 //!   functionality in the [`runtime`] module (if the **runtime** feature is
 //!   also enabled).
