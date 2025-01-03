@@ -1,5 +1,7 @@
 //! A controller runtime
 
+#[cfg(feature = "lease")]
+use crate::lease;
 #[cfg(feature = "server")]
 use crate::server::{self, ServerArgs};
 use crate::{
@@ -26,7 +28,7 @@ mod diagnostics;
 mod metrics;
 
 #[cfg(feature = "runtime-diagnostics")]
-pub(crate) use self::diagnostics::Diagnostics;
+pub(crate) use self::diagnostics::{Diagnostics, LeaseDiagnostics};
 
 /// Configures a controller [`Runtime`]
 #[derive(Debug, Default)]
@@ -322,6 +324,43 @@ impl<S> Runtime<S> {
         let (tx, rx) = crate::requeue::channel(capacity);
         let rx = shutdown::CancelOnShutdown::new(self.shutdown_rx.clone(), rx);
         (tx, rx)
+    }
+
+    #[cfg(feature = "lease")]
+    #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "lease"))))]
+    /// Spawns a lease.
+    pub async fn spawn_lease(
+        &self,
+        params: lease::LeaseParams,
+    ) -> Result<lease::Spawned, lease::Error> {
+        #[cfg(feature = "runtime-diagnostics")]
+        let diagnostics = self.diagnostics.register_lease(&params);
+
+        let lease::LeaseParams {
+            name,
+            namespace,
+            field_manager,
+            claimant,
+            lease_duration,
+            renew_grace_period,
+        } = params;
+
+        let manager = {
+            let api = lease::Api::namespaced(self.client.clone(), &namespace);
+            lease::LeaseManager::init(api, name).await?
+        };
+        let manager = field_manager
+            .into_iter()
+            .fold(manager, |m, fm| m.with_field_manager(fm));
+
+        #[cfg(feature = "runtime-diagnostics")]
+        let manager = manager.with_diagnostics(diagnostics);
+
+        let params = lease::ClaimParams {
+            lease_duration,
+            renew_grace_period,
+        };
+        manager.spawn(claimant, params).await
     }
 
     /// Creates a watch with the given [`Api`]
