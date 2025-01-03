@@ -13,6 +13,12 @@ use std::{
 };
 use tracing::{debug, info_span, Instrument};
 
+#[cfg(feature = "runtime-diagnostics")]
+mod diagnostics;
+
+#[cfg(feature = "runtime-diagnostics")]
+pub(crate) use self::diagnostics::Diagnostics;
+
 /// An error binding an admin server.
 #[derive(Debug, thiserror::Error)]
 #[error("failed to bind admin server: {0}")]
@@ -44,6 +50,8 @@ pub struct Builder {
     addr: SocketAddr,
     ready: Readiness,
     routes: AHashMap<String, HandlerFn>,
+    #[cfg(feature = "runtime-diagnostics")]
+    diagnostics: Diagnostics,
 }
 
 /// Supports spawning an admin server
@@ -54,6 +62,8 @@ pub struct Bound {
     listener: tokio::net::TcpListener,
     server: hyper::server::conn::http1::Builder,
     routes: AHashMap<String, HandlerFn>,
+    #[cfg(feature = "runtime-diagnostics")]
+    diagnostics: Diagnostics,
 }
 
 /// Controls how the admin server advertises readiness
@@ -110,6 +120,8 @@ impl Builder {
             addr,
             ready: Readiness(Arc::new(false.into())),
             routes: Default::default(),
+            #[cfg(feature = "runtime-diagnostics")]
+            diagnostics: Diagnostics::new(),
         }
     }
 
@@ -204,6 +216,8 @@ impl Builder {
             addr,
             ready,
             routes,
+            #[cfg(feature = "runtime-diagnostics")]
+            diagnostics,
         } = self;
 
         let lis = std::net::TcpListener::bind(addr)?;
@@ -226,6 +240,8 @@ impl Builder {
             server,
             listener,
             routes,
+            #[cfg(feature = "runtime-diagnostics")]
+            diagnostics,
         })
     }
 }
@@ -260,11 +276,15 @@ impl Bound {
             listener,
             routes,
             addr,
+            #[cfg(feature = "runtime-diagnostics")]
+            diagnostics,
         } = self;
 
         let task = tokio::spawn({
             let ready = ready.clone();
             let routes = Arc::new(routes);
+            #[cfg(feature = "runtime-diagnostics")]
+            let diagnostics = diagnostics.clone();
             async move {
                 loop {
                     let (stream, client_addr) = match listener.accept().await {
@@ -283,8 +303,17 @@ impl Bound {
                         use tower::ServiceExt;
                         let ready = ready.clone();
                         let routes = routes.clone();
-                        let svc =
-                            tower::service_fn(move |req: Request| handle(&ready, &routes, req));
+                        #[cfg(feature = "runtime-diagnostics")]
+                        let diagnostics = diagnostics.clone();
+                        let svc = tower::service_fn(move |req: Request| {
+                            handle(
+                                &ready,
+                                &routes,
+                                req,
+                                #[cfg(feature = "runtime-diagnostics")]
+                                (client_addr, &diagnostics),
+                            )
+                        });
                         #[cfg(any(feature = "admin-brotli", feature = "admin-gzip"))]
                         let svc = tower_http::compression::Compression::new(svc);
                         hyper::service::service_fn(move |req| svc.clone().oneshot(req))
@@ -349,6 +378,10 @@ fn handle(
     ready: &Readiness,
     routes: &Arc<AHashMap<String, HandlerFn>>,
     req: Request,
+    #[cfg(feature = "runtime-diagnostics")] (client_addr, diagnostics): (
+        std::net::SocketAddr,
+        &Diagnostics,
+    ),
 ) -> Pin<
     Box<
         dyn std::future::Future<Output = Result<hyper::Response<Body>, tokio::task::JoinError>>
@@ -361,6 +394,11 @@ fn handle(
     }
     if req.uri().path() == "/ready" {
         return Box::pin(future::ok(handle_ready(ready, req)));
+    }
+
+    #[cfg(feature = "runtime-diagnostics")]
+    if req.uri().path() == "/kubert.json" {
+        return Box::pin(future::ok(diagnostics.handle(client_addr, req)));
     }
 
     if routes.contains_key(req.uri().path()) {
