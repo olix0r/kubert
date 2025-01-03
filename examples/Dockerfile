@@ -6,7 +6,7 @@ ENV CARGO_NET_RETRY=10 \
     RUSTFLAGS="--cfg tokio_unstable"
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     just-cargo fetch
-ARG FEATURES="rustls-tls"
+ARG FEATURES=""
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     just-cargo build \
     --package=kubert-examples --examples \

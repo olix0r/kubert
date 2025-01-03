@@ -14,44 +14,14 @@
 //! which does not require either particular TLS implementation, so that the
 //! top-level binary crate may choose which TLS implementation is used.
 
-#![cfg_attr(
-    not(any(feature = "rustls-tls", feature = "openssl-tls")),
-    allow(dead_code)
-)]
-
 use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use thiserror::Error;
 use tokio::net::{TcpListener, TcpStream};
 use tower::Service;
 use tracing::{debug, error, info, info_span, Instrument};
 
-#[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
 mod tls_rustls;
-#[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
 use tls_rustls as tls;
-
-#[cfg(feature = "openssl-tls")]
-mod tls_openssl;
-#[cfg(feature = "openssl-tls")]
-use tls_openssl as tls;
-
-#[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
-mod tls {
-    use super::*;
-
-    pub(super) struct TlsAcceptor;
-
-    const PANIC_MESSAGE: &str = "using Kubert's `server` module requires one \
-        of the \"rustls-tls\" or \"openssl-tls\" Cargo features to be enabled";
-
-    pub(super) async fn load_tls(_: &TlsKeyPath, _: &TlsCertPath) -> Result<TlsAcceptor, Error> {
-        panic!("{PANIC_MESSAGE}")
-    }
-
-    pub(super) async fn accept(_: &TlsAcceptor, _: TcpStream) -> Result<TcpStream, std::io::Error> {
-        panic!("{PANIC_MESSAGE}")
-    }
-}
 
 #[cfg(test)]
 mod tests;
@@ -149,15 +119,6 @@ struct TlsPaths {
 
 impl ServerArgs {
     /// Attempts to load credentials and bind the server socket
-    ///
-    /// # Panics
-    ///
-    /// This method panics if neither of [the "rustls-tls" or "openssl-tls" Cargo
-    /// features][tls-features] are enabled. See [the module-level
-    /// documentation][tls-doc] for details.
-    ///
-    /// [tls-features]: crate#tls-features
-    /// [tls-doc]: crate::server#tls-feature-flags
     pub async fn bind(self) -> Result<Bound, Error> {
         let tls = {
             let key = self.server_tls_key.ok_or(Error::NoTlsKey)?;

@@ -10,18 +10,6 @@ rust-version = "1.81"
 keywords = ["kubernetes", "client", "runtime", "server"]
 
 [features]
-rustls-tls = [
-    "tokio-rustls",
-    "rustls-pemfile",
-    "kube-client?/rustls-tls",
-]
-openssl-tls = [
-    "openssl",
-    "hyper-openssl",
-    "tokio-openssl",
-    "once_cell",
-    "kube-client?/openssl-tls",
-]
 admin = [
     "ahash",
     "bytes",
@@ -38,7 +26,7 @@ admin-gzip = ["tower-http/compression-gzip"]
 admin-compression = ["admin-brotli", "admin-gzip"]
 client = [
     "bytes",
-    "kube-client",
+    "kube-client/rustls-tls",
     "thiserror",
     "tower",
     "tower/util",
@@ -123,6 +111,7 @@ server = [
     "tokio/macros",
     "tokio/net",
     "tokio/rt",
+    "tokio-rustls",
     "tower",
     "tracing",
 ]
@@ -140,8 +129,6 @@ shutdown = [
 
 [package.metadata.docs.rs]
 features = [
-    "rustls-tls",
-    "openssl-tls",
     "admin",
     "client",
     "errors",
@@ -172,10 +159,8 @@ futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
 http-body-util = { version = "0.1", optional = true }
 hyper = { workspace = true, optional = true, default-features = false }
-hyper-openssl = { workspace = true, optional = true }
 hyper-util = { workspace = true, optional = true, default-features = false }
 once_cell = { version = "1", optional = true }
-openssl = { version = "0.10.57", optional = true, default-features = false }
 parking_lot = { version = "0.12", optional = true }
 pin-project-lite = { version = "0.2", optional = true }
 prometheus-client = { workspace = true, optional = true }
@@ -185,7 +170,6 @@ serde_json = { version = "1", optional = true }
 thiserror = { version = "2", optional = true }
 tokio = { workspace = true, optional = false, default-features = false }
 tokio-rustls = { version = "0.26.1", optional = true, default-features = false }
-tokio-openssl = { version = "0.6.3", optional = true }
 tokio-util = { version = "0.7", optional = true, default-features = false }
 tower-http = { version = "0.6.0", optional = true, default-features = false }
 tower = { version = "0.5", default-features = false, optional = true }

@@ -37,23 +37,10 @@
 //!   and [`ServerArgs`] types, allowing them to be parsed from command-line
 //!   arguments.
 //!
-//! ### TLS Features
+//! ### TLS
 //!
-//! These feature flags determine which TLS implementation is used by `kubert`'s
-//! [`client`] and [`server`] modules. If neither feature is enabled, `kubert`'s
-//! [`client`] module will use whatever TLS implementation is provided by the
-//! [`kube-client`] crate's feature flags, and `kubert`'s [`server`] module will
-//! panic when starting the server.
-//!
-//! - **rustls-tls**: Use [`rustls`] as the TLS implementation.
-//! - **openssl-tls**: Use [OpenSSL] (via the [`openssl`] crate) as the TLS
-//!   implementation. This feature takes priority over the **rustls-tls**
-//!   feature flag. If both are enabled, OpenSSL will be used instead of
-//!   Rustls.
-//!
-//! If the `client` feature flag is enabled, these features will also enable the
-//! corresponding feature flags on the [`kube-client`] crate, to configure which
-//! TLS implementation is used by the underlying Kubernetes API client.
+//! Kubert exclusively uses [`rustls`] for TLS support. Rustls supports a
+//! variety of cryptographic providers.
 //!
 //! [`kube`]: https://github.com/kube-rs/kube-rs
 //! [Cargo features]: https://doc.rust-lang.org/cargo/reference/features.html
@@ -61,8 +48,6 @@
 //! [`clap::Parser`]: https://docs.rs/clap/4/clap/trait.Parser.html
 //! [`kube-client`]: https://crates.io/crates/kube-client
 //! [`rustls`]: https://crates.io/crates/rustls
-//! [OpenSSL]: https://www.openssl.org/
-//! [`openssl`]: https://crates.io/crates/openssl
 
 #![deny(warnings, rust_2018_idioms, missing_docs)]
 #![forbid(unsafe_code)]
