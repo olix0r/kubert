@@ -1,7 +1,6 @@
 //! Admin server utilities.
 use ahash::AHashMap;
 use futures_util::future;
-use hyper::{Request, Response};
 use std::{
     fmt,
     net::SocketAddr,
@@ -19,11 +18,12 @@ use tracing::{debug, info_span, Instrument};
 #[error("failed to bind admin server: {0}")]
 pub struct BindError(#[from] std::io::Error);
 
+type Request = hyper::Request<hyper::body::Incoming>;
 type Body = http_body_util::Full<bytes::Bytes>;
+type Response = hyper::Response<Body>;
 
 /// A handler for a request path.
-type HandlerFn =
-    Box<dyn Fn(Request<hyper::body::Incoming>) -> Response<Body> + Send + Sync + 'static>;
+type HandlerFn = Box<dyn Fn(Request) -> Response + Send + Sync + 'static>;
 
 #[cfg(feature = "prometheus-client")]
 mod metrics;
@@ -183,7 +183,7 @@ impl Builder {
     pub fn with_handler(
         mut self,
         path: impl ToString,
-        handler: impl Fn(Request<hyper::body::Incoming>) -> Response<Body> + Send + Sync + 'static,
+        handler: impl Fn(Request) -> Response + Send + Sync + 'static,
     ) -> Self {
         let path = path.to_string();
         assert_ne!(
@@ -262,18 +262,9 @@ impl Bound {
             addr,
         } = self;
 
-        let svc = {
-            use tower::ServiceExt;
+        let task = tokio::spawn({
             let ready = ready.clone();
             let routes = Arc::new(routes);
-            let svc = tower::service_fn(move |req: hyper::Request<hyper::body::Incoming>| {
-                handle(&ready, &routes, req)
-            });
-            #[cfg(any(feature = "admin-brotli", feature = "admin-gzip"))]
-            let svc = tower_http::compression::Compression::new(svc);
-            hyper::service::service_fn(move |req| svc.clone().oneshot(req))
-        };
-        let task = tokio::spawn(
             async move {
                 loop {
                     let (stream, client_addr) = match listener.accept().await {
@@ -288,6 +279,17 @@ impl Bound {
                     }
                     tracing::trace!(client.addr = ?client_addr, "Accepted connection");
 
+                    let svc = {
+                        use tower::ServiceExt;
+                        let ready = ready.clone();
+                        let routes = routes.clone();
+                        let svc =
+                            tower::service_fn(move |req: Request| handle(&ready, &routes, req));
+                        #[cfg(any(feature = "admin-brotli", feature = "admin-gzip"))]
+                        let svc = tower_http::compression::Compression::new(svc);
+                        hyper::service::service_fn(move |req| svc.clone().oneshot(req))
+                    };
+
                     let serve =
                         server.serve_connection(hyper_util::rt::TokioIo::new(stream), svc.clone());
                     tokio::spawn(
@@ -301,8 +303,8 @@ impl Bound {
                     );
                 }
             }
-            .instrument(info_span!("admin", port = %self.addr.port())),
-        );
+            .instrument(info_span!("admin", port = %self.addr.port()))
+        });
 
         Server { task, addr, ready }
     }
@@ -346,7 +348,7 @@ impl Server {
 fn handle(
     ready: &Readiness,
     routes: &Arc<AHashMap<String, HandlerFn>>,
-    req: hyper::Request<hyper::body::Incoming>,
+    req: Request,
 ) -> Pin<
     Box<
         dyn std::future::Future<Output = Result<hyper::Response<Body>, tokio::task::JoinError>>
@@ -355,40 +357,40 @@ fn handle(
 > {
     // Fast path for probe handlers.
     if req.uri().path() == "/live" {
-        Box::pin(future::ok(handle_live(req)))
-    } else if req.uri().path() == "/ready" {
-        Box::pin(future::ok(handle_ready(ready, req)))
-    } else if routes.contains_key(req.uri().path()) {
+        return Box::pin(future::ok(handle_live(req)));
+    }
+    if req.uri().path() == "/ready" {
+        return Box::pin(future::ok(handle_ready(ready, req)));
+    }
+
+    if routes.contains_key(req.uri().path()) {
         // User-provided handlers--especially metrics collectors--may perform
         // blocking calls like stat. Prevent these tasks from blocking the
         // runtime.
         let routes = routes.clone();
         let path = req.uri().path().to_string();
-        Box::pin(async move {
-            tokio::task::spawn_blocking(move || {
-                let handler = routes.get(&path).expect("routes must contain path");
-                handler(req)
-            })
-            .await
-        })
-    } else {
-        Box::pin(future::ok(
-            Response::builder()
-                .status(hyper::StatusCode::NOT_FOUND)
-                .body(Body::default())
-                .unwrap(),
-        ))
+        return Box::pin(tokio::task::spawn_blocking(move || {
+            let handler = routes.get(&path).expect("routes must contain path");
+            handler(req)
+        }));
     }
+
+    Box::pin(future::ok(
+        hyper::Response::builder()
+            .status(hyper::StatusCode::NOT_FOUND)
+            .body(Body::default())
+            .unwrap(),
+    ))
 }
 
-fn handle_live(req: Request<hyper::body::Incoming>) -> Response<Body> {
+fn handle_live(req: Request) -> Response {
     match *req.method() {
-        hyper::Method::GET | hyper::Method::HEAD => Response::builder()
+        hyper::Method::GET | hyper::Method::HEAD => hyper::Response::builder()
             .status(hyper::StatusCode::OK)
             .header(hyper::header::CONTENT_TYPE, "text/plain")
             .body("alive\n".into())
             .unwrap(),
-        _ => Response::builder()
+        _ => hyper::Response::builder()
             .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
             .header(hyper::header::ALLOW, "GET, HEAD")
             .body(Body::default())
@@ -396,27 +398,24 @@ fn handle_live(req: Request<hyper::body::Incoming>) -> Response<Body> {
     }
 }
 
-fn handle_ready(
-    Readiness(ready): &Readiness,
-    req: Request<hyper::body::Incoming>,
-) -> Response<Body> {
+fn handle_ready(Readiness(ready): &Readiness, req: Request) -> Response {
     match *req.method() {
         hyper::Method::GET | hyper::Method::HEAD => {
             if ready.load(Ordering::Acquire) {
-                return Response::builder()
+                return hyper::Response::builder()
                     .status(hyper::StatusCode::OK)
                     .header(hyper::header::CONTENT_TYPE, "text/plain")
                     .body("ready\n".into())
                     .unwrap();
             }
 
-            Response::builder()
+            hyper::Response::builder()
                 .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
                 .header(hyper::header::CONTENT_TYPE, "text/plain")
                 .body("not ready\n".into())
                 .unwrap()
         }
-        _ => Response::builder()
+        _ => hyper::Response::builder()
             .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
             .header(hyper::header::ALLOW, "GET, HEAD")
             .body(Body::default())
