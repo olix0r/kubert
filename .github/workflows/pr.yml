@@ -187,9 +187,8 @@ jobs:
           - admin
           - admin,prometheus-client
           - client
-          - client rustls-tls
-          - client openssl-tls
-          - client openssl-tls rustls-tls
+          - client,rustls-tls
+          - client,openssl-tls
           - errors
           - index
           - initialized
@@ -200,9 +199,8 @@ jobs:
           - runtime
           - runtime,prometheus-client
           - server
-          - server rustls-tls
-          - server openssl-tls
-          - server openssl-tls rustls-tls
+          - server,rustls-tls
+          - server,openssl-tls
           - shutdown
     timeout-minutes: 10
     runs-on: ubuntu-latest

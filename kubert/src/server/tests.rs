@@ -31,11 +31,6 @@ fn gen_keys() -> (TempDir, TlsPaths) {
 }
 
 #[tokio::test]
-// if no TLS features are enabled, this will panic.
-#[cfg_attr(
-    not(any(feature = "rustls-tls", feature = "openssl-tls")),
-    should_panic
-)]
 async fn load_tls() {
     let (_tempdir, TlsPaths { key, certs }) = gen_keys();
     match super::tls::load_tls(&key, &certs).await {
