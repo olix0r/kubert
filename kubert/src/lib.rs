@@ -22,6 +22,7 @@
 //! - **runtime**: Enables the [`runtime`] module. Enabling this feature flag
 //!   also enables the **admin**, **client**, **initialized**, and **log**
 //!   features.
+//! - **runtime-diagnostics**: Enables the /kubert.json local admin endpoint.
 //! - **server**: Enables the [`server`] module, and server-related
 //!   functionality in the [`runtime`] module (if the **runtime** feature is
 //!   also enabled).
@@ -48,12 +49,20 @@
 //! - **rustls-tls**: Use [`rustls`] as the TLS implementation.
 //! - **openssl-tls**: Use [OpenSSL] (via the [`openssl`] crate) as the TLS
 //!   implementation. This feature takes priority over the **rustls-tls**
-//!   feature flag. If both are enabled, OpenSSL will be used instead of
-//!   Rustls.
+//!   feature flag. If both are enabled, OpenSSL will be used instead of Rustls.
 //!
 //! If the `client` feature flag is enabled, these features will also enable the
 //! corresponding feature flags on the [`kube-client`] crate, to configure which
 //! TLS implementation is used by the underlying Kubernetes API client.
+//!
+//! ## Runtime Diagnostics
+//!
+//! The **runtime-diagnostics** feature flag enables the `/kubert.json` local
+//! admin endpoint. This endpoint provides a JSON representation of the current
+//! state of each watch that has been initialized in the runtime.
+//!
+//!    curl 'http://localhost:8080/kubert.json'
+//!    curl 'http://localhost:8080/kubert.json?resources'
 //!
 //! [`kube`]: https://github.com/kube-rs/kube-rs
 //! [Cargo features]: https://doc.rust-lang.org/cargo/reference/features.html

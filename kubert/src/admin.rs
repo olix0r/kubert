@@ -1,7 +1,6 @@
 //! Admin server utilities.
 use ahash::AHashMap;
 use futures_util::future;
-use hyper::{Request, Response};
 use std::{
     fmt,
     net::SocketAddr,
@@ -14,21 +13,23 @@ use std::{
 };
 use tracing::{debug, info_span, Instrument};
 
+#[cfg(feature = "runtime-diagnostics")]
+mod diagnostics;
+
+#[cfg(feature = "runtime-diagnostics")]
+pub(crate) use self::diagnostics::{Diagnostics, LeaseDiagnostics};
+
 /// An error binding an admin server.
 #[derive(Debug, thiserror::Error)]
 #[error("failed to bind admin server: {0}")]
 pub struct BindError(#[from] std::io::Error);
 
+type Request = hyper::Request<hyper::body::Incoming>;
 type Body = http_body_util::Full<bytes::Bytes>;
+type Response = hyper::Response<Body>;
 
 /// A handler for a request path.
-type RouteFn =
-    Box<dyn Fn(Request<hyper::body::Incoming>) -> Response<Body> + Send + Sync + 'static>;
-
-struct Route {
-    call: RouteFn,
-    require_loopback: bool,
-}
+type HandlerFn = Box<dyn Fn(Request) -> Response + Send + Sync + 'static>;
 
 #[cfg(feature = "prometheus-client")]
 mod metrics;
@@ -48,7 +49,9 @@ pub struct AdminArgs {
 pub struct Builder {
     addr: SocketAddr,
     ready: Readiness,
-    routes: AHashMap<String, Route>,
+    routes: AHashMap<String, HandlerFn>,
+    #[cfg(feature = "runtime-diagnostics")]
+    diagnostics: Diagnostics,
 }
 
 /// Supports spawning an admin server
@@ -58,7 +61,9 @@ pub struct Bound {
     ready: Readiness,
     listener: tokio::net::TcpListener,
     server: hyper::server::conn::http1::Builder,
-    routes: AHashMap<String, Route>,
+    routes: AHashMap<String, HandlerFn>,
+    #[cfg(feature = "runtime-diagnostics")]
+    diagnostics: Diagnostics,
 }
 
 /// Controls how the admin server advertises readiness
@@ -115,6 +120,8 @@ impl Builder {
             addr,
             ready: Readiness(Arc::new(false.into())),
             routes: Default::default(),
+            #[cfg(feature = "runtime-diagnostics")]
+            diagnostics: Diagnostics::new(),
         }
     }
 
@@ -175,22 +182,6 @@ impl Builder {
         self.with_handler(path, move |req| prom.handle_metrics(req))
     }
 
-    #[cfg(feature = "runtime-diagnostics")]
-    pub(crate) fn with_runtime_diagnostics(self, diagnostics: crate::runtime::Diagnostics) -> Self {
-        self.with_loopback_handler("/kubert.json", move |req| {
-            let with_resources = req.uri().query() == Some("resources");
-            let summary = diagnostics.summarize(with_resources);
-
-            let mut bytes = Vec::with_capacity(8 * 1024);
-            serde_json::to_writer_pretty(&mut bytes, &summary)
-                .expect("json serialization must succeed");
-            hyper::Response::builder()
-                .header(hyper::header::CONTENT_TYPE, "application/json")
-                .body(Body::from(bytes))
-                .expect("response must succeed")
-        })
-    }
-
     /// Adds a request handler for `path` to the admin server.
     ///
     /// Requests to `path` will be handled by invoking the provided `handler`
@@ -204,42 +195,8 @@ impl Builder {
     pub fn with_handler(
         mut self,
         path: impl ToString,
-        handler: impl Fn(Request<hyper::body::Incoming>) -> Response<Body> + Send + Sync + 'static,
+        handler: impl Fn(Request) -> Response + Send + Sync + 'static,
     ) -> Self {
-        let path = path.to_string();
-        let route = Self::new_route(&path, handler);
-        self.routes.insert(path, route);
-        self
-    }
-    /// Adds a request handler for `path` to the admin server that only accepts
-    /// requests from the loopback interface.
-    ///
-    /// Requests to `path` will be handled by invoking the provided `handler`
-    /// function with each request. This can be used to add additional
-    /// functionality to the admin server. The handler will only be invoked for
-    /// requests that originate from the loopback interface. All other requests
-    /// will receive a `403 Forbidden` response.
-    ///
-    /// # Panics
-    ///
-    /// This method panics if called with the path `/ready` or `/live`, as these
-    /// paths would conflict with the built-in readiness and liveness endpoints.
-    pub fn with_loopback_handler(
-        mut self,
-        path: impl ToString,
-        handler: impl Fn(Request<hyper::body::Incoming>) -> Response<Body> + Send + Sync + 'static,
-    ) -> Self {
-        let path = path.to_string();
-        let mut route = Self::new_route(&path, handler);
-        route.require_loopback = true;
-        self.routes.insert(path, route);
-        self
-    }
-
-    fn new_route(
-        path: &str,
-        handler: impl Fn(Request<hyper::body::Incoming>) -> Response<Body> + Send + Sync + 'static,
-    ) -> Route {
         let path = path.to_string();
         assert_ne!(
             path, "/ready",
@@ -249,10 +206,8 @@ impl Builder {
             path, "/live",
             "the built-in `/live` handler cannot be overridden"
         );
-        Route {
-            call: Box::new(handler),
-            require_loopback: false,
-        }
+        self.routes.insert(path, Box::new(handler));
+        self
     }
 
     /// Binds the admin server without accepting connections
@@ -261,6 +216,8 @@ impl Builder {
             addr,
             ready,
             routes,
+            #[cfg(feature = "runtime-diagnostics")]
+            diagnostics,
         } = self;
 
         let lis = std::net::TcpListener::bind(addr)?;
@@ -283,6 +240,8 @@ impl Builder {
             server,
             listener,
             routes,
+            #[cfg(feature = "runtime-diagnostics")]
+            diagnostics,
         })
     }
 }
@@ -317,11 +276,15 @@ impl Bound {
             listener,
             routes,
             addr,
+            #[cfg(feature = "runtime-diagnostics")]
+            diagnostics,
         } = self;
 
         let task = tokio::spawn({
             let ready = ready.clone();
             let routes = Arc::new(routes);
+            #[cfg(feature = "runtime-diagnostics")]
+            let diagnostics = diagnostics.clone();
             async move {
                 loop {
                     let (stream, client_addr) = match listener.accept().await {
@@ -340,10 +303,17 @@ impl Bound {
                         use tower::ServiceExt;
                         let ready = ready.clone();
                         let routes = routes.clone();
-                        let svc =
-                            tower::service_fn(move |req: hyper::Request<hyper::body::Incoming>| {
-                                handle(client_addr, &ready, &routes, req)
-                            });
+                        #[cfg(feature = "runtime-diagnostics")]
+                        let diagnostics = diagnostics.clone();
+                        let svc = tower::service_fn(move |req: Request| {
+                            handle(
+                                &ready,
+                                &routes,
+                                req,
+                                #[cfg(feature = "runtime-diagnostics")]
+                                (client_addr, &diagnostics),
+                            )
+                        });
                         #[cfg(any(feature = "admin-brotli", feature = "admin-gzip"))]
                         let svc = tower_http::compression::Compression::new(svc);
                         hyper::service::service_fn(move |req| svc.clone().oneshot(req))
@@ -366,6 +336,11 @@ impl Bound {
         });
 
         Server { task, addr, ready }
+    }
+
+    #[cfg(feature = "runtime-diagnostics")]
+    pub(crate) fn diagnostics(&self) -> &Diagnostics {
+        &self.diagnostics
     }
 }
 
@@ -405,59 +380,55 @@ impl Server {
 // === routes ===
 
 fn handle(
-    client_addr: SocketAddr,
     ready: &Readiness,
-    routes: &Arc<AHashMap<String, Route>>,
-    req: hyper::Request<hyper::body::Incoming>,
-) -> Pin<
-    Box<
-        dyn std::future::Future<Output = Result<hyper::Response<Body>, tokio::task::JoinError>>
-            + Send,
-    >,
-> {
+    routes: &Arc<AHashMap<String, HandlerFn>>,
+    req: Request,
+    #[cfg(feature = "runtime-diagnostics")] (client_addr, diagnostics): (
+        std::net::SocketAddr,
+        &Diagnostics,
+    ),
+) -> Pin<Box<dyn std::future::Future<Output = Result<Response, tokio::task::JoinError>> + Send>> {
     // Fast path for probe handlers.
     if req.uri().path() == "/live" {
-        Box::pin(future::ok(handle_live(req)))
-    } else if req.uri().path() == "/ready" {
-        Box::pin(future::ok(handle_ready(ready, req)))
-    } else if routes.contains_key(req.uri().path()) {
+        return Box::pin(future::ok(handle_live(req)));
+    }
+    if req.uri().path() == "/ready" {
+        return Box::pin(future::ok(handle_ready(ready, req)));
+    }
+
+    #[cfg(feature = "runtime-diagnostics")]
+    if req.uri().path() == "/kubert.json" {
+        return Box::pin(future::ok(diagnostics.handle(client_addr, req)));
+    }
+
+    if routes.contains_key(req.uri().path()) {
         // User-provided handlers--especially metrics collectors--may perform
         // blocking calls like stat. Prevent these tasks from blocking the
         // runtime.
         let routes = routes.clone();
         let path = req.uri().path().to_string();
-        let is_loopback = client_addr.ip().is_loopback();
-        Box::pin(async move {
-            tokio::task::spawn_blocking(move || {
-                let route = routes.get(&path).expect("routes must contain path");
-                if route.require_loopback && !is_loopback {
-                    return Response::builder()
-                        .status(hyper::StatusCode::FORBIDDEN)
-                        .body(Body::default())
-                        .unwrap();
-                }
-                (route.call)(req)
-            })
-            .await
-        })
-    } else {
-        Box::pin(future::ok(
-            Response::builder()
-                .status(hyper::StatusCode::NOT_FOUND)
-                .body(Body::default())
-                .unwrap(),
-        ))
+        return Box::pin(tokio::task::spawn_blocking(move || {
+            let handler = routes.get(&path).expect("routes must contain path");
+            handler(req)
+        }));
     }
+
+    Box::pin(future::ok(
+        hyper::Response::builder()
+            .status(hyper::StatusCode::NOT_FOUND)
+            .body(Body::default())
+            .unwrap(),
+    ))
 }
 
-fn handle_live(req: Request<hyper::body::Incoming>) -> Response<Body> {
+fn handle_live(req: Request) -> Response {
     match *req.method() {
-        hyper::Method::GET | hyper::Method::HEAD => Response::builder()
+        hyper::Method::GET | hyper::Method::HEAD => hyper::Response::builder()
             .status(hyper::StatusCode::OK)
             .header(hyper::header::CONTENT_TYPE, "text/plain")
             .body("alive\n".into())
             .unwrap(),
-        _ => Response::builder()
+        _ => hyper::Response::builder()
             .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
             .header(hyper::header::ALLOW, "GET, HEAD")
             .body(Body::default())
@@ -465,27 +436,24 @@ fn handle_live(req: Request<hyper::body::Incoming>) -> Response<Body> {
     }
 }
 
-fn handle_ready(
-    Readiness(ready): &Readiness,
-    req: Request<hyper::body::Incoming>,
-) -> Response<Body> {
+fn handle_ready(Readiness(ready): &Readiness, req: Request) -> Response {
     match *req.method() {
         hyper::Method::GET | hyper::Method::HEAD => {
             if ready.load(Ordering::Acquire) {
-                return Response::builder()
+                return hyper::Response::builder()
                     .status(hyper::StatusCode::OK)
                     .header(hyper::header::CONTENT_TYPE, "text/plain")
                     .body("ready\n".into())
                     .unwrap();
             }
 
-            Response::builder()
+            hyper::Response::builder()
                 .status(hyper::StatusCode::INTERNAL_SERVER_ERROR)
                 .header(hyper::header::CONTENT_TYPE, "text/plain")
                 .body("not ready\n".into())
                 .unwrap()
         }
-        _ => Response::builder()
+        _ => hyper::Response::builder()
             .status(hyper::StatusCode::METHOD_NOT_ALLOWED)
             .header(hyper::header::ALLOW, "GET, HEAD")
             .body(Body::default())

@@ -22,13 +22,8 @@ use tower::Service;
 pub use kube_client::Api;
 pub use reflector::Store;
 
-#[cfg(feature = "runtime-diagnostics")]
-mod diagnostics;
 #[cfg(feature = "prometheus-client")]
 mod metrics;
-
-#[cfg(feature = "runtime-diagnostics")]
-pub(crate) use self::diagnostics::{Diagnostics, LeaseDiagnostics};
 
 /// Configures a controller [`Runtime`]
 #[derive(Debug, Default)]
@@ -72,9 +67,6 @@ pub struct Runtime<S = NoServer> {
     server: S,
     #[cfg(not(feature = "server"))]
     server: std::marker::PhantomData<S>,
-
-    #[cfg(feature = "runtime-diagnostics")]
-    diagnostics: diagnostics::Diagnostics,
 
     #[cfg(feature = "prometheus-client")]
     metrics: Option<RuntimeMetrics>,
@@ -171,24 +163,12 @@ impl<S> Builder<S> {
         self.log.unwrap_or_default().try_init()?;
         let client = mk_client(self.client.unwrap_or_default()).await?;
         let (shutdown, shutdown_rx) = shutdown::sigint_or_sigterm()?;
-
-        #[cfg_attr(not(feature = "runtime-diagnostics"), allow(unused_mut))]
-        let mut admin = self.admin;
-        #[cfg(feature = "runtime-diagnostics")]
-        let diagnostics = {
-            let diag = diagnostics::Diagnostics::default();
-            admin = admin.with_runtime_diagnostics(diag.clone());
-            diag
-        };
-        let admin = admin.bind()?;
-
+        let admin = self.admin.bind()?;
         Ok(Runtime {
             client,
             shutdown_rx,
             shutdown,
             admin,
-            #[cfg(feature = "runtime-diagnostics")]
-            diagnostics,
             error_delay: self.error_delay.unwrap_or(Self::DEFAULT_ERROR_DELAY),
             initialized: Initialized::default(),
             // Server must be built by `Builder::build`
@@ -334,7 +314,7 @@ impl<S> Runtime<S> {
         params: lease::LeaseParams,
     ) -> Result<lease::Spawned, lease::Error> {
         #[cfg(feature = "runtime-diagnostics")]
-        let diagnostics = self.diagnostics.register_lease(&params);
+        let diagnostics = self.admin.diagnostics().register_lease(&params);
 
         let lease::LeaseParams {
             name,
@@ -494,7 +474,8 @@ impl<S> Runtime<S> {
     {
         #[cfg(feature = "runtime-diagnostics")]
         let diagnostics = self
-            .diagnostics
+            .admin
+            .diagnostics()
             .register_watch(&api, watcher_config.label_selector.as_deref());
 
         let watch = watcher::watcher(api, watcher_config);
