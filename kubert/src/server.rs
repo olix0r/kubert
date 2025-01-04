@@ -16,7 +16,7 @@
 
 #![cfg_attr(
     not(any(feature = "rustls-tls", feature = "openssl-tls")),
-    allow(dead_code)
+    allow(dead_code, unused_variables)
 )]
 
 use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
@@ -25,33 +25,11 @@ use tokio::net::{TcpListener, TcpStream};
 use tower::Service;
 use tracing::{debug, error, info, info_span, Instrument};
 
-#[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
+#[cfg(feature = "rustls-tls")]
 mod tls_rustls;
-#[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
-use tls_rustls as tls;
 
 #[cfg(feature = "openssl-tls")]
 mod tls_openssl;
-#[cfg(feature = "openssl-tls")]
-use tls_openssl as tls;
-
-#[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
-mod tls {
-    use super::*;
-
-    pub(super) struct TlsAcceptor;
-
-    const PANIC_MESSAGE: &str = "using Kubert's `server` module requires one \
-        of the \"rustls-tls\" or \"openssl-tls\" Cargo features to be enabled";
-
-    pub(super) async fn load_tls(_: &TlsKeyPath, _: &TlsCertPath) -> Result<TlsAcceptor, Error> {
-        panic!("{PANIC_MESSAGE}")
-    }
-
-    pub(super) async fn accept(_: &TlsAcceptor, _: TcpStream) -> Result<TcpStream, std::io::Error> {
-        panic!("{PANIC_MESSAGE}")
-    }
-}
 
 #[cfg(test)]
 mod tests;
@@ -164,7 +142,12 @@ impl ServerArgs {
             let certs = self.server_tls_certs.ok_or(Error::NoTlsCerts)?;
             // Ensure the TLS key and certificate files load properly before binding the socket and
             // spawning the server.
-            let _ = tls::load_tls(&key, &certs).await?;
+
+            #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+            let _ = tls_openssl::load_tls(&key, &certs).await?;
+            #[cfg(feature = "rustls-tls")]
+            let _ = tls_rustls::load_tls(&key, &certs).await?;
+
             Arc::new(TlsPaths { key, certs })
         };
 
@@ -313,7 +296,20 @@ where
     let socket = {
         let TlsPaths { ref key, ref certs } = &*tls;
         // Reload the TLS credentials for each connection.
-        let tls = match tls::load_tls(key, certs).await {
+
+        #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+        let res = tls_openssl::load_tls(key, certs).await;
+        #[cfg(feature = "rustls-tls")]
+        let res = tls_rustls::load_tls(key, certs).await;
+        #[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
+        let res = {
+            enum Accept {}
+            Err::<Accept, _>(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "TLS support not enabled",
+            ))
+        };
+        let tls = match res {
             Ok(tls) => tls,
             Err(error) => {
                 info!(%error, "Connection failed");
@@ -322,7 +318,16 @@ where
         };
         tracing::trace!("loaded TLS credentials");
 
-        let socket = match tls::accept(&tls, socket).await {
+        #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+        let res = tls_openssl::accept(&tls, socket).await;
+        #[cfg(feature = "rustls-tls")]
+        let res = tls_rustls::accept(&tls, socket).await;
+        #[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
+        let res = Err::<TcpStream, _>(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "TLS support not enabled",
+        ));
+        let socket = match res {
             Ok(s) => s,
             Err(error) => {
                 info!(%error, "TLS handshake failed");
@@ -330,6 +335,7 @@ where
             }
         };
         tracing::trace!("TLS handshake completed");
+
         socket
     };
 
