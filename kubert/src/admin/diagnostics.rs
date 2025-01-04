@@ -38,28 +38,7 @@ impl Diagnostics {
         Self {
             initial_time: chrono::Utc::now(),
             watches: Default::default(),
-            leases: Default::default(),
         }
-    }
-
-    pub(crate) fn register_watch<T>(
-        &self,
-        api: &crate::runtime::Api<T>,
-        label_selector: Option<&str>,
-    ) -> WatchDiagnostics
-    where
-        T: kube_client::Resource,
-        T::DynamicType: Default,
-    {
-        let wd = WatchDiagnostics::new(api.resource_url(), label_selector);
-        self.watches.lock().push(wd.weak());
-        wd
-    }
-
-    pub(crate) fn register_lease(&self, params: &crate::LeaseParams) -> LeaseDiagnostics {
-        let ld = LeaseDiagnostics::new(params);
-        self.leases.lock().push(ld.weak());
-        ld
     }
 
     pub(super) fn handle(&self, client_addr: SocketAddr, req: super::Request) -> super::Response {
