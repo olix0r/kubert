@@ -317,6 +317,8 @@ impl<S> Runtime<S> {
         &self,
         params: lease::LeaseParams,
     ) -> Result<lease::Spawned, lease::Error> {
+        #[cfg(feature = "runtime-diagnostics")]
+        let diagnostics = self.admin.diagnostics().register_lease(&params);
         let lease::LeaseParams {
             name,
             namespace,
@@ -331,6 +333,8 @@ impl<S> Runtime<S> {
         let manager = field_manager
             .into_iter()
             .fold(manager, |m, fm| m.with_field_manager(fm));
+        #[cfg(feature = "runtime-diagnostics")]
+        let manager = manager.with_diagnostics(diagnostics);
 
         let params = lease::ClaimParams {
             lease_duration,

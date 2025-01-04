@@ -59,9 +59,15 @@
 //!
 //! The **runtime-diagnostics** feature flag enables the `/kubert.json` local
 //! admin endpoint. This endpoint provides a JSON representation of the current
-//! state of each watch that has been initialized in the runtime.
+//! state of each lease and watch that has been initialized in the runtime.
 //!
 //!    curl 'http://localhost:8080/kubert.json'
+//!
+//! The endpoint also supports a `resources` query parameter, which causes
+//! responses to enumerate all resources returned by the watch. These resources
+//! are omitted by default, though their state can easily be compared via the
+//! 'checksum' field.
+//!
 //!    curl 'http://localhost:8080/kubert.json?resources'
 //!
 //! [`kube`]: https://github.com/kube-rs/kube-rs

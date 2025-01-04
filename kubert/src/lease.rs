@@ -12,6 +12,9 @@ use k8s_openapi::{api::coordination::v1 as coordv1, apimachinery::pkg::apis::met
 use std::{borrow::Cow, sync::Arc};
 use tokio::time::{self, Duration};
 
+#[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+use crate::admin::LeaseDiagnostics;
+
 /// Manages a Kubernetes `Lease`
 #[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
 pub struct LeaseManager {
@@ -19,6 +22,9 @@ pub struct LeaseManager {
     name: String,
     field_manager: Cow<'static, str>,
     state: tokio::sync::Mutex<State>,
+
+    #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+    diagnostics: Option<LeaseDiagnostics>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -153,7 +159,7 @@ impl Claim {
 // === impl LeaseManager ===
 
 impl LeaseManager {
-    const DEFAULT_FIELD_MANAGER: &'static str = "kubert";
+    pub(crate) const DEFAULT_FIELD_MANAGER: &'static str = "kubert";
     const DEFAULT_MIN_BACKOFF: Duration = Duration::from_millis(5);
     const DEFAULT_BACKOFF_JITTER: f64 = 0.5; // up to 50% of the backoff duration
     const API_TIMEOUT: Duration = Duration::from_secs(10);
@@ -170,6 +176,7 @@ impl LeaseManager {
             name,
             field_manager: Self::DEFAULT_FIELD_MANAGER.into(),
             state: tokio::sync::Mutex::new(state),
+            diagnostics: None,
         })
     }
 
@@ -182,6 +189,12 @@ impl LeaseManager {
         self
     }
 
+    #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+    pub(crate) fn with_diagnostics(mut self, diagnostics: LeaseDiagnostics) -> Self {
+        self.diagnostics = Some(diagnostics);
+        self
+    }
+
     /// Return the state of the claim without updating it from the API.
     pub async fn claimed(&self) -> Option<Arc<Claim>> {
         self.state.lock().await.claim.clone()
@@ -191,6 +204,10 @@ impl LeaseManager {
     pub async fn sync(&self) -> Result<Option<Arc<Claim>>, Error> {
         let mut state = self.state.lock().await;
         *state = Self::get(self.api.clone(), &self.name).await?;
+        #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+        if let Some(diagnostics) = self.diagnostics.as_ref() {
+            diagnostics.inspect(state.claim.clone(), state.meta.version.clone());
+        }
         Ok(state.claim.clone())
     }
 
@@ -224,6 +241,11 @@ impl LeaseManager {
                             // Another process updated the claim's resource version, so
                             // re-sync the state and try again.
                             *state = Self::get(self.api.clone(), &self.name).await?;
+                            #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+                            if let Some(diagnostics) = self.diagnostics.as_ref() {
+                                diagnostics
+                                    .inspect(state.claim.clone(), state.meta.version.clone());
+                            }
                             continue;
                         }
 
@@ -234,6 +256,10 @@ impl LeaseManager {
                         claim: Some(claim.clone()),
                         meta,
                     };
+                    #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+                    if let Some(diagnostics) = self.diagnostics.as_ref() {
+                        diagnostics.inspect(state.claim.clone(), state.meta.version.clone());
+                    }
                     return Ok(claim);
                 }
 
@@ -251,6 +277,10 @@ impl LeaseManager {
                     // Another process updated the claim's resource version, so
                     // re-sync the state and try again.
                     *state = Self::get(self.api.clone(), &self.name).await?;
+                    #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+                    if let Some(diagnostics) = self.diagnostics.as_ref() {
+                        diagnostics.inspect(state.claim.clone(), state.meta.version.clone());
+                    }
                     continue;
                 }
 
@@ -261,6 +291,10 @@ impl LeaseManager {
                 claim: Some(claim.clone()),
                 meta,
             };
+            #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+            if let Some(diagnostics) = self.diagnostics.as_ref() {
+                diagnostics.inspect(state.claim.clone(), state.meta.version.clone());
+            }
 
             return Ok(claim);
         }
@@ -286,7 +320,7 @@ impl LeaseManager {
             return Ok(false);
         }
 
-        let _lease = self
+        let lease = self
             .patch(&kube_client::api::Patch::Strategic(serde_json::json!({
                 "apiVersion": "coordination.k8s.io/v1",
                 "kind": "Lease",
@@ -302,6 +336,14 @@ impl LeaseManager {
                 },
             })))
             .await?;
+
+        #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
+        if let Some(diagnostics) = self.diagnostics.as_ref() {
+            diagnostics.inspect(
+                None,
+                lease.metadata.resource_version.clone().unwrap_or_default(),
+            );
+        }
 
         Ok(true)
     }

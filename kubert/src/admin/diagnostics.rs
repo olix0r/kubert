@@ -2,14 +2,20 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use parking_lot::Mutex;
 use std::{net::SocketAddr, sync::Arc};
 
+#[cfg(feature = "lease")]
+mod lease;
 mod watch;
 
-pub(crate) use self::watch::WatchDiagnostics;
+#[cfg(feature = "lease")]
+pub(crate) use self::lease::LeaseDiagnostics;
+use self::watch::WatchDiagnostics;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Diagnostics {
     initial_time: chrono::DateTime<chrono::Utc>,
     watches: Arc<Mutex<Vec<watch::StateRef>>>,
+    #[cfg(feature = "lease")]
+    leases: Arc<Mutex<Vec<lease::StateRef>>>,
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
@@ -20,6 +26,10 @@ struct Summary {
 
     #[serde(skip_serializing_if = "Vec::is_empty")]
     watches: Vec<watch::WatchSummary>,
+
+    #[cfg(feature = "lease")]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    leases: Vec<lease::LeaseState>,
 }
 
 // === impl Diagnostics ===
@@ -29,6 +39,8 @@ impl Diagnostics {
         Self {
             initial_time: chrono::Utc::now(),
             watches: Default::default(),
+            #[cfg(feature = "lease")]
+            leases: Default::default(),
         }
     }
 
@@ -38,7 +50,7 @@ impl Diagnostics {
         label_selector: Option<&str>,
     ) -> WatchDiagnostics
     where
-        T: kube_client::Resource,
+        T: kube_core::Resource,
         T::DynamicType: Default,
     {
         let wd = WatchDiagnostics::new(api.resource_url(), label_selector);
@@ -65,10 +77,14 @@ impl Diagnostics {
 
         let with_resources = req.uri().query() == Some("resources");
         let watches = self.summarize_watches(with_resources);
+        #[cfg(feature = "lease")]
+        let leases = self.summarize_leases();
         let summary = Summary {
             initial_timestamp: Time(self.initial_time),
             current_timestamp: Time(chrono::Utc::now()),
             watches,
+            #[cfg(feature = "lease")]
+            leases,
         };
 
         let mut bytes = Vec::with_capacity(8 * 1024);
@@ -97,6 +113,28 @@ impl Diagnostics {
                 let watch = wref.upgrade()?;
                 let state = watch.read();
                 Some(state.summary(with_resources))
+            })
+            .collect()
+    }
+}
+
+#[cfg(feature = "lease")]
+impl Diagnostics {
+    pub(crate) fn register_lease(&self, params: &crate::LeaseParams) -> LeaseDiagnostics {
+        let ld = LeaseDiagnostics::new(params);
+        self.leases.lock().push(ld.weak());
+        ld
+    }
+
+    fn summarize_leases(&self) -> Vec<lease::LeaseState> {
+        let mut refs = self.leases.lock();
+        // Clean up any dead weak refs, i.e. of leases that have been dropped.
+        refs.retain(|w| w.upgrade().is_some());
+        refs.iter()
+            .filter_map(|wref| {
+                let lease = wref.upgrade()?;
+                let state = lease.read();
+                Some(state.clone())
             })
             .collect()
     }
