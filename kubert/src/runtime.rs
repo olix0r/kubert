@@ -1,5 +1,7 @@
 //! A controller runtime
 
+#[cfg(feature = "lease")]
+use crate::lease;
 #[cfg(feature = "server")]
 use crate::server::{self, ServerArgs};
 use crate::{
@@ -302,6 +304,39 @@ impl<S> Runtime<S> {
         let (tx, rx) = crate::requeue::channel(capacity);
         let rx = shutdown::CancelOnShutdown::new(self.shutdown_rx.clone(), rx);
         (tx, rx)
+    }
+
+    #[cfg(feature = "lease")]
+    #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "lease"))))]
+    /// Initializes and spawns a lease manager.
+    ///
+    /// The lease manager is used to acquire and renew leases for a given
+    /// claimant. The returned receiver is updated with the current lease
+    /// status, indicating whether the lease is currently held by the claimant.
+    pub async fn spawn_lease(
+        &self,
+        params: lease::LeaseParams,
+    ) -> Result<lease::Spawned, lease::Error> {
+        let lease::LeaseParams {
+            name,
+            namespace,
+            field_manager,
+            claimant,
+            lease_duration,
+            renew_grace_period,
+        } = params;
+
+        let api = lease::Api::namespaced(self.client.clone(), &namespace);
+        let manager = lease::LeaseManager::init(api, name).await?;
+        let manager = field_manager
+            .into_iter()
+            .fold(manager, |m, fm| m.with_field_manager(fm));
+
+        let params = lease::ClaimParams {
+            lease_duration,
+            renew_grace_period,
+        };
+        manager.spawn(claimant, params).await
     }
 
     /// Creates a watch with the given [`Api`]

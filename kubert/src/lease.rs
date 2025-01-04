@@ -21,6 +21,30 @@ pub struct LeaseManager {
     state: tokio::sync::Mutex<State>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
+/// Configures a Lease.
+pub struct LeaseParams {
+    /// Lease name.
+    pub name: String,
+
+    /// Lease namespace.
+    pub namespace: String,
+
+    /// The identity of the claimant.
+    pub claimant: String,
+
+    /// The duration of the lease
+    pub lease_duration: Duration,
+
+    /// The amount of time before the lease expiration that the lease holder
+    /// should renew the lease
+    pub renew_grace_period: Duration,
+
+    /// The field manager used when updating the Lease.
+    pub field_manager: Option<Cow<'static, str>>,
+}
+
 /// Configuration used when obtaining a lease.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
@@ -77,9 +101,9 @@ struct Meta {
     transitions: u16,
 }
 
-type Api = kube_client::Api<coordv1::Lease>;
+pub(crate) type Api = kube_client::Api<coordv1::Lease>;
 
-type Spawned = (
+pub(crate) type Spawned = (
     tokio::sync::watch::Receiver<Arc<Claim>>,
     tokio::task::JoinHandle<Result<(), Error>>,
 );
@@ -195,14 +219,17 @@ impl LeaseManager {
 
                     let (claim, meta) = match self.renew(&state.meta, claimant, params).await {
                         Ok(renew) => renew,
+
                         Err(e) if Self::is_conflict(&e) => {
                             // Another process updated the claim's resource version, so
                             // re-sync the state and try again.
                             *state = Self::get(self.api.clone(), &self.name).await?;
                             continue;
                         }
+
                         Err(e) => return Err(e),
                     };
+
                     *state = State {
                         claim: Some(claim.clone()),
                         meta,
@@ -219,18 +246,22 @@ impl LeaseManager {
             // There's no current claim, so try to acquire it.
             let (claim, meta) = match self.acquire(&state.meta, claimant, params).await {
                 Ok(acquire) => acquire,
+
                 Err(e) if Self::is_conflict(&e) => {
                     // Another process updated the claim's resource version, so
                     // re-sync the state and try again.
                     *state = Self::get(self.api.clone(), &self.name).await?;
                     continue;
                 }
+
                 Err(e) => return Err(e),
             };
+
             *state = State {
                 claim: Some(claim.clone()),
                 meta,
             };
+
             return Ok(claim);
         }
     }
@@ -242,32 +273,37 @@ impl LeaseManager {
     /// can potentially claim the lease before the prior lease duration expires.
     pub async fn vacate(&self, claimant: &str) -> Result<bool, Error> {
         let mut state = self.state.lock().await;
-        if let Some(claim) = state.claim.take() {
-            if claim.is_current() {
-                if claim.holder == claimant {
-                    self.patch(&kube_client::api::Patch::Strategic(serde_json::json!({
-                        "apiVersion": "coordination.k8s.io/v1",
-                        "kind": "Lease",
-                        "metadata": {
-                            "resourceVersion": state.meta.version,
-                        },
-                        "spec": {
-                            "acquireTime": Option::<()>::None,
-                            "renewTime": Option::<()>::None,
-                            "holderIdentity": Option::<()>::None,
-                            "leaseDurationSeconds": Option::<()>::None,
-                            // leaseTransitions is preserved by strategic patch
-                        },
-                    })))
-                    .await?;
-                    return Ok(true);
-                } else {
-                    state.claim = Some(claim);
-                }
-            }
+        let Some(claim) = state.claim.take() else {
+            return Ok(false);
+        };
+
+        if !claim.is_current() {
+            return Ok(false);
         }
 
-        Ok(false)
+        if claim.holder != claimant {
+            state.claim = Some(claim);
+            return Ok(false);
+        }
+
+        let _lease = self
+            .patch(&kube_client::api::Patch::Strategic(serde_json::json!({
+                "apiVersion": "coordination.k8s.io/v1",
+                "kind": "Lease",
+                "metadata": {
+                    "resourceVersion": state.meta.version,
+                },
+                "spec": {
+                    "acquireTime": Option::<()>::None,
+                    "renewTime": Option::<()>::None,
+                    "holderIdentity": Option::<()>::None,
+                    "leaseDurationSeconds": Option::<()>::None,
+                    // leaseTransitions is preserved by strategic patch
+                },
+            })))
+            .await?;
+
+        Ok(true)
     }
 
     /// Spawn a task that ensures the lease is claimed.

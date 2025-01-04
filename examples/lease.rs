@@ -198,19 +198,19 @@ async fn main() -> Result<()> {
                 .with_admin(admin.into_builder().with_prometheus(prom))
                 .build()
                 .await?;
-            let api = kube::Api::namespaced(rt.client(), &namespace);
             let shutdown = rt.shutdown_handle();
-            run(rt, async move {
-                let params = kubert::lease::ClaimParams {
+            let (mut claims, task) = rt
+                .spawn_lease(kubert::LeaseParams {
+                    name,
+                    namespace,
+                    field_manager: Some(field_manager.into()),
+                    claimant: identity.clone(),
                     lease_duration,
                     renew_grace_period,
-                };
-
-                let lease = kubert::LeaseManager::init(api, name)
-                    .await?
-                    .with_field_manager(field_manager);
+                })
+                .await?;
+            run(rt, async move {
                 let mut claimed = false;
-                let (mut claims, task) = lease.spawn(&identity, params).await?;
                 loop {
                     claimed = {
                         let claim = claims.borrow_and_update();
