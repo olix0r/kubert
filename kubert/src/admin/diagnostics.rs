@@ -8,13 +8,14 @@ mod watch;
 
 #[cfg(feature = "lease")]
 pub(crate) use self::lease::LeaseDiagnostics;
-pub(crate) use self::watch::WatchDiagnostics;
+use self::watch::WatchDiagnostics;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Diagnostics {
     initial_time: chrono::DateTime<chrono::Utc>,
-    leases: Arc<Mutex<Vec<lease::StateRef>>>,
     watches: Arc<Mutex<Vec<watch::StateRef>>>,
+    #[cfg(feature = "lease")]
+    leases: Arc<Mutex<Vec<lease::StateRef>>>,
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
@@ -38,7 +39,23 @@ impl Diagnostics {
         Self {
             initial_time: chrono::Utc::now(),
             watches: Default::default(),
+            #[cfg(feature = "lease")]
+            leases: Default::default(),
         }
+    }
+
+    pub(crate) fn register_watch<T>(
+        &self,
+        api: &kube_client::Api<T>,
+        label_selector: Option<&str>,
+    ) -> WatchDiagnostics
+    where
+        T: kube_core::Resource,
+        T::DynamicType: Default,
+    {
+        let wd = WatchDiagnostics::new(api.resource_url(), label_selector);
+        self.watches.lock().push(wd.weak());
+        wd
     }
 
     pub(super) fn handle(&self, client_addr: SocketAddr, req: super::Request) -> super::Response {
@@ -60,11 +77,13 @@ impl Diagnostics {
 
         let with_resources = req.uri().query() == Some("resources");
         let watches = self.summarize_watches(with_resources);
+        #[cfg(feature = "lease")]
         let leases = self.summarize_leases();
         let summary = Summary {
             initial_timestamp: Time(self.initial_time),
             current_timestamp: Time(chrono::Utc::now()),
             watches,
+            #[cfg(feature = "lease")]
             leases,
         };
 
@@ -96,6 +115,15 @@ impl Diagnostics {
                 Some(state.summary(with_resources))
             })
             .collect()
+    }
+}
+
+#[cfg(feature = "lease")]
+impl Diagnostics {
+    pub(crate) fn register_lease(&self, params: &crate::LeaseParams) -> LeaseDiagnostics {
+        let ld = LeaseDiagnostics::new(params);
+        self.leases.lock().push(ld.weak());
+        ld
     }
 
     fn summarize_leases(&self) -> Vec<lease::LeaseState> {

@@ -106,7 +106,10 @@ runtime = [
     "tracing",
 ]
 runtime-diagnostics = [
+    "chrono",
     "runtime",
+    "serde",
+    "serde_json",
     "dep:k8s-openapi",
     "dep:parking_lot",
     "dep:sha2",
