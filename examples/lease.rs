@@ -203,7 +203,7 @@ async fn main() -> Result<()> {
                 .spawn_lease(kubert::LeaseParams {
                     name,
                     namespace,
-                    field_manager: Some(std::borrow::Cow::Owned(field_manager)),
+                    field_manager: Some(field_manager.into()),
                     claimant: identity.clone(),
                     lease_duration,
                     renew_grace_period,
