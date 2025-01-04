@@ -15,25 +15,30 @@ pub(super) struct LeaseState {
     name: String,
     namespace: String,
     claimant: String,
+    field_manager: Cow<'static, str>,
     lease_duration_seconds: f64,
     renew_grace_period_seconds: f64,
-    field_manager: Cow<'static, str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    claim: Option<crate::lease::Claim>,
+    #[serde(flatten)]
+    stats: LeaseStats,
     #[serde(skip_serializing_if = "Option::is_none")]
     resource_version: Option<String>,
-    stats: LeaseStats,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    current: Option<Claim>,
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct LeaseStats {
-    creation_timestamp: Time,
-
     updates: u64,
-
+    creation_timestamp: Time,
     #[serde(skip_serializing_if = "Option::is_none")]
     last_update_timestamp: Option<Time>,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+struct Claim {
+    holder: String,
+    expiry: Time,
 }
 
 // === impl LeaseDiagnostics ===
@@ -59,7 +64,7 @@ impl LeaseDiagnostics {
             field_manager: field_manager.clone().unwrap_or(Cow::Borrowed(
                 crate::lease::LeaseManager::DEFAULT_FIELD_MANAGER,
             )),
-            claim: None,
+            current: None,
             resource_version: None,
             stats: LeaseStats {
                 creation_timestamp: now,
@@ -79,13 +84,20 @@ impl LeaseDiagnostics {
         resource_version: String,
     ) {
         let mut state = self.0.write();
-        if claim.as_deref() == state.claim.as_ref()
+        if state.current.as_ref().map(|c| (&c.holder, c.expiry.0))
+            == claim.as_deref().map(|c| (&c.holder, c.expiry))
             && Some(&*resource_version) == state.resource_version.as_deref()
         {
             return;
         }
         let now = Time(chrono::Utc::now());
-        state.claim = claim.as_deref().cloned();
+        state.current = claim
+            .as_deref()
+            .cloned()
+            .map(|crate::lease::Claim { holder, expiry }| Claim {
+                holder,
+                expiry: Time(expiry),
+            });
         state.resource_version = Some(resource_version);
         state.stats.updates += 1;
         state.stats.last_update_timestamp = Some(now);

@@ -65,7 +65,6 @@ pub struct ClaimParams {
 
 /// Describes the state of a lease
 #[derive(Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "runtime-diagnostics", derive(serde::Serialize))]
 #[cfg_attr(docsrs, doc(cfg(feature = "lease")))]
 pub struct Claim {
     /// The identity of the claim holder.
