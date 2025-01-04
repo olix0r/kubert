@@ -61,8 +61,8 @@ index = [
     "futures-util",
     "kube-core",
     "kube-runtime",
-    "parking_lot",
     "tracing",
+    "dep:parking_lot",
 ]
 initialized = ["futures-core", "futures-util", "pin-project-lite", "tokio/sync"]
 lease = [
@@ -105,7 +105,12 @@ runtime = [
     "thiserror",
     "tracing",
 ]
-runtime-diagnostics = ["dep:k8s-openapi"]
+runtime-diagnostics = [
+    "runtime",
+    "dep:k8s-openapi",
+    "dep:parking_lot",
+    "dep:sha2",
+]
 runtime-brotli = ["admin-brotli", "client-brotli"]
 runtime-gzip = ["admin-gzip", "client-gzip"]
 runtime-compression = ["admin-compression", "client-decompression"]
@@ -154,6 +159,7 @@ features = [
     "prometheus-client",
     "requeue",
     "runtime",
+    "runtime-diagnostics",
     "server",
     "shutdown",
     "k8s-openapi/latest",
@@ -183,6 +189,7 @@ prometheus-client = { workspace = true, optional = true }
 rustls-pemfile = { version = "2", optional = true }
 serde = { version = "1", optional = true }
 serde_json = { version = "1", optional = true }
+sha2 = { version = "0.10", optional = true }
 thiserror = { version = "2", optional = true }
 tokio = { workspace = true, optional = false, default-features = false }
 tokio-rustls = { version = "0.26.1", optional = true, default-features = false }
