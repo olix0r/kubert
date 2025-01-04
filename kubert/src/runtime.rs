@@ -308,14 +308,17 @@ impl<S> Runtime<S> {
 
     #[cfg(feature = "lease")]
     #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "lease"))))]
-    /// Spawns a lease.
+    /// Initializes and spawns a lease manager.
+    ///
+    /// The lease manager is used to acquire and renew leases for a given
+    /// claimant. The returned receiver is updated with the current lease
+    /// status, indicating whether the lease is currently held by the claimant.
     pub async fn spawn_lease(
         &self,
         params: lease::LeaseParams,
     ) -> Result<lease::Spawned, lease::Error> {
         #[cfg(feature = "runtime-diagnostics")]
         let diagnostics = self.admin.diagnostics().register_lease(&params);
-
         let lease::LeaseParams {
             name,
             namespace,
@@ -325,14 +328,11 @@ impl<S> Runtime<S> {
             renew_grace_period,
         } = params;
 
-        let manager = {
-            let api = lease::Api::namespaced(self.client.clone(), &namespace);
-            lease::LeaseManager::init(api, name).await?
-        };
+        let api = lease::Api::namespaced(self.client.clone(), &namespace);
+        let manager = lease::LeaseManager::init(api, name).await?;
         let manager = field_manager
             .into_iter()
             .fold(manager, |m, fm| m.with_field_manager(fm));
-
         #[cfg(feature = "runtime-diagnostics")]
         let manager = manager.with_diagnostics(diagnostics);
 
