@@ -18,6 +18,7 @@ pub(super) struct WatchState {
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(super) struct WatchSummary {
     api_url: String,
     label_selector: String,
@@ -30,6 +31,7 @@ pub(super) struct WatchSummary {
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct WatchStats {
     creation_timestamp: Time,
 
@@ -51,21 +53,14 @@ struct WatchStats {
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct WatchError {
     message: String,
     timestamp: Time,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-struct ObjRef {
-    kind: String,
-    api_version: String,
-    namespace: Option<String>,
-    name: Option<String>,
-    uid: Option<String>,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Resource {
     creation_timestamp: Option<Time>,
     uid: String,
@@ -73,6 +68,16 @@ struct Resource {
     namespace: String,
     generation: Option<i64>,
     resource_version: String,
+}
+
+/// Map key for resources.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct ObjRef {
+    kind: String,
+    api_version: String,
+    namespace: Option<String>,
+    name: Option<String>,
+    uid: Option<String>,
 }
 
 // === impl WatchDiagnostics ===

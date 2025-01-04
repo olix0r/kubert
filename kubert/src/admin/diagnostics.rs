@@ -13,6 +13,7 @@ pub(crate) struct Diagnostics {
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct Summary {
     initial_timestamp: Time,
     current_timestamp: Time,
