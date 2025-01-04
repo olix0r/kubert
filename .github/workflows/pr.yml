@@ -197,7 +197,9 @@ jobs:
           - prometheus-client
           - requeue
           - runtime
-          - runtime,runtime-diagnostics,prometheus-client
+          - runtime,lease
+          - runtime,runtime-diagnostics
+          - runtime,runtime-diagnostics,lease,prometheus-client
           - server
           - server,rustls-tls
           - server,openssl-tls
