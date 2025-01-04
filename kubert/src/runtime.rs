@@ -507,8 +507,6 @@ impl<S> Runtime<S> {
             shutdown_rx: self.shutdown_rx,
             shutdown: self.shutdown,
             metrics: self.metrics,
-            #[cfg(feature = "runtime-diagnostics")]
-            diagnostics: self.diagnostics,
         })
     }
 
@@ -524,8 +522,6 @@ impl<S> Runtime<S> {
             shutdown_rx: self.shutdown_rx,
             shutdown: self.shutdown,
             metrics: self.metrics,
-            #[cfg(feature = "runtime-diagnostics")]
-            diagnostics: self.diagnostics,
         }
     }
 }
