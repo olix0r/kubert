@@ -17,7 +17,9 @@ use tracing::{debug, info_span, Instrument};
 mod diagnostics;
 
 #[cfg(feature = "runtime-diagnostics")]
-pub(crate) use self::diagnostics::{Diagnostics, LeaseDiagnostics};
+pub(crate) use self::diagnostics::Diagnostics;
+#[cfg(all(feature = "runtime-diagnostics", feature = "lease"))]
+pub(crate) use self::diagnostics::LeaseDiagnostics;
 
 /// An error binding an admin server.
 #[derive(Debug, thiserror::Error)]
