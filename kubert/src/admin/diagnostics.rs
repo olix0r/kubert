@@ -16,7 +16,7 @@ pub(crate) struct Diagnostics {
 pub(crate) struct WatchDiagnostics(Arc<RwLock<WatchState>>);
 
 #[derive(Clone, Debug)]
-pub(super) struct WatchState {
+struct WatchState {
     api_url: String,
     label_selector: String,
     stats: WatchStats,
@@ -25,9 +25,11 @@ pub(super) struct WatchState {
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
-pub(super) struct Summary {
+struct Summary {
     initial_timestamp: Time,
     current_timestamp: Time,
+
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     watches: Vec<WatchSummary>,
 }
 
