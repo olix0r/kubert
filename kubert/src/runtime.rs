@@ -433,7 +433,16 @@ impl<S> Runtime<S> {
         T: Resource + DeserializeOwned + Clone + Debug + Send + 'static,
         T::DynamicType: Default,
     {
+        #[cfg(feature = "runtime-diagnostics")]
+        let diagnostics = self
+            .admin
+            .diagnostics()
+            .register_watch(&api, watcher_config.label_selector.as_deref());
+
         let watch = watcher::watcher(api, watcher_config);
+
+        #[cfg(feature = "runtime-diagnostics")]
+        let watch = futures_util::StreamExt::inspect(watch, move |ev| diagnostics.inspect(ev));
 
         #[cfg(feature = "prometheus-client")]
         let watch = metrics::ResourceWatchMetrics::instrument_watch(
