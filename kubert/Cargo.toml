@@ -61,8 +61,8 @@ index = [
     "futures-util",
     "kube-core",
     "kube-runtime",
-    "dep:parking_lot",
     "tracing",
+    "dep:parking_lot",
 ]
 initialized = ["futures-core", "futures-util", "pin-project-lite", "tokio/sync"]
 lease = [
@@ -106,9 +106,9 @@ runtime = [
     "tracing",
 ]
 runtime-diagnostics = [
+    "runtime",
     "dep:k8s-openapi",
     "dep:parking_lot",
-    "runtime",
     "dep:sha2",
 ]
 runtime-brotli = ["admin-brotli", "client-brotli"]

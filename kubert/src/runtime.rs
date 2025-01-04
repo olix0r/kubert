@@ -161,7 +161,6 @@ impl<S> Builder<S> {
         self.log.unwrap_or_default().try_init()?;
         let client = mk_client(self.client.unwrap_or_default()).await?;
         let (shutdown, shutdown_rx) = shutdown::sigint_or_sigterm()?;
-
         let admin = self.admin.bind()?;
         Ok(Runtime {
             client,
