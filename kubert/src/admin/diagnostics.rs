@@ -84,10 +84,11 @@ struct ObjRef {
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize)]
 struct Resource {
     creation_timestamp: Option<Time>,
+    uid: String,
     name: String,
     namespace: String,
+    generation: Option<i64>,
     resource_version: String,
-    uid: String,
 }
 
 // === impl Diagnostics ===
@@ -219,35 +220,40 @@ impl WatchDiagnostics {
         T: kube_client::Resource,
         T::DynamicType: Default,
     {
-        let obj_ref = |meta: &ObjectMeta| ObjRef {
+        let to_key = |meta: &ObjectMeta| ObjRef {
             kind: T::kind(&Default::default()).to_string(),
             api_version: T::api_version(&Default::default()).to_string(),
             namespace: meta.namespace.clone(),
             name: meta.name.clone(),
             uid: meta.uid.clone(),
         };
-        let prep_meta = |meta: &ObjectMeta| Resource {
+
+        // We store a summarized version fo resources to avoid storing, for
+        // example, all state for a cluster. We store only the metadata that we
+        // can use to establish a comparison between multiple controller
+        // instances and the kubernets API state.
+        let to_resource = |meta: &ObjectMeta| Resource {
             creation_timestamp: meta.creation_timestamp.clone(),
             name: meta.name.clone().unwrap_or_default(),
             namespace: meta.namespace.clone().unwrap_or_default(),
             resource_version: meta.resource_version.clone().unwrap_or_default(),
+            generation: meta.generation,
             uid: meta.uid.clone().unwrap_or_default(),
         };
 
+        let now = Time(chrono::Utc::now());
         let WatchState {
             ref mut known,
             ref mut resetting,
             ref mut stats,
             ..
         } = *self.0.write();
-        let now = Time(chrono::Utc::now());
-
         match event {
             Ok(watcher::Event::Init) => {
                 resetting.clear();
             }
             Ok(watcher::Event::InitApply(res)) => {
-                resetting.insert(obj_ref(res.meta()), prep_meta(res.meta()));
+                resetting.insert(to_key(res.meta()), to_resource(res.meta()));
             }
             Ok(watcher::Event::InitDone) => {
                 std::mem::swap(known, resetting);
@@ -255,12 +261,12 @@ impl WatchDiagnostics {
                 stats.last_reset_timestamp = Some(now);
             }
             Ok(watcher::Event::Apply(res)) => {
-                known.insert(obj_ref(res.meta()), prep_meta(res.meta()));
+                known.insert(to_key(res.meta()), to_resource(res.meta()));
                 stats.applies += 1;
                 stats.last_apply_timestamp = Some(now);
             }
             Ok(watcher::Event::Delete(res)) => {
-                known.remove(&obj_ref(res.meta()));
+                known.remove(&to_key(res.meta()));
                 stats.deletes += 1;
                 stats.last_delete_timestamp = Some(now);
             }
