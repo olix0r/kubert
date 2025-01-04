@@ -13,12 +13,16 @@ use std::{
 };
 use tracing::{debug, info_span, Instrument};
 
-#[cfg(feature = "runtime-diagnostics")]
+#[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
 mod diagnostics;
 
-#[cfg(feature = "runtime-diagnostics")]
+#[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
 pub(crate) use self::diagnostics::Diagnostics;
-#[cfg(all(feature = "runtime-diagnostics", feature = "lease"))]
+#[cfg(all(
+    feature = "runtime",
+    feature = "runtime-diagnostics",
+    feature = "lease"
+))]
 pub(crate) use self::diagnostics::LeaseDiagnostics;
 
 /// An error binding an admin server.
@@ -52,7 +56,7 @@ pub struct Builder {
     addr: SocketAddr,
     ready: Readiness,
     routes: AHashMap<String, HandlerFn>,
-    #[cfg(feature = "runtime-diagnostics")]
+    #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
     diagnostics: Diagnostics,
 }
 
@@ -64,7 +68,7 @@ pub struct Bound {
     listener: tokio::net::TcpListener,
     server: hyper::server::conn::http1::Builder,
     routes: AHashMap<String, HandlerFn>,
-    #[cfg(feature = "runtime-diagnostics")]
+    #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
     diagnostics: Diagnostics,
 }
 
@@ -122,7 +126,7 @@ impl Builder {
             addr,
             ready: Readiness(Arc::new(false.into())),
             routes: Default::default(),
-            #[cfg(feature = "runtime-diagnostics")]
+            #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
             diagnostics: Diagnostics::new(),
         }
     }
@@ -218,7 +222,7 @@ impl Builder {
             addr,
             ready,
             routes,
-            #[cfg(feature = "runtime-diagnostics")]
+            #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
             diagnostics,
         } = self;
 
@@ -242,7 +246,7 @@ impl Builder {
             server,
             listener,
             routes,
-            #[cfg(feature = "runtime-diagnostics")]
+            #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
             diagnostics,
         })
     }
@@ -278,14 +282,14 @@ impl Bound {
             listener,
             routes,
             addr,
-            #[cfg(feature = "runtime-diagnostics")]
+            #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
             diagnostics,
         } = self;
 
         let task = tokio::spawn({
             let ready = ready.clone();
             let routes = Arc::new(routes);
-            #[cfg(feature = "runtime-diagnostics")]
+            #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
             let diagnostics = diagnostics.clone();
             async move {
                 loop {
@@ -305,14 +309,14 @@ impl Bound {
                         use tower::ServiceExt;
                         let ready = ready.clone();
                         let routes = routes.clone();
-                        #[cfg(feature = "runtime-diagnostics")]
+                        #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
                         let diagnostics = diagnostics.clone();
                         let svc = tower::service_fn(move |req: Request| {
                             handle(
                                 &ready,
                                 &routes,
                                 req,
-                                #[cfg(feature = "runtime-diagnostics")]
+                                #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
                                 (client_addr, &diagnostics),
                             )
                         });
@@ -340,7 +344,7 @@ impl Bound {
         Server { task, addr, ready }
     }
 
-    #[cfg(feature = "runtime-diagnostics")]
+    #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
     pub(crate) fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
@@ -385,7 +389,7 @@ fn handle(
     ready: &Readiness,
     routes: &Arc<AHashMap<String, HandlerFn>>,
     req: Request,
-    #[cfg(feature = "runtime-diagnostics")] (client_addr, diagnostics): (
+    #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))] (client_addr, diagnostics): (
         std::net::SocketAddr,
         &Diagnostics,
     ),
@@ -398,7 +402,7 @@ fn handle(
         return Box::pin(future::ok(handle_ready(ready, req)));
     }
 
-    #[cfg(feature = "runtime-diagnostics")]
+    #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
     if req.uri().path() == "/kubert.json" {
         return Box::pin(future::ok(diagnostics.handle(client_addr, req)));
     }

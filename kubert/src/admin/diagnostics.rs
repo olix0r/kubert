@@ -46,7 +46,7 @@ impl Diagnostics {
 
     pub(crate) fn register_watch<T>(
         &self,
-        api: &kube_client::Api<T>,
+        api: &crate::runtime::Api<T>,
         label_selector: Option<&str>,
     ) -> WatchDiagnostics
     where
