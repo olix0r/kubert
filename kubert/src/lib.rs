@@ -131,7 +131,7 @@ pub use self::client::ClientArgs;
 pub use self::initialized::Initialized;
 
 #[cfg(feature = "lease")]
-pub use self::lease::LeaseManager;
+pub use self::lease::{LeaseManager, LeaseParams};
 
 #[cfg(feature = "log")]
 pub use self::log::{LogFilter, LogFormat, LogInitError};
