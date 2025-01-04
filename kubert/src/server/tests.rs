@@ -30,11 +30,22 @@ fn gen_keys() -> (TempDir, TlsPaths) {
     (dir, TlsPaths { key, certs })
 }
 
+#[cfg(feature = "rustls-tls")]
 #[tokio::test]
-async fn load_tls() {
+async fn load_tls_rustls() {
     let (_tempdir, TlsPaths { key, certs }) = gen_keys();
-    match super::tls::load_tls(&key, &certs).await {
-        Ok(_) => eprintln!("load_tls: success!"),
+    match super::tls_rustls::load_tls(&key, &certs).await {
+        Ok(_) => println!("load_tls: success!"),
+        Err(error) => panic!("load_tls failed! {error}"),
+    }
+}
+
+#[cfg(feature = "openssl-tls")]
+#[tokio::test]
+async fn load_tls_openssl() {
+    let (_tempdir, TlsPaths { key, certs }) = gen_keys();
+    match super::tls_openssl::load_tls(&key, &certs).await {
+        Ok(_) => println!("load_tls: success!"),
         Err(error) => panic!("load_tls failed! {error}"),
     }
 }

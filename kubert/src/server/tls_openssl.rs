@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "rustls-tls", allow(dead_code))]
+
 use super::*;
 use once_cell::sync::Lazy;
 use openssl::{
@@ -37,13 +39,8 @@ pub(in crate::server) async fn load_tls(
     pk: &TlsKeyPath,
     crts: &TlsCertPath,
 ) -> Result<TlsAcceptor, Error> {
-    let key = pk
-        .load_private_key()
-        .await
-        .map_err(Error::TlsKeyReadError)?;
-
-    let certs = crts.load_certs().await.map_err(Error::TlsCertsReadError)?;
-
+    let key = load_private_key(pk).await.map_err(Error::TlsKeyReadError)?;
+    let certs = load_certs(crts).await.map_err(Error::TlsCertsReadError)?;
     configure(key, certs).map_err(|error| Error::InvalidTlsCredentials(Box::new(error)))
 }
 
@@ -95,33 +92,20 @@ static ALPN_PROTOCOLS: Lazy<Vec<u8>> = Lazy::new(|| {
     bytes
 });
 
-// === impl TlsCertPath ===
-
-impl TlsCertPath {
-    // Load public certificate from file
-    async fn load_certs(&self) -> std::io::Result<Vec<X509>> {
-        // Open certificate file.
-        let pem = tokio::fs::read(&self.0).await?;
-
-        // Load and return certificate.
-        let certs = X509::stack_from_pem(&pem)?;
-        Ok(certs)
-    }
+async fn load_certs(TlsCertPath(cp): &TlsCertPath) -> std::io::Result<Vec<X509>> {
+    let pem = tokio::fs::read(cp).await?;
+    let certs = X509::stack_from_pem(&pem)?;
+    Ok(certs)
 }
 
-// === impl TlsKeyPath ===
+async fn load_private_key(TlsKeyPath(kp): &TlsKeyPath) -> std::io::Result<PKey<Private>> {
+    let pem = tokio::fs::read(kp).await?;
 
-impl TlsKeyPath {
-    async fn load_private_key(&self) -> std::io::Result<PKey<Private>> {
-        // Open keyfile.
-        let pem = tokio::fs::read(&self.0).await?;
-
-        // Load and return a single private key. The keyfile should be
-        // PEM-encoded.
-        // TODO(eliza): Potentially, we may want to support both PEM-encoded and
-        // DER-encoded keyfiles, and decide whether to use
-        // `PKey::private_key_from_pem` or `PKey::private_key_from_pkcs8` based
-        // on the filename extension.
-        Ok(PKey::private_key_from_pem(&pem)?)
-    }
+    // Load and return a single private key. The keyfile should be
+    // PEM-encoded.
+    // TODO(eliza): Potentially, we may want to support both PEM-encoded and
+    // DER-encoded keyfiles, and decide whether to use
+    // `PKey::private_key_from_pem` or `PKey::private_key_from_pkcs8` based
+    // on the filename extension.
+    Ok(PKey::private_key_from_pem(&pem)?)
 }
