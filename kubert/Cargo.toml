@@ -11,114 +11,122 @@ keywords = ["kubernetes", "client", "runtime", "server"]
 
 [features]
 rustls-tls = [
-    "tokio-rustls",
-    "rustls-pemfile",
+    "dep:rustls-pemfile",
+    "dep:tokio-rustls",
     "kube-client?/rustls-tls",
 ]
 openssl-tls = [
-    "openssl",
-    "hyper-openssl",
-    "tokio-openssl",
-    "once_cell",
+    "dep:hyper-openssl",
+    "dep:once_cell",
+    "dep:openssl",
+    "dep:tokio-openssl",
     "kube-client?/openssl-tls",
 ]
 admin = [
-    "ahash",
-    "bytes",
-    "futures-util",
-    "http-body-util",
+    "dep:ahash",
+    "dep:bytes",
+    "dep:futures-util",
+    "dep:http-body-util",
+    "dep:tracing",
     "hyper/http1",
     "hyper/server",
     "hyper-util/server",
     "tokio/sync",
-    "tracing",
 ]
 admin-brotli = ["tower-http/compression-br"]
 admin-gzip = ["tower-http/compression-gzip"]
 admin-compression = ["admin-brotli", "admin-gzip"]
 client = [
-    "bytes",
-    "kube-client",
-    "thiserror",
-    "tower",
+    "dep:bytes",
+    "dep:hyper",
+    "dep:kube-client",
+    "dep:thiserror",
+    "dep:tower",
     "tower/util",
     "tower-http/map-response-body",
-    "hyper",
 ]
 client-brotli = ["tower-http/decompression-br"]
 client-gzip = ["tower-http/decompression-gzip"]
 client-decompression = ["client-brotli", "client-gzip"]
 errors = [
-    "futures-core",
-    "futures-util",
-    "pin-project-lite",
+    "dep:futures-core",
+    "dep:futures-util",
+    "dep:pin-project-lite",
+    "dep:tracing",
     "tokio/time",
-    "tracing",
 ]
 index = [
-    "ahash",
-    "futures-core",
-    "futures-util",
-    "kube-core",
-    "kube-runtime",
-    "tracing",
+    "dep:ahash",
+    "dep:futures-core",
+    "dep:futures-util",
+    "dep:kube-core",
+    "dep:kube-runtime",
+    "dep:tracing",
     "dep:parking_lot",
 ]
-initialized = ["futures-core", "futures-util", "pin-project-lite", "tokio/sync"]
-lease = [
-    "backoff",
-    "chrono",
-    "futures-util",
-    "hyper",
-    "dep:k8s-openapi",
-    "kube-client",
-    "kube-core",
-    "serde",
-    "serde_json",
-    "thiserror",
+initialized = [
+    "dep:futures-core",
+    "dep:futures-util",
+    "dep:pin-project-lite",
     "tokio/sync",
-    "tracing",
 ]
-log = ["thiserror", "tracing", "tracing-subscriber"]
+lease = [
+    "dep:backoff",
+    "dep:chrono",
+    "dep:futures-util",
+    "dep:hyper",
+    "dep:k8s-openapi",
+    "dep:kube-client",
+    "dep:kube-core",
+    "dep:serde",
+    "dep:serde_json",
+    "dep:thiserror",
+    "dep:tracing",
+    "tokio/sync",
+]
+log = ["dep:thiserror", "dep:tracing", "dep:tracing-subscriber"]
 prometheus-client = [
-    "dep:prometheus-client",
     "dep:kubert-prometheus-process",
     "dep:kubert-prometheus-tokio",
+    "dep:prometheus-client",
 ]
 requeue = [
-    "futures-core",
+    "dep:futures-core",
+    "dep:tracing",
     "tokio/macros",
     "tokio/sync",
     "tokio-util/time",
-    "tracing",
 ]
 runtime = [
+    "dep:kube-core",
+    "dep:kube-runtime",
+    "dep:serde",
+    "dep:thiserror",
+    "dep:tracing",
     "admin",
     "client",
     "errors",
     "initialized",
-    "kube-core",
-    "kube-runtime",
     "log",
-    "serde",
     "shutdown",
-    "thiserror",
-    "tracing",
 ]
 runtime-diagnostics = [
-    "chrono",
-    "runtime",
-    "serde",
-    "serde_json",
+    "dep:chrono",
+    "dep:serde_json",
     "dep:k8s-openapi",
     "dep:parking_lot",
     "dep:sha2",
+    "runtime",
 ]
 runtime-brotli = ["admin-brotli", "client-brotli"]
 runtime-gzip = ["admin-gzip", "client-gzip"]
 runtime-compression = ["admin-compression", "client-decompression"]
 server = [
-    "drain",
+    "dep:drain",
+    "dep:rustls-pemfile",
+    "dep:thiserror",
+    "dep:tower",
+    "dep:tracing",
     "hyper/http1",
     "hyper/http2",
     "hyper/server",
@@ -126,25 +134,21 @@ server = [
     "hyper-util/server-auto",
     "hyper-util/server-graceful",
     "hyper-util/service",
-    "rustls-pemfile",
-    "thiserror",
     "tokio/fs",
     "tokio/macros",
     "tokio/net",
     "tokio/rt",
-    "tower",
-    "tracing",
 ]
 server-brotli = ["tower-http/compression-br", "tower-http/decompression-br"]
 server-gzip = ["tower-http/compression-gzip", "tower-http/decompression-gzip"]
 server-compression = ["server-brotli", "server-gzip"]
 shutdown = [
-    "drain",
-    "futures-core",
+    "dep:drain",
+    "dep:futures-core",
+    "dep:thiserror",
+    "dep:tracing",
     "tokio/macros",
     "tokio/signal",
-    "thiserror",
-    "tracing",
 ]
 
 [package.metadata.docs.rs]

@@ -12,7 +12,7 @@ release = false
 [features]
 default = ["rustls-tls"]
 rustls-tls = ["kubert/rustls-tls"]
-openssl-tls = ["kubert/openssl-tls", "openssl"]
+openssl-tls = ["kubert/openssl-tls", "dep:openssl"]
 
 [dependencies.kubert]
 path = "../kubert"
