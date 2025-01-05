@@ -33,8 +33,11 @@ fetch:
 check *args:
     @just-cargo check --workspace --all-targets {{ _features }} {{ args }}
 
+clippy-all *args:
+    @just-cargo clippy --workspace --all-targets --all-features {{ args }}
+
 clippy *args:
-    @just-cargo clippy --workspace --all-targets {{ _features }} {{ args }}
+    @just-cargo clippy -p kubert --all-targets {{ _features }} {{ args }}
 
 doc:
     @just-cargo doc -p kubert --no-deps --all-features --features=k8s-openapi/latest
