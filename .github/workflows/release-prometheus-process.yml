@@ -18,7 +18,7 @@ permissions:
 
 jobs:
   cleanup:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: write
     steps:
@@ -29,8 +29,8 @@ jobs:
 
   meta:
     timeout-minutes: 5
-    runs-on: ubuntu-latest
-    container: ghcr.io/linkerd/dev:v44-rust
+    runs-on: ubuntu-24.04
+    container: ghcr.io/linkerd/dev:v45-rust
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - id: meta
@@ -62,7 +62,7 @@ jobs:
     permissions:
       contents: write
     timeout-minutes: 5
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - if: needs.meta.outputs.mode == 'release'
         uses: softprops/action-gh-release@7b4da11513bf3f43f9999e90eabced41ab8bb048
@@ -75,8 +75,8 @@ jobs:
     # Only publish the crate after the rest of the release succeeds.
     needs: [meta, release]
     timeout-minutes: 10
-    runs-on: ubuntu-latest
-    container: ghcr.io/linkerd/dev:v44-rust
+    runs-on: ubuntu-24.04
+    container: ghcr.io/linkerd/dev:v45-rust
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - run: cargo publish --package=kubert-prometheus-process --dry-run
