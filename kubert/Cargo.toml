@@ -27,6 +27,8 @@ admin = [
     "dep:bytes",
     "dep:futures-util",
     "dep:http-body-util",
+    "dep:thiserror",
+    "dep:tower",
     "dep:tracing",
     "hyper/http1",
     "hyper/server",
