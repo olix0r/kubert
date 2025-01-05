@@ -176,6 +176,7 @@ impl LeaseManager {
             name,
             field_manager: Self::DEFAULT_FIELD_MANAGER.into(),
             state: tokio::sync::Mutex::new(state),
+            #[cfg(all(feature = "runtime", feature = "runtime-diagnostics"))]
             diagnostics: None,
         })
     }
@@ -320,6 +321,10 @@ impl LeaseManager {
             return Ok(false);
         }
 
+        #[cfg_attr(
+            not(all(feature = "runtime", feature = "runtime-diagnostics")),
+            allow(unused_variables)
+        )]
         let lease = self
             .patch(&kube_client::api::Patch::Strategic(serde_json::json!({
                 "apiVersion": "coordination.k8s.io/v1",
