@@ -33,7 +33,9 @@ admin = [
     "hyper/http1",
     "hyper/server",
     "hyper-util/server",
+    "hyper-util/tokio",
     "tokio/sync",
+    "tower/util",
 ]
 admin-brotli = ["tower-http/compression-br"]
 admin-gzip = ["tower-http/compression-gzip"]
