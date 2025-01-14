@@ -1,6 +1,6 @@
 [package]
 name = "kubert"
-version = "0.23.0-alpha6"
+version = "0.23.0-alpha7"
 edition = "2021"
 license = "Apache-2.0"
 description = "Kubernetes runtime helpers. Based on kube-rs."
@@ -33,7 +33,9 @@ admin = [
     "hyper/http1",
     "hyper/server",
     "hyper-util/server",
+    "hyper-util/tokio",
     "tokio/sync",
+    "tower/util",
 ]
 admin-brotli = ["tower-http/compression-br"]
 admin-gzip = ["tower-http/compression-gzip"]
