@@ -363,7 +363,7 @@ impl Handle {
         //
         // Copyright 2018 Developers of the Rand project
         // Copyright (c) 2014 The Rust Project Developers
-        impl rand::distributions::Distribution<u8> for LowercaseAlphanumeric {
+        impl rand::distr::Distribution<u8> for LowercaseAlphanumeric {
             fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> u8 {
                 const RANGE: u32 = 26 + 10;
                 const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
@@ -376,7 +376,7 @@ impl Handle {
             }
         }
 
-        let suffix = rand::thread_rng()
+        let suffix = rand::rng()
             .sample_iter(&LowercaseAlphanumeric)
             .take(5)
             .map(char::from)
