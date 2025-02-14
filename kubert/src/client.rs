@@ -31,6 +31,13 @@ pub struct ClientArgs {
     /// Group to impersonate for Kubernetes operations
     #[cfg_attr(feature = "clap", clap(long = "as-group"))]
     pub impersonate_group: Option<String>,
+
+    /// The timeout for response headers from the Kubernetes API.
+    #[cfg_attr(feature = "clap", clap(
+        long = "kube-api-response-headers-timeout",
+        default_value_t = timeouts::ResponseHeaders::default(),
+    ))]
+    pub response_headers_timeout: timeouts::ResponseHeaders,
 }
 
 /// Indicates an error occurred while configuring the Kubernetes client
@@ -60,13 +67,17 @@ impl ClientArgs {
     /// This is basically equivalent to using `kube_client::Client::try_default`, except that it
     /// supports kubeconfig configuration from the command-line.
     pub async fn try_client(self) -> Result<Client, ConfigError> {
-        let client = match self.load_local_config().await {
-            Ok(client) => client,
+        let config = match self.load_local_config().await {
+            Ok(config) => config,
             Err(e) if self.is_customized() => return Err(e),
             Err(_) => Config::incluster()?,
         };
 
-        client.try_into().map_err(Into::into)
+        let client = kube_client::client::ClientBuilder::try_from(config)?
+            .with_layer(&timeouts::layer(self.response_headers_timeout))
+            .build();
+
+        Ok(client)
     }
 
     /// Indicates whether the command-line arguments attempt to customize the Kubernetes
@@ -115,5 +126,108 @@ impl ClientArgs {
         Config::from_custom_kubeconfig(kubeconfig, &options)
             .await
             .map_err(Into::into)
+    }
+}
+
+type BoxService = tower::util::BoxService<Request, Response, BoxError>;
+type Request = hyper::Request<kube_client::client::Body>;
+type Response = hyper::Response<BoxBody>;
+type BoxBody = Box<dyn hyper::body::Body<Data = bytes::Bytes, Error = BoxError> + Send + Unpin>;
+type BoxError = tower::BoxError;
+type BoxFuture = futures_util::future::BoxFuture<'static, Result<Response, BoxError>>;
+
+mod timeouts {
+    use super::{BoxError, BoxFuture, BoxService, Request, Response};
+    use kube_client::core::Duration as KubeDuration;
+    use std::task::{Context, Poll};
+    use tokio::time;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct ResponseHeaders(time::Duration);
+
+    #[derive(Debug, thiserror::Error)]
+    #[error("response headers timeout after {0:?}")]
+    pub struct ResponseHeadersTimeoutError(time::Duration);
+
+    #[derive(Debug)]
+    struct TimeoutService {
+        response_headers_timeout: time::Duration,
+        inner: BoxService,
+    }
+
+    pub fn layer(
+        ResponseHeaders(response_headers_timeout): ResponseHeaders,
+    ) -> impl tower::layer::Layer<BoxService, Service = BoxService> + Clone {
+        tower::layer::layer_fn(move |inner| {
+            BoxService::new(TimeoutService {
+                response_headers_timeout,
+                inner,
+            })
+        })
+    }
+
+    impl tower::Service<Request> for TimeoutService {
+        type Response = Response;
+        type Error = BoxError;
+        type Future = BoxFuture;
+
+        fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+            self.inner.poll_ready(cx).map_err(Into::into)
+        }
+
+        fn call(&mut self, req: Request) -> Self::Future {
+            let Self {
+                response_headers_timeout,
+                ref mut inner,
+            } = *self;
+            let call = time::timeout(response_headers_timeout, inner.call(req));
+            Box::pin(async move {
+                let rsp = call
+                    .await
+                    .map_err(|_| ResponseHeadersTimeoutError(response_headers_timeout))??;
+                // TODO request timeouts
+                Ok(rsp)
+            })
+        }
+    }
+
+    // === impl ResponseHeaders ===
+
+    impl ResponseHeaders {
+        // This default timeout is fairly arbitrary, but intended to be
+        // reasonably long enough that no legitimate API calls would be
+        // affected. The value of 9s is chose to differentiate it from other 10s
+        // timeouts in the system.
+        const DEFAULT: Self = Self(time::Duration::from_secs(9));
+    }
+
+    impl Default for ResponseHeaders {
+        fn default() -> Self {
+            Self::DEFAULT
+        }
+    }
+
+    impl std::str::FromStr for ResponseHeaders {
+        type Err = <KubeDuration as std::str::FromStr>::Err;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            Ok(Self(s.parse::<KubeDuration>()?.into()))
+        }
+    }
+
+    impl std::fmt::Display for ResponseHeaders {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            KubeDuration::from(self.0).fmt(f)
+        }
+    }
+
+    #[cfg(test)]
+    #[test]
+    fn response_headers_roundtrip() {
+        let orig = "2h3m4s5ms".parse::<ResponseHeaders>().expect("valid");
+        assert_eq!(
+            orig.to_string().parse::<ResponseHeaders>().expect("valid"),
+            orig,
+        );
     }
 }
