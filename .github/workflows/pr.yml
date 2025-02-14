@@ -47,6 +47,7 @@ jobs:
           files: |
             Cargo.toml
             kubert/**
+            kubert-examples/**
 
       - id: kubert-prometheus-process
         uses: tj-actions/changed-files@d6e91a2266cdb9d62096cebf1e8546899c6aa18f
