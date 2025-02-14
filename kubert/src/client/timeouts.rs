@@ -3,8 +3,9 @@ use kube_client::core::Duration as KubeDuration;
 use std::task::{Context, Poll};
 use tokio::time;
 
+/// A timeout for the response headers of an HTTP request.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ResponseHeaders(time::Duration);
+pub struct ResponseHeadersTimeout(time::Duration);
 
 #[derive(Debug, thiserror::Error)]
 #[error("response headers timeout after {0:?}")]
@@ -17,7 +18,7 @@ struct TimeoutService {
 }
 
 pub fn layer(
-    ResponseHeaders(response_headers_timeout): ResponseHeaders,
+    ResponseHeadersTimeout(response_headers_timeout): ResponseHeadersTimeout,
 ) -> impl tower::layer::Layer<BoxService, Service = BoxService> + Clone {
     tower::layer::layer_fn(move |inner| {
         BoxService::new(TimeoutService {
@@ -52,23 +53,22 @@ impl tower::Service<Request> for TimeoutService {
     }
 }
 
-// === impl ResponseHeaders ===
+// === impl ResponseHeadersTimeout ===
 
-impl ResponseHeaders {
-    // This default timeout is fairly arbitrary, but intended to be
-    // reasonably long enough that no legitimate API calls would be
-    // affected. The value of 9s is chose to differentiate it from other 10s
-    // timeouts in the system.
+impl ResponseHeadersTimeout {
+    // This default timeout is fairly arbitrary, but intended to be reasonably
+    // long enough that no legitimate API calls would be affected. The value of
+    // 9s is chosen to differentiate it from other 10s timeouts in the system.
     const DEFAULT: Self = Self(time::Duration::from_secs(9));
 }
 
-impl Default for ResponseHeaders {
+impl Default for ResponseHeadersTimeout {
     fn default() -> Self {
         Self::DEFAULT
     }
 }
 
-impl std::str::FromStr for ResponseHeaders {
+impl std::str::FromStr for ResponseHeadersTimeout {
     type Err = <KubeDuration as std::str::FromStr>::Err;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -76,7 +76,7 @@ impl std::str::FromStr for ResponseHeaders {
     }
 }
 
-impl std::fmt::Display for ResponseHeaders {
+impl std::fmt::Display for ResponseHeadersTimeout {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         KubeDuration::from(self.0).fmt(f)
     }
@@ -84,10 +84,14 @@ impl std::fmt::Display for ResponseHeaders {
 
 #[cfg(test)]
 #[test]
-fn response_headers_roundtrip() {
-    let orig = "2h3m4s5ms".parse::<ResponseHeaders>().expect("valid");
+fn response_headers_timeout_roundtrip() {
+    let orig = "2h3m4s5ms"
+        .parse::<ResponseHeadersTimeout>()
+        .expect("valid");
     assert_eq!(
-        orig.to_string().parse::<ResponseHeaders>().expect("valid"),
+        orig.to_string()
+            .parse::<ResponseHeadersTimeout>()
+            .expect("valid"),
         orig,
     );
 }

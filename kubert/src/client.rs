@@ -5,6 +5,8 @@ use thiserror::Error;
 
 mod timeouts;
 
+pub use self::timeouts::ResponseHeadersTimeout;
+
 /// Configures a Kubernetes client
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
@@ -37,9 +39,9 @@ pub struct ClientArgs {
     /// The timeout for response headers from the Kubernetes API.
     #[cfg_attr(feature = "clap", clap(
         long = "kube-api-response-headers-timeout",
-        default_value_t = timeouts::ResponseHeaders::default(),
+        default_value_t = ResponseHeadersTimeout::default(),
     ))]
-    pub response_headers_timeout: timeouts::ResponseHeaders,
+    pub response_headers_timeout: ResponseHeadersTimeout,
 }
 
 /// Indicates an error occurred while configuring the Kubernetes client
