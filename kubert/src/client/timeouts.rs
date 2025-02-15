@@ -1,4 +1,4 @@
-use super::{BoxError, BoxFuture, BoxService, Request, Response};
+use super::svc::{self, BoxError, BoxFuture, BoxService, Request, Response};
 use kube_client::core::Duration as KubeDuration;
 use std::task::{Context, Poll};
 use tokio::time;
@@ -19,8 +19,8 @@ struct TimeoutService {
 
 pub fn layer(
     ResponseHeadersTimeout(response_headers_timeout): ResponseHeadersTimeout,
-) -> impl tower::layer::Layer<BoxService, Service = BoxService> + Clone {
-    tower::layer::layer_fn(move |inner| {
+) -> impl svc::Layer<BoxService, Service = BoxService> + Clone {
+    svc::layer_fn(move |inner| {
         BoxService::new(TimeoutService {
             response_headers_timeout,
             inner,
@@ -28,7 +28,7 @@ pub fn layer(
     })
 }
 
-impl tower::Service<Request> for TimeoutService {
+impl svc::Service<Request> for TimeoutService {
     type Response = Response;
     type Error = BoxError;
     type Future = BoxFuture;
