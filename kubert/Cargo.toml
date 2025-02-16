@@ -42,6 +42,7 @@ admin-gzip = ["tower-http/compression-gzip"]
 admin-compression = ["admin-brotli", "admin-gzip"]
 client = [
     "dep:bytes",
+    "dep:futures-util",
     "dep:hyper",
     "dep:kube-client",
     "dep:thiserror",

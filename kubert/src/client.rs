@@ -3,6 +3,10 @@ pub use kube_client::*;
 use std::path::PathBuf;
 use thiserror::Error;
 
+mod timeouts;
+
+pub use self::timeouts::ResponseHeadersTimeout;
+
 /// Configures a Kubernetes client
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
@@ -31,6 +35,13 @@ pub struct ClientArgs {
     /// Group to impersonate for Kubernetes operations
     #[cfg_attr(feature = "clap", clap(long = "as-group"))]
     pub impersonate_group: Option<String>,
+
+    /// The timeout for response headers from the Kubernetes API.
+    #[cfg_attr(feature = "clap", clap(
+        long = "kube-api-response-headers-timeout",
+        default_value_t = ResponseHeadersTimeout::default(),
+    ))]
+    pub response_headers_timeout: ResponseHeadersTimeout,
 }
 
 /// Indicates an error occurred while configuring the Kubernetes client
@@ -60,13 +71,17 @@ impl ClientArgs {
     /// This is basically equivalent to using `kube_client::Client::try_default`, except that it
     /// supports kubeconfig configuration from the command-line.
     pub async fn try_client(self) -> Result<Client, ConfigError> {
-        let client = match self.load_local_config().await {
-            Ok(client) => client,
+        let config = match self.load_local_config().await {
+            Ok(config) => config,
             Err(e) if self.is_customized() => return Err(e),
             Err(_) => Config::incluster()?,
         };
 
-        client.try_into().map_err(Into::into)
+        let client = kube_client::client::ClientBuilder::try_from(config)?
+            .with_layer(&timeouts::layer(self.response_headers_timeout))
+            .build();
+
+        Ok(client)
     }
 
     /// Indicates whether the command-line arguments attempt to customize the Kubernetes
@@ -116,4 +131,17 @@ impl ClientArgs {
             .await
             .map_err(Into::into)
     }
+}
+
+// Used by middlewares, e.g. timeouts.
+mod svc {
+    pub use tower::{layer::layer_fn, layer::Layer, Service};
+
+    pub type BoxService = tower::util::BoxService<Request, Response, BoxError>;
+    pub type Request = hyper::Request<kube_client::client::Body>;
+    pub type Response = hyper::Response<BoxBody>;
+    pub type BoxBody =
+        Box<dyn hyper::body::Body<Data = bytes::Bytes, Error = BoxError> + Send + Unpin>;
+    pub type BoxError = tower::BoxError;
+    pub type BoxFuture = futures_util::future::BoxFuture<'static, Result<Response, BoxError>>;
 }
