@@ -134,9 +134,14 @@ impl ClientArgs {
 }
 
 // Used by middlewares, e.g. timeouts.
-type BoxService = tower::util::BoxService<Request, Response, BoxError>;
-type Request = hyper::Request<kube_client::client::Body>;
-type Response = hyper::Response<BoxBody>;
-type BoxBody = Box<dyn hyper::body::Body<Data = bytes::Bytes, Error = BoxError> + Send + Unpin>;
-type BoxError = tower::BoxError;
-type BoxFuture = futures_util::future::BoxFuture<'static, Result<Response, BoxError>>;
+mod svc {
+    pub use tower::{layer::layer_fn, layer::Layer, Service};
+
+    pub type BoxService = tower::util::BoxService<Request, Response, BoxError>;
+    pub type Request = hyper::Request<kube_client::client::Body>;
+    pub type Response = hyper::Response<BoxBody>;
+    pub type BoxBody =
+        Box<dyn hyper::body::Body<Data = bytes::Bytes, Error = BoxError> + Send + Unpin>;
+    pub type BoxError = tower::BoxError;
+    pub type BoxFuture = futures_util::future::BoxFuture<'static, Result<Response, BoxError>>;
+}
