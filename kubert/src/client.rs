@@ -83,11 +83,7 @@ impl ClientArgs {
     /// This is basically equivalent to using `kube_client::Client::try_default`, except that it
     /// supports kubeconfig configuration from the command-line.
     pub async fn try_client(self) -> Result<Client, ConfigError> {
-        let config = self.load_config().await?;
-        let client = kube_client::client::ClientBuilder::try_from(config)?
-            .with_layer(&timeouts::layer(self.response_headers_timeout))
-            .build();
-        Ok(client)
+        ClientBuilder::from_args(self).build().await
     }
 
     /// Indicates whether the command-line arguments attempt to customize the Kubernetes
