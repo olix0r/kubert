@@ -131,9 +131,7 @@ impl ClientArgs {
 impl ClientBuilder {
     /// Creates a new client builder from the given command-line arguments.
     pub fn from_args(args: ClientArgs) -> Self {
-        Self {
-            args,
-        }
+        Self { args }
     }
 
     /// Builds the Kubernetes client.
