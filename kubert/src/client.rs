@@ -44,6 +44,12 @@ pub struct ClientArgs {
     pub response_headers_timeout: ResponseHeadersTimeout,
 }
 
+/// A builder for a Kubernetes client.
+#[cfg_attr(docsrs, doc(cfg(feature = "client")))]
+pub struct ClientBuilder {
+    args: ClientArgs,
+}
+
 /// Indicates an error occurred while configuring the Kubernetes client
 #[derive(Debug, Error)]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
@@ -71,17 +77,7 @@ impl ClientArgs {
     /// This is basically equivalent to using `kube_client::Client::try_default`, except that it
     /// supports kubeconfig configuration from the command-line.
     pub async fn try_client(self) -> Result<Client, ConfigError> {
-        let config = match self.load_local_config().await {
-            Ok(config) => config,
-            Err(e) if self.is_customized() => return Err(e),
-            Err(_) => Config::incluster()?,
-        };
-
-        let client = kube_client::client::ClientBuilder::try_from(config)?
-            .with_layer(&timeouts::layer(self.response_headers_timeout))
-            .build();
-
-        Ok(client)
+        ClientBuilder::from_args(self).build().await
     }
 
     /// Indicates whether the command-line arguments attempt to customize the Kubernetes
@@ -93,6 +89,16 @@ impl ClientArgs {
             || self.impersonate_user.is_some()
             || self.impersonate_group.is_some()
             || self.kubeconfig.is_some()
+    }
+
+    /// Loads a local config if available, falling back to in-cluster config if
+    /// client args have not been specified.
+    async fn load_config(&self) -> Result<Config, ConfigError> {
+        match self.load_local_config().await {
+            Ok(config) => Ok(config),
+            Err(e) if self.is_customized() => Err(e),
+            Err(_) => Config::incluster().map_err(Into::into),
+        }
     }
 
     /// Loads a local (i.e. not in-cluster) Kubernetes client configuration
@@ -130,6 +136,23 @@ impl ClientArgs {
         Config::from_custom_kubeconfig(kubeconfig, &options)
             .await
             .map_err(Into::into)
+    }
+}
+
+impl ClientBuilder {
+    /// Creates a new client builder from the given command-line arguments.
+    pub fn from_args(args: ClientArgs) -> Self {
+        Self { args }
+    }
+
+    /// Builds the Kubernetes client.
+    pub async fn build(self) -> Result<Client, ConfigError> {
+        let config = self.args.load_config().await?;
+
+        let cb = kube_client::client::ClientBuilder::try_from(config)?
+            .with_layer(&timeouts::layer(self.args.response_headers_timeout));
+
+        Ok(cb.build())
     }
 }
 
