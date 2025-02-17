@@ -13,9 +13,9 @@ use tokio::time;
 #[derive(Clone, Debug)]
 pub struct ClientMetricsFamilies {
     requests: Family<RequestLabels, Counter>,
-    response_latency: Family<ResponseStatusLabels, Histogram>,
+    response_latency: Family<RequestLabels, Histogram>,
     response_frames: Family<ResponseStatusLabels, Counter>,
-    response_duration: Family<ResponseStatusLabels, Histogram>,
+    response_duration: Family<RequestLabels, Histogram>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -150,49 +150,51 @@ impl svc::Service<svc::Request> for ClientMetricsService {
             ref mut inner,
         } = self;
 
+        let cluster_url = metrics.cluster_url.clone();
         let method = req.method().as_str().to_string();
-        let metrics = metrics.clone();
-        metrics
-            .families
-            .requests
-            .get_or_create(&RequestLabels {
-                cluster_url: metrics.cluster_url.clone(),
-                method: method.clone(),
-            })
-            .inc();
+
+        let req_labels = RequestLabels {
+            cluster_url: metrics.cluster_url.clone(),
+            method: method.clone(),
+        };
+        metrics.families.requests.get_or_create(&req_labels).inc();
 
         let response_frames = metrics.families.response_frames.clone();
-        let responses = metrics.families.response_duration.clone();
-        let response_latency = metrics.families.response_latency.clone();
-        let cluster_url = metrics.cluster_url.clone();
-        drop(metrics);
+        let response_latency = metrics
+            .families
+            .response_latency
+            .get_or_create(&req_labels)
+            .clone();
+        let responses = metrics
+            .families
+            .response_duration
+            .get_or_create(&req_labels)
+            .clone();
 
         let start = time::Instant::now();
         let call = inner.call(req);
         Box::pin(async move {
             let res = call.await;
             let receipt = time::Instant::now();
+            response_latency.observe(receipt.saturating_duration_since(start).as_secs_f64());
 
-            let status = res.as_ref().ok().map(|res| res.status().as_u16());
-            let error = res.as_ref().err().map(|err| {
-                if err.is::<super::timeouts::ResponseHeadersTimeoutError>() {
-                    ErrorKind::Timeout
-                } else {
-                    ErrorKind::Other
+            let rsp_labels = {
+                let status = res.as_ref().ok().map(|res| res.status().as_u16());
+                let error = res.as_ref().err().map(|err| {
+                    if err.is::<super::timeouts::ResponseHeadersTimeoutError>() {
+                        ErrorKind::Timeout
+                    } else {
+                        ErrorKind::Other
+                    }
+                });
+                ResponseStatusLabels {
+                    cluster_url,
+                    method,
+                    status,
+                    error,
                 }
-            });
-
-            let labels = ResponseStatusLabels {
-                cluster_url,
-                method,
-                status,
-                error,
             };
-            response_latency
-                .get_or_create(&labels)
-                .observe(receipt.saturating_duration_since(start).as_secs_f64());
-            let responses = (*responses.get_or_create(&labels)).clone();
-            let response_frames = (*response_frames.get_or_create(&labels)).clone();
+            let response_frames = response_frames.get_or_create(&rsp_labels).clone();
 
             res.map(move |rsp| {
                 rsp.map(move |inner| {
