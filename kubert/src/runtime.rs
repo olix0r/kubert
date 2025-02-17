@@ -81,6 +81,7 @@ pub struct NoServer(());
 #[must_use = "RuntimeMetrics must be passed to `Builder::with_metrics`"]
 #[derive(Debug)]
 pub struct RuntimeMetrics {
+    client: client::ClientMetricsFamilies,
     watch: metrics::ResourceWatchMetrics,
 }
 
@@ -157,7 +158,13 @@ impl<S> Builder<S> {
         self.log.unwrap_or_default().try_init()?;
 
         let client = {
-            let cb = client::ClientBuilder::from_args(self.client.unwrap_or_default());
+            #[cfg_attr(not(feature = "prometheus-client"), allow(unused_mut))]
+            let mut cb = client::ClientBuilder::from_args(self.client.unwrap_or_default());
+
+            #[cfg(feature = "prometheus-client")]
+            if let Some(metrics) = self.metrics.as_ref() {
+                cb = cb.with_metrics(metrics.client.clone());
+            }
 
             cb.build().await?
         };
@@ -658,8 +665,10 @@ impl LogSettings {
 impl RuntimeMetrics {
     /// Creates a new set of metrics and registers them.
     pub fn register(registry: &mut prometheus_client::registry::Registry) -> Self {
+        let client =
+            client::ClientMetricsFamilies::register(registry.sub_registry_with_prefix("client"));
         let watch =
             metrics::ResourceWatchMetrics::register(registry.sub_registry_with_prefix("watch"));
-        Self { watch }
+        Self { client, watch }
     }
 }
