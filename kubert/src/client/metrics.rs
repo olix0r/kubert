@@ -14,8 +14,9 @@ use tokio::time;
 pub struct ClientMetricsFamilies {
     requests: Family<RequestLabels, Counter>,
     response_latency: Family<RequestLabels, Histogram>,
-    response_frames: Family<ResponseStatusLabels, Counter>,
     response_duration: Family<RequestLabels, Histogram>,
+    response_frames: Family<ResponseStatusLabels, Counter>,
+    response_status: Family<ResponseStatusLabels, Counter>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -74,20 +75,15 @@ impl ClientMetricsFamilies {
         let Self {
             requests,
             response_duration,
-            response_frames,
             response_latency,
+            response_status,
+            response_frames,
         } = &families;
 
         registry.register(
             "requests",
             "Number of requests sent by tha Kubernetes API client",
             requests.clone(),
-        );
-
-        registry.register(
-            "response_frames",
-            "Response frames received by the Kubernetes API client",
-            response_frames.clone(),
         );
 
         registry.register_with_unit(
@@ -102,6 +98,18 @@ impl ClientMetricsFamilies {
             "Duration of a response stream from receiving the initial status to the end of the stream",
             Unit::Seconds,
             response_duration.clone(),
+        );
+
+        registry.register(
+            "response_status",
+            "Response statuses received by the Kubernetes API client",
+            response_status.clone(),
+        );
+
+        registry.register(
+            "response_frames",
+            "Response frames received by the Kubernetes API client",
+            response_frames.clone(),
         );
 
         families
@@ -119,6 +127,7 @@ impl Default for ClientMetricsFamilies {
     fn default() -> Self {
         Self {
             requests: Family::default(),
+            response_status: Family::default(),
             response_frames: Family::default(),
             response_latency: Family::new_with_constructor(|| {
                 // Indicates whether we're getting timely responses or slow
@@ -146,30 +155,33 @@ impl svc::Service<svc::Request> for ClientMetricsService {
 
     fn call(&mut self, req: svc::Request) -> Self::Future {
         let Self {
-            metrics,
             ref mut inner,
+            metrics:
+                ClientMetrics {
+                    cluster_url,
+                    families:
+                        ClientMetricsFamilies {
+                            requests,
+                            response_duration,
+                            response_latency,
+                            response_status,
+                            response_frames,
+                        },
+                },
         } = self;
 
-        let cluster_url = metrics.cluster_url.clone();
+        let cluster_url = cluster_url.clone();
         let method = req.method().as_str().to_string();
 
         let req_labels = RequestLabels {
-            cluster_url: metrics.cluster_url.clone(),
+            cluster_url: cluster_url.clone(),
             method: method.clone(),
         };
-        metrics.families.requests.get_or_create(&req_labels).inc();
-
-        let response_frames = metrics.families.response_frames.clone();
-        let response_latency = metrics
-            .families
-            .response_latency
-            .get_or_create(&req_labels)
-            .clone();
-        let responses = metrics
-            .families
-            .response_duration
-            .get_or_create(&req_labels)
-            .clone();
+        requests.get_or_create(&req_labels).inc();
+        let response_latency = response_latency.get_or_create(&req_labels).clone();
+        let responses = response_duration.get_or_create(&req_labels).clone();
+        let response_status = response_status.clone();
+        let response_frames = response_frames.clone();
 
         let start = time::Instant::now();
         let call = inner.call(req);
@@ -194,6 +206,7 @@ impl svc::Service<svc::Request> for ClientMetricsService {
                     error,
                 }
             };
+            response_status.get_or_create(&rsp_labels).inc();
             let response_frames = response_frames.get_or_create(&rsp_labels).clone();
 
             res.map(move |rsp| {
