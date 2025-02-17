@@ -15,7 +15,7 @@ use futures_core::Stream;
 use kube_core::{NamespaceResourceScope, Resource};
 use kube_runtime::{reflector, watcher};
 use serde::de::DeserializeOwned;
-use std::{fmt::Debug, future::Future, hash::Hash, time::Duration};
+use std::{fmt::Debug, hash::Hash, time::Duration};
 #[cfg(feature = "server")]
 use tower::Service;
 
@@ -153,15 +153,15 @@ impl<S> Builder<S> {
     }
 
     #[inline]
-    async fn build_inner<F>(
-        self,
-        mk_client: impl FnOnce(ClientArgs) -> F,
-    ) -> Result<Runtime<S>, BuildError>
-    where
-        F: Future<Output = Result<Client, client::ConfigError>>,
-    {
+    async fn build_inner(self) -> Result<Runtime<S>, BuildError> {
         self.log.unwrap_or_default().try_init()?;
-        let client = mk_client(self.client.unwrap_or_default()).await?;
+
+        let client = {
+            let cb = client::ClientBuilder::from_args(self.client.unwrap_or_default());
+
+            cb.build().await?
+        };
+
         let (shutdown, shutdown_rx) = shutdown::sigint_or_sigterm()?;
         let admin = self.admin.bind()?;
         Ok(Runtime {
@@ -215,7 +215,7 @@ impl Builder<NoServer> {
     /// Attempts to build a runtime by initializing logs, loading the default Kubernetes client,
     /// registering signal handlers and binding an admin server
     pub async fn build(self) -> Result<Runtime<NoServer>, BuildError> {
-        self.build_inner(ClientArgs::try_client).await
+        self.build_inner().await
     }
 }
 
@@ -225,7 +225,7 @@ impl Builder<ServerArgs> {
     /// registering signal handlers and binding admin and HTTPS servers
     #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "server"))))]
     pub async fn build(self) -> Result<Runtime<server::Bound>, BuildError> {
-        self.build_inner(ClientArgs::try_client)
+        self.build_inner()
             .await?
             .bind_server(|args| async move {
                 let srv = args.bind().await?;
@@ -241,7 +241,7 @@ impl Builder<Option<ServerArgs>> {
     /// registering signal handlers and binding admin and HTTPS servers
     #[cfg_attr(docsrs, doc(cfg(all(features = "runtime", feature = "server"))))]
     pub async fn build(self) -> Result<Runtime<Option<server::Bound>>, BuildError> {
-        self.build_inner(ClientArgs::try_client)
+        self.build_inner()
             .await?
             .bind_server(|args| async move {
                 match args {
