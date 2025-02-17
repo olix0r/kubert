@@ -3,8 +3,12 @@ pub use kube_client::*;
 use std::path::PathBuf;
 use thiserror::Error;
 
+#[cfg(feature = "prometheus-client")]
+mod metrics;
 mod timeouts;
 
+#[cfg(feature = "prometheus-client")]
+pub use self::metrics::ClientMetricsFamilies;
 pub use self::timeouts::ResponseHeadersTimeout;
 
 /// Configures a Kubernetes client
@@ -48,6 +52,8 @@ pub struct ClientArgs {
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
 pub struct ClientBuilder {
     args: ClientArgs,
+    #[cfg(feature = "prometheus-client")]
+    metrics_families: Option<ClientMetricsFamilies>,
 }
 
 /// Indicates an error occurred while configuring the Kubernetes client
@@ -142,15 +148,38 @@ impl ClientArgs {
 impl ClientBuilder {
     /// Creates a new client builder from the given command-line arguments.
     pub fn from_args(args: ClientArgs) -> Self {
-        Self { args }
+        Self {
+            args,
+            #[cfg(feature = "prometheus-client")]
+            metrics_families: None,
+        }
+    }
+
+    #[cfg(feature = "prometheus-client")]
+    #[cfg_attr(
+        docsrs,
+        doc(cfg(all(features = "client", feature = "prometheus-client")))
+    )]
+    /// Adds registered Prometheus metrics to the client.
+    pub fn with_metrics(mut self, metrics: ClientMetricsFamilies) -> Self {
+        self.metrics_families = Some(metrics);
+        self
     }
 
     /// Builds the Kubernetes client.
     pub async fn build(self) -> Result<Client, ConfigError> {
         let config = self.args.load_config().await?;
 
+        #[cfg(feature = "prometheus-client")]
+        let metrics = self
+            .metrics_families
+            .map_or_else(Default::default, |m| m.metrics(&config));
+
         let cb = kube_client::client::ClientBuilder::try_from(config)?
             .with_layer(&timeouts::layer(self.args.response_headers_timeout));
+
+        #[cfg(feature = "prometheus-client")]
+        let cb = cb.with_layer(&metrics::layer(metrics));
 
         Ok(cb.build())
     }
