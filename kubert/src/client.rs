@@ -3,6 +3,10 @@ pub use kube_client::*;
 use std::path::PathBuf;
 use thiserror::Error;
 
+mod timeouts;
+
+pub use self::timeouts::ResponseHeadersTimeout;
+
 /// Configures a Kubernetes client
 #[derive(Clone, Debug, Default)]
 #[cfg_attr(docsrs, doc(cfg(feature = "client")))]
@@ -31,6 +35,13 @@ pub struct ClientArgs {
     /// Group to impersonate for Kubernetes operations
     #[cfg_attr(feature = "clap", clap(long = "as-group"))]
     pub impersonate_group: Option<String>,
+
+    /// The timeout for response headers from the Kubernetes API.
+    #[cfg_attr(feature = "clap", clap(
+        long = "kube-api-response-headers-timeout",
+        default_value_t = ResponseHeadersTimeout::default(),
+    ))]
+    pub response_headers_timeout: ResponseHeadersTimeout,
 }
 
 /// A builder for a Kubernetes client.
@@ -138,8 +149,22 @@ impl ClientBuilder {
     pub async fn build(self) -> Result<Client, ConfigError> {
         let config = self.args.load_config().await?;
 
-        let cb = kube_client::client::ClientBuilder::try_from(config)?;
+        let cb = kube_client::client::ClientBuilder::try_from(config)?
+            .with_layer(&timeouts::layer(self.args.response_headers_timeout));
 
         Ok(cb.build())
     }
+}
+
+// Used by middlewares, e.g. timeouts.
+mod svc {
+    pub use tower::{layer::layer_fn, layer::Layer, Service};
+
+    pub type BoxService = tower::util::BoxService<Request, Response, BoxError>;
+    pub type Request = hyper::Request<kube_client::client::Body>;
+    pub type Response = hyper::Response<BoxBody>;
+    pub type BoxBody =
+        Box<dyn hyper::body::Body<Data = bytes::Bytes, Error = BoxError> + Send + Unpin>;
+    pub type BoxError = tower::BoxError;
+    pub type BoxFuture = futures_util::future::BoxFuture<'static, Result<Response, BoxError>>;
 }
