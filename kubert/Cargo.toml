@@ -1,6 +1,6 @@
 [package]
 name = "kubert"
-version = "0.23.0-alpha10"
+version = "0.23.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Kubernetes runtime helpers. Based on kube-rs."
