@@ -71,7 +71,7 @@ pub fn register(reg: &mut Registry) -> std::io::Result<()> {
     let clock_time_ts = Gauge::<f64, ClockMetric>::default();
     reg.register_with_unit(
         "clock_time",
-        "Current system time for this proxy",
+        "Current system time for this process",
         Unit::Seconds,
         clock_time_ts,
     );
