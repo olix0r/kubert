@@ -143,7 +143,7 @@ impl Collector for System {
             Ok(ProcNetstat { ip_ext, .. }) => {
                 let recv_bytes = ConstCounter::new(ip_ext.in_octets.unwrap_or_default());
                 let rbe = encoder.encode_descriptor(
-                    "network_receive_bytes_total",
+                    "network_receive",
                     "Number of bytes received by the process over the network",
                     Some(&Unit::Bytes),
                     MetricType::Counter,
@@ -152,7 +152,7 @@ impl Collector for System {
 
                 let transmit_bytes = ConstCounter::new(ip_ext.out_octets.unwrap_or_default());
                 let tbe = encoder.encode_descriptor(
-                    "network_transmit_bytes_total",
+                    "network_transmit",
                     "Number of bytes sent by the process over the network",
                     Some(&Unit::Bytes),
                     MetricType::Counter,
