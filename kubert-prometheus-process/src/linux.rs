@@ -46,6 +46,10 @@ use std::time::Duration;
 use std::{fs, io};
 use tracing::{error, warn};
 
+mod netstat;
+
+use self::netstat::ProcNetstat;
+
 #[derive(Clone, Debug)]
 pub(super) struct System {
     page_size: u64,
@@ -131,6 +135,32 @@ impl Collector for System {
             }
             Err(error) => {
                 tracing::warn!(%error, "Could not determine max fds");
+            }
+        }
+
+        // Add network metrics
+        match ProcNetstat::read(stat.pid) {
+            Ok(ProcNetstat { ip_ext, .. }) => {
+                let recv_bytes = ConstCounter::new(ip_ext.in_octets.unwrap_or_default());
+                let rbe = encoder.encode_descriptor(
+                    "network_receive_bytes_total",
+                    "Number of bytes received by the process over the network",
+                    Some(&Unit::Bytes),
+                    MetricType::Counter,
+                )?;
+                recv_bytes.encode(rbe)?;
+
+                let transmit_bytes = ConstCounter::new(ip_ext.out_octets.unwrap_or_default());
+                let tbe = encoder.encode_descriptor(
+                    "network_transmit_bytes_total",
+                    "Number of bytes sent by the process over the network",
+                    Some(&Unit::Bytes),
+                    MetricType::Counter,
+                )?;
+                transmit_bytes.encode(tbe)?;
+            }
+            Err(error) => {
+                tracing::warn!(%error, "Failed to get network statistics");
             }
         }
 
