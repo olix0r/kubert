@@ -185,7 +185,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
 ahash = { version = "0.8", optional = true }
 backoff = { version = "0.4", features = ["tokio"], optional = true }
 bytes = { version = "1", optional = true }
-drain = { version = "0.1.1", optional = true, default-features = false }
+drain = { version = "0.2.1", optional = true, default-features = false }
 chrono = { version = "0.4", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
