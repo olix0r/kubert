@@ -119,6 +119,9 @@ pub mod requeue;
 #[cfg_attr(docsrs, doc(cfg(feature = "runtime")))]
 pub mod runtime;
 
+#[cfg(feature = "rustls-tls")]
+pub use tokio_rustls::rustls;
+
 #[cfg(feature = "server")]
 #[cfg_attr(docsrs, doc(cfg(feature = "server")))]
 pub mod server;

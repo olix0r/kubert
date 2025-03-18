@@ -1,6 +1,6 @@
 [package]
 name = "kubert"
-version = "0.23.1"
+version = "0.24.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "Kubernetes runtime helpers. Based on kube-rs."
@@ -13,6 +13,18 @@ keywords = ["kubernetes", "client", "runtime", "server"]
 rustls-tls = [
     "dep:rustls-pemfile",
     "dep:tokio-rustls",
+    "kube-client?/rustls-tls",
+]
+rustls-tls-aws-lc-rs = [
+    "rustls-tls",
+    "tokio-rustls/aws-lc-rs",
+    "kube-client?/aws-lc-rs",
+    "kube-client?/rustls-tls",
+]
+rustls-tls-ring = [
+    "rustls-tls",
+    "tokio-rustls/ring",
+    "kube-client?/ring",
     "kube-client?/rustls-tls",
 ]
 openssl-tls = [
@@ -76,7 +88,7 @@ initialized = [
     "tokio/sync",
 ]
 lease = [
-    "dep:backoff",
+    "dep:backon",
     "dep:chrono",
     "dep:futures-util",
     "dep:hyper",
@@ -183,7 +195,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
 
 [dependencies]
 ahash = { version = "0.8", optional = true }
-backoff = { version = "0.4", features = ["tokio"], optional = true }
+backon = { version = "1", optional = true, features = ["tokio-sleep"] }
 bytes = { version = "1", optional = true }
 drain = { version = "0.2.1", optional = true, default-features = false }
 chrono = { version = "0.4", optional = true, default-features = false }
@@ -204,7 +216,7 @@ serde_json = { version = "1", optional = true }
 sha2 = { version = "0.10", optional = true }
 thiserror = { version = "2", optional = true }
 tokio = { workspace = true, optional = false, default-features = false }
-tokio-rustls = { version = "0.26.1", optional = true, default-features = false }
+tokio-rustls = { workspace = true, optional = true }
 tokio-openssl = { version = "0.6.3", optional = true }
 tokio-util = { version = "0.7", optional = true, default-features = false }
 tower-http = { version = "0.6.0", optional = true, default-features = false }
@@ -253,6 +265,7 @@ features = ["rt"]
 # === Dev ===
 
 [dev-dependencies]
+tokio-rustls = { workspace = true, features = ["aws-lc-rs"] }
 kube = { workspace = true, features = ["runtime"] }
 rcgen = { version = "0.13.0" }
 tempfile = "3.8"
