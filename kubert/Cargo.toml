@@ -18,9 +18,15 @@ rustls-tls = [
 rustls-tls-aws-lc-rs = [
     "rustls-tls",
     "tokio-rustls/aws-lc-rs",
+    "kube-client?/aws-lc-rs",
     "kube-client?/rustls-tls",
 ]
-rustls-tls-ring = ["rustls-tls", "tokio-rustls/ring", "kube-client?/rustls-tls"]
+rustls-tls-ring = [
+    "rustls-tls",
+    "tokio-rustls/ring",
+    "kube-client?/ring",
+    "kube-client?/rustls-tls",
+]
 openssl-tls = [
     "dep:hyper-openssl",
     "dep:once_cell",
