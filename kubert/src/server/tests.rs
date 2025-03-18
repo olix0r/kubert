@@ -33,6 +33,9 @@ fn gen_keys() -> (TempDir, TlsPaths) {
 #[cfg(feature = "rustls-tls")]
 #[tokio::test]
 async fn load_tls_rustls() {
+    tokio_rustls::rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("installing aws-lc-rs provider must succeed");
     let (_tempdir, TlsPaths { key, certs }) = gen_keys();
     match super::tls_rustls::load_tls(&key, &certs).await {
         Ok(_) => println!("load_tls: success!"),

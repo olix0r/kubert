@@ -11,7 +11,7 @@ release = false
 
 [features]
 default = ["rustls-tls"]
-rustls-tls = ["kubert/rustls-tls"]
+rustls-tls = ["kubert/rustls-tls-aws-lc-rs"]
 openssl-tls = ["kubert/openssl-tls", "dep:openssl"]
 
 [dependencies.kubert]
