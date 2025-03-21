@@ -134,7 +134,7 @@ jobs:
     container: ghcr.io/linkerd/dev:v45-rust
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6
       - run: just fetch
       - run: just doc
 
@@ -146,7 +146,7 @@ jobs:
     container: ghcr.io/linkerd/dev:v45-rust
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6
       - run: just fetch
       - run: cargo deny --all-features check bans licenses sources
       - run: cargo deny --all-features check advisories
@@ -169,7 +169,7 @@ jobs:
           version: ${{ matrix.rust }}
           components: clippy
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6
       - run: just fetch
       - run: just clippy-all
       - run: just test-build
@@ -206,7 +206,7 @@ jobs:
     container: ghcr.io/linkerd/dev:v45-rust
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6
       - run: just fetch
       - run: just "features=${{ matrix.feature }}" clippy
 
@@ -232,7 +232,7 @@ jobs:
       - uses: linkerd/dev/actions/setup-tools@v45
       - uses: linkerd/dev/actions/setup-rust@v45
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6
       - run: just fetch
       - run: just features=${{ matrix.tls }} build-examples
       - run: just features=${{ matrix.tls }} test-cluster-create
@@ -295,7 +295,7 @@ jobs:
           version: ${{ matrix.rust }}
           components: clippy
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6
       - run: just fetch
       - run: just-cargo clippy -p kubert-prometheus-process
       #- run: just-cargo test -p kubert-prometheus-process
@@ -317,7 +317,7 @@ jobs:
           version: ${{ matrix.rust }}
           components: clippy
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
+      - uses: Swatinem/rust-cache@9d47c6ad4b02e050fd481d890b2ea34778fd09d6
       - run: just fetch
       - run: just-cargo clippy -p kubert-prometheus-tokio
       #- run: just-cargo test -p kubert-prometheus-tokio
