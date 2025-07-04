@@ -160,6 +160,12 @@ jobs:
         rust:
           - "1.81"
           - "1.83"
+        os: 
+          - windows
+          - linux
+        include:
+          - os: windows
+            target: x86_64-pc-windows-gnu
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
@@ -170,10 +176,14 @@ jobs:
           components: clippy
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
-      - run: just fetch
-      - run: just clippy-all
+      - run: apt-get update && apt-get install mingw-w64 -y
+        if: matrix.os == 'windows'
+      - run: just "target=${{ matrix.target }}" fetch
+      - run: just "target=${{ matrix.target }}" clippy-all
       - run: just test-build
+        if: matrix.os == 'linux'
       - run: just test
+        if: matrix.os == 'linux'
 
   kubert-check-feature:
     needs: changed
