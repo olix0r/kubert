@@ -267,7 +267,7 @@ features = ["rt"]
 [dev-dependencies]
 tokio-rustls = { workspace = true, features = ["aws-lc-rs"] }
 kube = { workspace = true, features = ["runtime"] }
-rcgen = { version = "0.13.0" }
+rcgen = { version = "0.14.1" }
 tempfile = "3.8"
 tokio-stream = "0.1"
 tokio-test = "0.4"
