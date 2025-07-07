@@ -176,7 +176,7 @@ jobs:
           components: clippy
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
-      - run: apt-get update && apt-get install mingw-w64 -y
+      - run: sudo apt-get update && sudo apt-get install mingw-w64 -y
         if: matrix.os == 'windows'
       - run: just "target=${{ matrix.target }}" fetch
       - run: just "target=${{ matrix.target }}" clippy-all
