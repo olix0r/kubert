@@ -6,7 +6,7 @@ license = "Apache-2.0"
 description = "A prometheus-client tokio runtime metrics collector"
 readme = "../README.md"
 repository = "https://github.com/olix0r/kubert"
-rust-version = "1.81"
+rust-version = "1.85"
 keywords = ["prometheus-client", "tokio", "metrics", "monitoring"]
 
 [features]
