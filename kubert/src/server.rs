@@ -304,9 +304,7 @@ where
         #[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
         let res = {
             enum Accept {}
-            Err::<Accept, _>(std::io::Error::other(
-                "TLS support not enabled",
-            ))
+            Err::<Accept, _>(std::io::Error::other("TLS support not enabled"))
         };
         let tls = match res {
             Ok(tls) => tls,
@@ -322,9 +320,7 @@ where
         #[cfg(feature = "rustls-tls")]
         let res = tls_rustls::accept(&tls, socket).await;
         #[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
-        let res = Err::<TcpStream, _>(std::io::Error::other(
-            "TLS support not enabled",
-        ));
+        let res = Err::<TcpStream, _>(std::io::Error::other("TLS support not enabled"));
         let socket = match res {
             Ok(s) => s,
             Err(error) => {
