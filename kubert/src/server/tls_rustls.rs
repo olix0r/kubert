@@ -45,7 +45,6 @@ async fn load_certs(
 ) -> std::io::Result<Vec<CertificateDer<'static>>> {
     let pem = tokio::fs::read(cp).await?;
     rustls_pemfile::certs(&mut pem.as_slice())
-        .map(|res| res.map(CertificateDer::from))
         .collect()
 }
 
@@ -62,11 +61,10 @@ async fn load_private_key(TlsKeyPath(kp): &TlsKeyPath) -> std::io::Result<Privat
     }
 
     let key = keys.pop().ok_or_else(|| {
-        std::io::Error::new(std::io::ErrorKind::Other, "could not load private key")
+        std::io::Error::other("could not load private key")
     })?;
     if !keys.is_empty() {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
+        return Err(std::io::Error::other(
             "too many private keys",
         ));
     }

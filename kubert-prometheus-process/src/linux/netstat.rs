@@ -165,7 +165,7 @@ pub struct ProcNetstat {
 impl ProcNetstat {
     /// Reads the /proc/<pid>/net/netstat file and returns a ProcNetstat structure.
     pub fn read(pid: i32) -> io::Result<ProcNetstat> {
-        let filename = format!("/proc/{}/net/netstat", pid);
+        let filename = format!("/proc/{pid}/net/netstat");
         let mut proc_netstat = read_from_file(&filename)?;
         proc_netstat.pid = pid;
         Ok(proc_netstat)
@@ -211,7 +211,7 @@ fn parse_proc_netstat<R: io::Read>(reader: R, file_name: &str) -> io::Result<Pro
             let value: f64 = value_parts[i].parse().map_err(|e| {
                 io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("invalid value in {}: {}", file_name, e),
+                    format!("invalid value in {file_name}: {e}"),
                 )
             })?;
             let key = name_parts[i];

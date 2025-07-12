@@ -201,7 +201,7 @@ mod tests {
             tx.try_send(kube::runtime::watcher::Event::InitApply(corev1::Pod {
                 metadata: metav1::ObjectMeta {
                     namespace: Some("default".to_string()),
-                    name: Some(format!("pod-{}", i)),
+                    name: Some(format!("pod-{i}")),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -228,7 +228,7 @@ mod tests {
             tx.try_send(kube::runtime::watcher::Event::InitApply(corev1::Pod {
                 metadata: metav1::ObjectMeta {
                     namespace: Some("default".to_string()),
-                    name: Some(format!("pod-{}", i)),
+                    name: Some(format!("pod-{i}")),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -263,7 +263,7 @@ mod tests {
                 corev1::Namespace {
                     metadata: metav1::ObjectMeta {
                         namespace: Some("default".to_string()),
-                        name: Some(format!("pod-{}", i)),
+                        name: Some(format!("pod-{i}")),
                         ..Default::default()
                     },
                     ..Default::default()
@@ -287,7 +287,7 @@ mod tests {
                 corev1::Namespace {
                     metadata: metav1::ObjectMeta {
                         namespace: Some("default".to_string()),
-                        name: Some(format!("pod-{}", i)),
+                        name: Some(format!("pod-{i}")),
                         ..Default::default()
                     },
                     ..Default::default()
