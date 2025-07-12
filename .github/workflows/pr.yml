@@ -217,7 +217,7 @@ jobs:
       matrix:
         k8s:
           - v1.21
-          - v1.31
+          - v1.33
         tls:
           - openssl-tls
           - rustls-tls
