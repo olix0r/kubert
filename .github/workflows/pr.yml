@@ -121,7 +121,7 @@ jobs:
     if: needs.changed.outputs.rust == 'true' || needs.changed.outputs.build == 'true'
     timeout-minutes: 5
     runs-on: ubuntu-24.04
-    container: ghcr.io/linkerd/dev:v45-rust
+    container: ghcr.io/linkerd/dev:v46-rust
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - run: just fmt-check
@@ -131,7 +131,7 @@ jobs:
     if: needs.changed.outputs.rust == 'true' || needs.changed.outputs.cargo == 'true' || needs.changed.outputs.build == 'true'
     timeout-minutes: 10
     runs-on: ubuntu-24.04
-    container: ghcr.io/linkerd/dev:v45-rust
+    container: ghcr.io/linkerd/dev:v46-rust
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
@@ -143,7 +143,7 @@ jobs:
     if: needs.changed.outputs.cargo == 'true' || needs.changed.outputs.deny == 'true' || needs.changed.outputs.build == 'true'
     timeout-minutes: 10
     runs-on: ubuntu-24.04
-    container: ghcr.io/linkerd/dev:v45-rust
+    container: ghcr.io/linkerd/dev:v46-rust
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
@@ -163,8 +163,8 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v45
-      - uses: linkerd/dev/actions/setup-rust@v45
+      - uses: linkerd/dev/actions/setup-tools@v46
+      - uses: linkerd/dev/actions/setup-rust@v46
         with:
           version: ${{ matrix.rust }}
           components: clippy
@@ -203,7 +203,7 @@ jobs:
           - shutdown
     timeout-minutes: 10
     runs-on: ubuntu-24.04
-    container: ghcr.io/linkerd/dev:v45-rust
+    container: ghcr.io/linkerd/dev:v46-rust
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
@@ -229,8 +229,8 @@ jobs:
     env:
       KUBERT_TEST_CLUSTER_VERSION: ${{ matrix.k8s }}
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v45
-      - uses: linkerd/dev/actions/setup-rust@v45
+      - uses: linkerd/dev/actions/setup-tools@v46
+      - uses: linkerd/dev/actions/setup-rust@v46
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: Swatinem/rust-cache@f0deed1e0edfc6a9be95417288c0e1099b1eeec3
       - run: just fetch
@@ -269,8 +269,8 @@ jobs:
       KUBERT_TEST_CLUSTER_VERSION: ${{ matrix.k8s }}
       KUBERT_TEST_NS: kubert-test
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v45
-      - uses: linkerd/dev/actions/setup-rust@v45
+      - uses: linkerd/dev/actions/setup-tools@v46
+      - uses: linkerd/dev/actions/setup-rust@v46
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - run: just features=${{ matrix.tls }} build-examples-image
       - run: just features=${{ matrix.tls }} test-cluster-create
@@ -289,8 +289,8 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v45
-      - uses: linkerd/dev/actions/setup-rust@v45
+      - uses: linkerd/dev/actions/setup-tools@v46
+      - uses: linkerd/dev/actions/setup-rust@v46
         with:
           version: ${{ matrix.rust }}
           components: clippy
@@ -311,8 +311,8 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v45
-      - uses: linkerd/dev/actions/setup-rust@v45
+      - uses: linkerd/dev/actions/setup-tools@v46
+      - uses: linkerd/dev/actions/setup-rust@v46
         with:
           version: ${{ matrix.rust }}
           components: clippy
