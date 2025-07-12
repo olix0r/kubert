@@ -381,7 +381,7 @@ impl Handle {
             .take(5)
             .map(char::from)
             .collect::<String>();
-        format!("{}-{}", base, suffix)
+        format!("{base}-{suffix}")
     }
 
     fn init_tracing() -> tracing::subscriber::DefaultGuard {
