@@ -56,14 +56,28 @@ pin_project_lite::pin_project! {
 
 /// Creates a shutdown channel
 ///
-/// [`Shutdown`] watches for `SIGINT` and `SIGTERM` signals on Linux or Ctrl-C and Ctrl-Break on
+/// [`Shutdown`] watches for `SIGINT` and `SIGTERM` signals. When a signal is received, [`Watch`]
+/// instances are notifed and, when all watches are dropped, the shutdown is completed. If a second
+/// signal is received while waiting for watches to be dropped, the shutdown is aborted.
+///
+/// If a second signal is received while waiting for shutdown to complete, the process
+#[cfg(unix)]
+#[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
+#[deprecated(note = "please use `register` instead")]
+pub fn sigint_or_sigterm() -> Result<(Shutdown, Watch), RegisterError> {
+    register()
+}
+
+/// Creates a shutdown channel
+///
+/// [`Shutdown`] watches for `SIGINT` and `SIGTERM` signals on Linux or Ctrl-Shutdown on
 /// Windows. When a signal is received, [`Watch`] instances are notifed and, when all watches are
 /// dropped, the shutdown is completed. If a second signal is received while waiting for watches
 /// to be dropped, the shutdown is aborted.
 ///
 /// If a second signal is received while waiting for shutdown to complete, the process
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
-pub fn sigint_or_sigterm() -> Result<(Shutdown, Watch), RegisterError> {
+pub fn register() -> Result<(Shutdown, Watch), RegisterError> {
     let signals = Signals::new()?;
 
     let (tx, rx) = drain::channel();
