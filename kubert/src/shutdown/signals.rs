@@ -1,5 +1,5 @@
-#[cfg(target_os = "linux")]
-pub(crate) mod linux {
+#![cfg(unix)]
+pub(crate) mod unix {
     use crate::shutdown::RegisterError;
     use tokio::signal::unix::{signal, Signal, SignalKind};
 
@@ -35,7 +35,7 @@ pub(crate) mod linux {
     }
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 pub(crate) mod windows {
     use crate::shutdown::RegisterError;
     use tokio::signal::windows::{ctrl_break, ctrl_c, CtrlBreak, CtrlC};

@@ -13,13 +13,13 @@ pub use drain::Watch;
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 mod signals;
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 use signals::windows::Signals;
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
-use signals::linux::Signals;
+use signals::unix::Signals;
 
 /// Drives shutdown by watching signals
 #[derive(Debug)]
