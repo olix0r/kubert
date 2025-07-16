@@ -1,4 +1,4 @@
-FROM ghcr.io/linkerd/dev:v45-rust as build
+FROM ghcr.io/linkerd/dev:v46-rust as build
 WORKDIR /kubert
 COPY . .
 ENV CARGO_NET_RETRY=10 \

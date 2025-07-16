@@ -202,7 +202,7 @@ fn blocking_stat() -> ProcResult<Stat> {
 
 fn open_fds(pid: pid_t) -> io::Result<u64> {
     let mut open = 0;
-    for f in fs::read_dir(format!("/proc/{}/fd", pid))? {
+    for f in fs::read_dir(format!("/proc/{pid}/fd"))? {
         if !f?.file_type()?.is_dir() {
             open += 1;
         }
