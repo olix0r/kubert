@@ -169,7 +169,7 @@ impl<S> Builder<S> {
             cb.build().await?
         };
 
-        let (shutdown, shutdown_rx) = shutdown::sigint_or_sigterm()?;
+        let (shutdown, shutdown_rx) = shutdown::register()?;
         let admin = self.admin.bind()?;
         Ok(Runtime {
             client,

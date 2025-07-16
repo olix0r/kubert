@@ -5,19 +5,28 @@ use std::{
     pin::Pin,
     task::{Context, Poll},
 };
-use tokio::signal::unix::{signal, Signal, SignalKind};
 use tracing::debug;
 
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 pub use drain::Watch;
+
+#[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
+mod signals;
+
+#[cfg(windows)]
+#[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
+use signals::windows::Signals;
+
+#[cfg(unix)]
+#[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
+use signals::unix::Signals;
 
 /// Drives shutdown by watching signals
 #[derive(Debug)]
 #[must_use = "call `Shutdown::on_signal` to await a signal"]
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
 pub struct Shutdown {
-    interrupt: Signal,
-    terminate: Signal,
+    signals: Signals,
     tx: drain::Signal,
 }
 
@@ -52,43 +61,48 @@ pin_project_lite::pin_project! {
 /// signal is received while waiting for watches to be dropped, the shutdown is aborted.
 ///
 /// If a second signal is received while waiting for shutdown to complete, the process
+#[cfg(unix)]
 #[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
+#[deprecated(note = "please use `register` instead")]
 pub fn sigint_or_sigterm() -> Result<(Shutdown, Watch), RegisterError> {
-    let interrupt = signal(SignalKind::interrupt())?;
-    let terminate = signal(SignalKind::terminate())?;
+    register()
+}
+
+/// Creates a shutdown channel
+///
+/// [`Shutdown`] watches for `SIGINT` and `SIGTERM` signals on Linux or Ctrl-Shutdown on
+/// Windows. When a signal is received, [`Watch`] instances are notifed and, when all watches are
+/// dropped, the shutdown is completed. If a second signal is received while waiting for watches
+/// to be dropped, the shutdown is aborted.
+///
+/// If a second signal is received while waiting for shutdown to complete, the process
+#[cfg_attr(docsrs, doc(cfg(feature = "shutdown")))]
+pub fn register() -> Result<(Shutdown, Watch), RegisterError> {
+    let signals = Signals::new()?;
 
     let (tx, rx) = drain::channel();
-    let shutdown = Shutdown {
-        interrupt,
-        terminate,
-        tx,
-    };
+    let shutdown = Shutdown { signals, tx };
     Ok((shutdown, rx))
 }
 
 impl Shutdown {
     /// Watches for signals and drives shutdown
     ///
-    /// When a `SIGINT` or `SIGTERM` signal is received, the shutdown is initiated, notifying all
+    /// When a signal is received, the shutdown is initiated, notifying all
     /// [`Watch`] instances. When all watches are dropped, the shutdown is completed.
     ///
     /// If a second signal is received while waiting for watches to be dropped, this future
     /// completes immediately with an [`Aborted`] error.
     pub async fn signaled(self) -> Result<(), Aborted> {
         let Self {
-            mut interrupt,
-            mut terminate,
+            mut signals,
             mut tx,
         } = self;
 
         tokio::select! {
-            _ = interrupt.recv() => {
-                debug!("Received SIGINT; draining");
+            _ = signals.recv() => {
+                debug!("draining");
             },
-
-            _ = terminate.recv() => {
-                debug!("Received SIGTERM; draining");
-            }
 
             _ = tx.closed() => {
                 debug!("All shutdown receivers dropped");
@@ -103,15 +117,10 @@ impl Shutdown {
                 Ok(())
             },
 
-            _ = interrupt.recv() => {
-                debug!("Received SIGINT; aborting");
+            _ = signals.recv() => {
+                debug!("aborting");
                 Err(Aborted(()))
             },
-
-            _ = terminate.recv() => {
-                debug!("Received SIGTERM; aborting");
-                Err(Aborted(()))
-            }
         }
     }
 }

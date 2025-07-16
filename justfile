@@ -14,6 +14,8 @@ export CXX := 'clang++-19'
 export RUSTFLAGS := env_var_or_default('RUSTFLAGS', '--cfg tokio_unstable')
 export RUSTDOCFLAGS := env_var_or_default('RUSTDOCFLAGS', '--cfg tokio_unstable')
 
+target := ''
+
 #
 # Recipes
 #
@@ -28,13 +30,13 @@ md-lint:
 
 # Fetch dependencies
 fetch:
-    @just-cargo fetch
+    @just-cargo target={{ target }} fetch
 
 check *args:
     @just-cargo check --workspace --all-targets {{ _features }} {{ args }}
 
 clippy-all *args:
-    @just-cargo clippy --workspace --all-targets --all-features {{ args }}
+    @just-cargo target={{ target }} clippy --workspace --all-targets --all-features {{ args }}
 
 clippy *args:
     @just-cargo clippy -p kubert --all-targets {{ _features }} {{ args }}
