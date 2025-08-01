@@ -163,8 +163,8 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v46
-      - uses: linkerd/dev/actions/setup-rust@v46
+      - uses: linkerd/dev/actions/setup-tools@v47
+      - uses: linkerd/dev/actions/setup-rust@v47
         with:
           version: ${{ matrix.rust }}
           components: clippy
@@ -229,8 +229,8 @@ jobs:
     env:
       KUBERT_TEST_CLUSTER_VERSION: ${{ matrix.k8s }}
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v46
-      - uses: linkerd/dev/actions/setup-rust@v46
+      - uses: linkerd/dev/actions/setup-tools@v47
+      - uses: linkerd/dev/actions/setup-rust@v47
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0
       - run: just fetch
@@ -269,8 +269,8 @@ jobs:
       KUBERT_TEST_CLUSTER_VERSION: ${{ matrix.k8s }}
       KUBERT_TEST_NS: kubert-test
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v46
-      - uses: linkerd/dev/actions/setup-rust@v46
+      - uses: linkerd/dev/actions/setup-tools@v47
+      - uses: linkerd/dev/actions/setup-rust@v47
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - run: just features=${{ matrix.tls }} build-examples-image
       - run: just features=${{ matrix.tls }} test-cluster-create
@@ -289,8 +289,8 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v46
-      - uses: linkerd/dev/actions/setup-rust@v46
+      - uses: linkerd/dev/actions/setup-tools@v47
+      - uses: linkerd/dev/actions/setup-rust@v47
         with:
           version: ${{ matrix.rust }}
           components: clippy
@@ -311,8 +311,8 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
-      - uses: linkerd/dev/actions/setup-tools@v46
-      - uses: linkerd/dev/actions/setup-rust@v46
+      - uses: linkerd/dev/actions/setup-tools@v47
+      - uses: linkerd/dev/actions/setup-rust@v47
         with:
           version: ${{ matrix.rust }}
           components: clippy
