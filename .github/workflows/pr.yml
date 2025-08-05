@@ -159,7 +159,7 @@ jobs:
       matrix:
         rust:
           - "1.88"
-          - "1.83"
+          - "1.85"
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
@@ -269,7 +269,7 @@ jobs:
       matrix:
         rust:
           - "1.88"
-          - "1.83"
+          - "1.85"
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
@@ -291,7 +291,7 @@ jobs:
       matrix:
         rust:
           - "1.88"
-          - "1.83"
+          - "1.85"
     timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
