@@ -14,22 +14,13 @@
 //! which does not require either particular TLS implementation, so that the
 //! top-level binary crate may choose which TLS implementation is used.
 
-#![cfg_attr(
-    not(any(feature = "rustls-tls", feature = "openssl-tls")),
-    allow(dead_code, unused_variables)
-)]
-
 use std::{convert::Infallible, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use thiserror::Error;
 use tokio::net::{TcpListener, TcpStream};
 use tower::Service;
 use tracing::{debug, error, info, info_span, Instrument};
 
-#[cfg(feature = "rustls-tls")]
 mod tls_rustls;
-
-#[cfg(feature = "openssl-tls")]
-mod tls_openssl;
 
 #[cfg(test)]
 mod tests;
@@ -128,12 +119,6 @@ struct TlsPaths {
 impl ServerArgs {
     /// Attempts to load credentials and bind the server socket
     ///
-    /// # Panics
-    ///
-    /// This method panics if neither of [the "rustls-tls" or "openssl-tls" Cargo
-    /// features][tls-features] are enabled. See [the module-level
-    /// documentation][tls-doc] for details.
-    ///
     /// [tls-features]: crate#tls-features
     /// [tls-doc]: crate::server#tls-feature-flags
     pub async fn bind(self) -> Result<Bound, Error> {
@@ -143,9 +128,6 @@ impl ServerArgs {
             // Ensure the TLS key and certificate files load properly before binding the socket and
             // spawning the server.
 
-            #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
-            let _ = tls_openssl::load_tls(&key, &certs).await?;
-            #[cfg(feature = "rustls-tls")]
             let _ = tls_rustls::load_tls(&key, &certs).await?;
 
             Arc::new(TlsPaths { key, certs })
@@ -296,17 +278,7 @@ where
     let socket = {
         let TlsPaths { ref key, ref certs } = &*tls;
         // Reload the TLS credentials for each connection.
-
-        #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
-        let res = tls_openssl::load_tls(key, certs).await;
-        #[cfg(feature = "rustls-tls")]
-        let res = tls_rustls::load_tls(key, certs).await;
-        #[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
-        let res = {
-            enum Accept {}
-            Err::<Accept, _>(std::io::Error::other("TLS support not enabled"))
-        };
-        let tls = match res {
+        let tls = match tls_rustls::load_tls(key, certs).await {
             Ok(tls) => tls,
             Err(error) => {
                 info!(%error, "Connection failed");
@@ -314,14 +286,7 @@ where
             }
         };
         tracing::trace!("loaded TLS credentials");
-
-        #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
-        let res = tls_openssl::accept(&tls, socket).await;
-        #[cfg(feature = "rustls-tls")]
-        let res = tls_rustls::accept(&tls, socket).await;
-        #[cfg(not(any(feature = "rustls-tls", feature = "openssl-tls")))]
-        let res = Err::<TcpStream, _>(std::io::Error::other("TLS support not enabled"));
-        let socket = match res {
+        let socket = match tls_rustls::accept(&tls, socket).await {
             Ok(s) => s,
             Err(error) => {
                 info!(%error, "TLS handshake failed");
