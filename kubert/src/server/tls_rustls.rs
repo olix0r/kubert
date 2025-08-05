@@ -9,17 +9,12 @@ use tokio_rustls::{
     TlsAcceptor,
 };
 
-pub(in crate::server) async fn load_tls(
-    pk: &TlsKeyPath,
-    crts: &TlsCertPath,
-) -> Result<TlsAcceptor, Error> {
+pub(super) async fn load_tls(pk: &TlsKeyPath, crts: &TlsCertPath) -> Result<TlsAcceptor, Error> {
+    #[cfg(feature = "aws-lc-rs")]
     if tokio_rustls::rustls::crypto::CryptoProvider::get_default().is_none() {
         // The only error here is if it's been initialized in between: we can ignore it
         // since our semantic is only to set the default value if it does not exist.
-        #[cfg(feature = "rustls-tls-aws-lc-rs")]
         let _ = tokio_rustls::rustls::crypto::aws_lc_rs::default_provider().install_default();
-        #[cfg(feature = "rustls-tls-ring")]
-        let _ = tokio_rustls::rustls::crypto::ring::default_provider().install_default();
     }
 
     let key = load_private_key(pk).await.map_err(Error::TlsKeyReadError)?;
@@ -33,7 +28,7 @@ pub(in crate::server) async fn load_tls(
     Ok(TlsAcceptor::from(Arc::new(cfg)))
 }
 
-pub(in crate::server) async fn accept(
+pub(super) async fn accept(
     acceptor: &TlsAcceptor,
     sock: TcpStream,
 ) -> Result<TlsStream<TcpStream>, std::io::Error> {

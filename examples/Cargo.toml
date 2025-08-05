@@ -9,15 +9,11 @@ rust-version = "1.85"
 [package.metadata.release]
 release = false
 
-[features]
-default = ["rustls-tls"]
-rustls-tls = ["kubert/rustls-tls-aws-lc-rs"]
-openssl-tls = ["kubert/openssl-tls", "dep:openssl"]
-
 [dependencies.kubert]
 path = "../kubert"
 default-features = false
 features = [
+    "aws-lc-rs",
     "clap",
     "lease",
     "prometheus-client",
@@ -25,11 +21,6 @@ features = [
     "runtime-brotli",
     "runtime-diagnostics",
 ]
-
-[dependencies.openssl]
-version = "0.10.57"
-optional = true
-features = ["vendored"]
 
 [dev-dependencies]
 anyhow = "1"
