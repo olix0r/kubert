@@ -10,29 +10,10 @@ rust-version = "1.85"
 keywords = ["kubernetes", "client", "runtime", "server"]
 
 [features]
-rustls-tls = [
+_tls = [
     "dep:rustls-pemfile",
     "dep:tokio-rustls",
     "kube-client?/rustls-tls",
-]
-rustls-tls-aws-lc-rs = [
-    "rustls-tls",
-    "tokio-rustls/aws-lc-rs",
-    "kube-client?/aws-lc-rs",
-    "kube-client?/rustls-tls",
-]
-rustls-tls-ring = [
-    "rustls-tls",
-    "tokio-rustls/ring",
-    "kube-client?/ring",
-    "kube-client?/rustls-tls",
-]
-openssl-tls = [
-    "dep:hyper-openssl",
-    "dep:once_cell",
-    "dep:openssl",
-    "dep:tokio-openssl",
-    "kube-client?/openssl-tls",
 ]
 admin = [
     "dep:ahash",
@@ -52,7 +33,13 @@ admin = [
 admin-brotli = ["tower-http/compression-br"]
 admin-gzip = ["tower-http/compression-gzip"]
 admin-compression = ["admin-brotli", "admin-gzip"]
+aws-lc-rs = [
+    "_tls",
+    "tokio-rustls/aws-lc-rs",
+    "kube-client?/aws-lc-rs",
+]
 client = [
+    "_tls",
     "dep:bytes",
     "dep:futures-util",
     "dep:hyper",
@@ -139,8 +126,8 @@ runtime-brotli = ["admin-brotli", "client-brotli"]
 runtime-gzip = ["admin-gzip", "client-gzip"]
 runtime-compression = ["admin-compression", "client-decompression"]
 server = [
+    "_tls",
     "dep:drain",
-    "dep:rustls-pemfile",
     "dep:thiserror",
     "dep:tower",
     "dep:tracing",
@@ -170,9 +157,8 @@ shutdown = [
 
 [package.metadata.docs.rs]
 features = [
-    "rustls-tls",
-    "openssl-tls",
     "admin",
+    "aws-lc-rs",
     "client",
     "errors",
     "gzip",
@@ -203,10 +189,8 @@ futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
 http-body-util = { version = "0.1", optional = true }
 hyper = { workspace = true, optional = true, default-features = false }
-hyper-openssl = { workspace = true, optional = true }
 hyper-util = { workspace = true, optional = true, default-features = false }
 once_cell = { version = "1", optional = true }
-openssl = { version = "0.10.57", optional = true, default-features = false }
 parking_lot = { version = "0.12", optional = true }
 pin-project-lite = { version = "0.2", optional = true }
 prometheus-client = { workspace = true, optional = true }
@@ -217,7 +201,6 @@ sha2 = { version = "0.10", optional = true }
 thiserror = { version = "2", optional = true }
 tokio = { workspace = true, optional = false, default-features = false }
 tokio-rustls = { workspace = true, optional = true }
-tokio-openssl = { version = "0.6.3", optional = true }
 tokio-util = { version = "0.7", optional = true, default-features = false }
 tower-http = { version = "0.6.0", optional = true, default-features = false }
 tower = { version = "0.5", default-features = false, optional = true }
