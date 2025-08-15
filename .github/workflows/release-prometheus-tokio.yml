@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: ghcr.io/linkerd/dev:v46-rust
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - id: meta
         shell: bash
         run: |
@@ -81,7 +81,7 @@ jobs:
       RUSTFLAGS: '--cfg tokio_unstable'
       RUSTDOCFLAGS: '--cfg tokio_unstable'
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - run: cargo publish --package=kubert-prometheus-tokio --dry-run
       - if: needs.meta.outputs.mode == 'release'
         run: cargo publish --package=kubert-prometheus-tokio --token=${{ secrets.CRATESIO_TOKEN }}

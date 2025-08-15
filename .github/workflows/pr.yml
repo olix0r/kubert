@@ -18,7 +18,7 @@ jobs:
     timeout-minutes: 5
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
 
       - id: build
         uses: tj-actions/changed-files@94d97fe3f88298bf8b2f2db6fa2ab150f3c1ab77
@@ -123,7 +123,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: ghcr.io/linkerd/dev:v46-rust
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - run: just fmt-check
 
   doc:
@@ -133,7 +133,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: ghcr.io/linkerd/dev:v46-rust
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0
       - run: just fetch
       - run: just doc
@@ -145,7 +145,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: ghcr.io/linkerd/dev:v46-rust
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0
       - run: just fetch
       - run: cargo deny --all-features check bans licenses sources
@@ -168,7 +168,7 @@ jobs:
         with:
           version: ${{ matrix.rust }}
           components: clippy
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0
       - run: just fetch
       - run: just clippy-all
@@ -201,7 +201,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: ghcr.io/linkerd/dev:v46-rust
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0
       - run: just fetch
       - run: just "features=${{ matrix.feature }}" clippy
@@ -221,7 +221,7 @@ jobs:
     steps:
       - uses: linkerd/dev/actions/setup-tools@v46
       - uses: linkerd/dev/actions/setup-rust@v46
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0
       - run: just fetch
       - run: just build-examples
@@ -255,7 +255,7 @@ jobs:
     steps:
       - uses: linkerd/dev/actions/setup-tools@v46
       - uses: linkerd/dev/actions/setup-rust@v46
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - run: just build-examples-image
       - run: just test-cluster-create
       - run: just test-cluster-import-examples
@@ -278,7 +278,7 @@ jobs:
         with:
           version: ${{ matrix.rust }}
           components: clippy
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0
       - run: just fetch
       - run: just-cargo clippy -p kubert-prometheus-process
@@ -300,7 +300,7 @@ jobs:
         with:
           version: ${{ matrix.rust }}
           components: clippy
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0
       - run: just fetch
       - run: just-cargo clippy -p kubert-prometheus-tokio
@@ -312,7 +312,7 @@ jobs:
     timeout-minutes: 5
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
       - uses: DavidAnson/markdownlint-cli2-action@992badcdf24e3b8eb7e87ff9287fe931bcb00c6e
         with:
           globs: |
