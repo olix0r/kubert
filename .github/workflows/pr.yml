@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - id: build
-        uses: tj-actions/changed-files@94d97fe3f88298bf8b2f2db6fa2ab150f3c1ab77
+        uses: tj-actions/changed-files@e874f3cddd0f54ae776e6995ae6dae4cf40fd3d3
         with:
           files: |
             .github/workflows/pr.yml
@@ -29,20 +29,20 @@ jobs:
             examples/Dockerfile
 
       - id: markdown
-        uses: tj-actions/changed-files@94d97fe3f88298bf8b2f2db6fa2ab150f3c1ab77
+        uses: tj-actions/changed-files@e874f3cddd0f54ae776e6995ae6dae4cf40fd3d3
         with:
           files: |
             **/*.md
 
       - id: actions
-        uses: tj-actions/changed-files@94d97fe3f88298bf8b2f2db6fa2ab150f3c1ab77
+        uses: tj-actions/changed-files@e874f3cddd0f54ae776e6995ae6dae4cf40fd3d3
         with:
           files: |
             .github/workflows/**
             .devcontainer/*
 
       - id: kubert
-        uses: tj-actions/changed-files@94d97fe3f88298bf8b2f2db6fa2ab150f3c1ab77
+        uses: tj-actions/changed-files@e874f3cddd0f54ae776e6995ae6dae4cf40fd3d3
         with:
           files: |
             Cargo.toml
@@ -50,33 +50,33 @@ jobs:
             kubert-examples/**
 
       - id: kubert-prometheus-process
-        uses: tj-actions/changed-files@94d97fe3f88298bf8b2f2db6fa2ab150f3c1ab77
+        uses: tj-actions/changed-files@e874f3cddd0f54ae776e6995ae6dae4cf40fd3d3
         with:
           files: |
             Cargo.toml
             kubert-prometheus-process/**
 
       - id: kubert-prometheus-tokio
-        uses: tj-actions/changed-files@94d97fe3f88298bf8b2f2db6fa2ab150f3c1ab77
+        uses: tj-actions/changed-files@e874f3cddd0f54ae776e6995ae6dae4cf40fd3d3
         with:
           files: |
             Cargo.toml
             kubert-prometheus-tokio/**
 
       - id: cargo
-        uses: tj-actions/changed-files@94d97fe3f88298bf8b2f2db6fa2ab150f3c1ab77
+        uses: tj-actions/changed-files@e874f3cddd0f54ae776e6995ae6dae4cf40fd3d3
         with:
           files: |
             **/Cargo.toml
 
       - id: deny
-        uses: tj-actions/changed-files@94d97fe3f88298bf8b2f2db6fa2ab150f3c1ab77
+        uses: tj-actions/changed-files@e874f3cddd0f54ae776e6995ae6dae4cf40fd3d3
         with:
           files: |
             deny.toml
 
       - id: rust
-        uses: tj-actions/changed-files@94d97fe3f88298bf8b2f2db6fa2ab150f3c1ab77
+        uses: tj-actions/changed-files@e874f3cddd0f54ae776e6995ae6dae4cf40fd3d3
         with:
           files: |
             **/*.rs
