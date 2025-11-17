@@ -27,7 +27,7 @@ anyhow = "1"
 chrono = { version = "0.4", default-features = false }
 futures = { version = "0.3", default-features = false }
 maplit = "1"
-prometheus-client = "0.23"
+prometheus-client = "0.24"
 rand = "0.9"
 regex = "1"
 thiserror = "2"

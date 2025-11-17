@@ -26,7 +26,7 @@ kube-core = { version = ">=1.1.0,<1.2.0", default-features = false }
 kube-runtime = { version = ">=1.1.0,<1.2.0", default-features = false }
 kube = { version = ">=1.1.0,<1.2.0", default-features = false }
 
-prometheus-client = { version = "0.23.0", default-features = false }
+prometheus-client = { version = "0.24.0", default-features = false }
 
 tokio = { version = "1.17.0", default-features = false }
 tokio-rustls = { version = "0.26.1", default-features = false }
