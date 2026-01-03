@@ -19,7 +19,7 @@ clap = { version = "4", default-features = false }
 hyper = { version = "1", default-features = false }
 hyper-util = { version = "0.1", default-features = false }
 
-k8s-openapi = { version = "0.26", features = ["v1_34"] }
+k8s-openapi = { version = "0.26", default-features = false }
 
 kube-client = { version = ">=2.0.0,<2.1.0", default-features = false }
 kube-core = { version = ">=2.0.0,<2.1.0", default-features = false }
