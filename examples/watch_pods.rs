@@ -183,7 +183,7 @@ async fn main() -> Result<()> {
 
         // If the watch stream completes, exit gracefully
         res = task => match res {
-            Err(error) => bail!("spawned task failed: {}", error),
+            Err(error) => bail!("spawned task failed: {error}"),
             Ok(Err(_)) => bail!("Timed out waiting for the first update"),
             Ok(Ok(())) => {
                 tracing::debug!("watch completed");
