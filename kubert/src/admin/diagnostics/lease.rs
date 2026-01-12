@@ -54,7 +54,7 @@ impl LeaseDiagnostics {
             field_manager,
         }: &crate::LeaseParams,
     ) -> Self {
-        let now = Time(chrono::Utc::now());
+        let now = Time(jiff::Timestamp::now());
         Self(Arc::new(RwLock::new(LeaseState {
             name: name.clone(),
             namespace: namespace.clone(),
@@ -90,7 +90,7 @@ impl LeaseDiagnostics {
         {
             return;
         }
-        let now = Time(chrono::Utc::now());
+        let now = Time(jiff::Timestamp::now());
         state.current = claim
             .as_deref()
             .cloned()

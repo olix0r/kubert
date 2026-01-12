@@ -12,7 +12,7 @@ use self::watch::WatchDiagnostics;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Diagnostics {
-    initial_time: chrono::DateTime<chrono::Utc>,
+    initial_time: jiff::Timestamp,
     watches: Arc<Mutex<Vec<watch::StateRef>>>,
     #[cfg(feature = "lease")]
     leases: Arc<Mutex<Vec<lease::StateRef>>>,
@@ -37,7 +37,7 @@ struct Summary {
 impl Diagnostics {
     pub(super) fn new() -> Self {
         Self {
-            initial_time: chrono::Utc::now(),
+            initial_time: jiff::Timestamp::now(),
             watches: Default::default(),
             #[cfg(feature = "lease")]
             leases: Default::default(),
@@ -81,7 +81,7 @@ impl Diagnostics {
         let leases = self.summarize_leases();
         let summary = Summary {
             initial_timestamp: Time(self.initial_time),
-            current_timestamp: Time(chrono::Utc::now()),
+            current_timestamp: Time(jiff::Timestamp::now()),
             watches,
             #[cfg(feature = "lease")]
             leases,

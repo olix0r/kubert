@@ -88,7 +88,7 @@ impl WatchDiagnostics {
             api_url: api_url.to_string(),
             label_selector: label_selector.unwrap_or_default().to_string(),
             stats: WatchStats {
-                creation_timestamp: Time(chrono::Utc::now()),
+                creation_timestamp: Time(jiff::Timestamp::now()),
                 errors: 0,
                 last_error: None,
                 resets: 0,
@@ -137,7 +137,7 @@ impl WatchDiagnostics {
             uid: meta.uid.clone().unwrap_or_default(),
         };
 
-        let now = Time(chrono::Utc::now());
+        let now = Time(jiff::Timestamp::now());
         let WatchState {
             ref mut known,
             ref mut resetting,
