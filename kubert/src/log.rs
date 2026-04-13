@@ -13,10 +13,11 @@ pub use tracing_subscriber::util::TryInitError as LogInitError;
 
 /// Configures whether logs should be emitted in plaintext (the default) or as JSON-encoded
 /// messages
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 #[cfg_attr(docsrs, doc(cfg(feature = "log")))]
 pub enum LogFormat {
     /// The default plaintext format
+    #[default]
     Plain,
 
     /// The JSON-encoded format
@@ -153,12 +154,6 @@ impl std::fmt::Display for LogFilter {
 }
 
 // === impl LogFormat ===
-
-impl Default for LogFormat {
-    fn default() -> Self {
-        Self::Plain
-    }
-}
 
 impl std::str::FromStr for LogFormat {
     type Err = InvalidLogFormat;
