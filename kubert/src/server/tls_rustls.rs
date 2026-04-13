@@ -1,5 +1,5 @@
 use super::*;
-use rustls_pki_types::{pem::PemObject, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer};
+use rustls_pki_types::{pem::PemObject as _, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer};
 use std::sync::Arc;
 use tokio_rustls::{
     rustls::{
