@@ -99,7 +99,7 @@ jobs:
       actions: ${{ steps.actions.outputs.any_changed == 'true' }}
       cargo: ${{ steps.cargo.outputs.any_changed == 'true' }}
       deny: ${{ steps.deny.outputs.any_changed == 'true' }}
-      kubert: ${{ steps.kubert.outputs.any_changed == 'true' }}
+      kubert: ${{ true || steps.kubert.outputs.any_changed == 'true' }}
       kubert-prometheus-process: ${{ steps.kubert-prometheus-process.outputs.any_changed == 'true' }}
       kubert-prometheus-tokio: ${{ steps.kubert-prometheus-tokio.outputs.any_changed == 'true' }}
       rust: ${{ steps.rust.outputs.any_changed == 'true' }}
