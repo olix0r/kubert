@@ -355,7 +355,7 @@ impl Handle {
     }
 
     fn rand_name(base: impl std::fmt::Display) -> String {
-        use rand::Rng;
+        use rand::RngExt as _;
 
         struct LowercaseAlphanumeric;
 
