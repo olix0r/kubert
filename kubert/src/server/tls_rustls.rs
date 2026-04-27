@@ -1,4 +1,5 @@
 use super::*;
+use rustls_pki_types::{pem::PemObject as _, PrivatePkcs1KeyDer, PrivatePkcs8KeyDer};
 use std::sync::Arc;
 use tokio_rustls::{
     rustls::{
@@ -39,19 +40,23 @@ async fn load_certs(
     TlsCertPath(cp): &TlsCertPath,
 ) -> std::io::Result<Vec<CertificateDer<'static>>> {
     let pem = tokio::fs::read(cp).await?;
-    rustls_pemfile::certs(&mut pem.as_slice()).collect()
+    CertificateDer::pem_slice_iter(pem.as_slice())
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(std::io::Error::other)
 }
 
 async fn load_private_key(TlsKeyPath(kp): &TlsKeyPath) -> std::io::Result<PrivateKeyDer<'static>> {
     let pem = tokio::fs::read(kp).await?;
 
-    let mut keys = rustls_pemfile::pkcs8_private_keys(&mut pem.as_slice())
+    let mut keys = PrivatePkcs8KeyDer::pem_slice_iter(pem.as_slice())
         .map(|res| res.map(PrivateKeyDer::from))
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(std::io::Error::other)?;
     if keys.is_empty() {
-        keys = rustls_pemfile::rsa_private_keys(&mut pem.as_slice())
+        keys = PrivatePkcs1KeyDer::pem_slice_iter(pem.as_slice())
             .map(|res| res.map(PrivateKeyDer::from))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(std::io::Error::other)?;
     }
 
     let key = keys
