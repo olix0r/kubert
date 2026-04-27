@@ -22,7 +22,7 @@ jobs:
     permissions:
       actions: write
     steps:
-      - uses: styfle/cancel-workflow-action@85880fa0301c86cca9da44039ee3bb12d3bedbfa
+      - uses: styfle/cancel-workflow-action@d07a454dad7609a92316b57b23c9ccfd4f59af66
         with:
           all_but_latest: true
           access_token: ${{ github.token }}
