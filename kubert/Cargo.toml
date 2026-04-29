@@ -76,7 +76,7 @@ initialized = [
 ]
 lease = [
     "dep:backon",
-    "dep:chrono",
+    "dep:jiff",
     "dep:futures-util",
     "dep:hyper",
     "dep:k8s-openapi",
@@ -115,7 +115,7 @@ runtime = [
     "shutdown",
 ]
 runtime-diagnostics = [
-    "dep:chrono",
+    "dep:jiff",
     "dep:serde_json",
     "dep:k8s-openapi",
     "dep:parking_lot",
@@ -184,9 +184,9 @@ ahash = { version = "0.8", optional = true }
 backon = { version = "1", optional = true, features = ["tokio-sleep"] }
 bytes = { version = "1", optional = true }
 drain = { version = "0.2.1", optional = true, default-features = false }
-chrono = { version = "0.4", optional = true, default-features = false }
 futures-core = { version = "0.3", optional = true, default-features = false }
 futures-util = { version = "0.3", optional = true, default-features = false }
+jiff = { version = "0.2", optional = true, default-features = false }
 http-body-util = { version = "0.1", optional = true }
 hyper = { workspace = true, optional = true, default-features = false }
 hyper-util = { workspace = true, optional = true, default-features = false }
