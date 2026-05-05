@@ -1,4 +1,8 @@
 use super::*;
+use rustls_pki_types::{
+    pem::{Error as PemError, PemObject as _},
+    PrivatePkcs1KeyDer, PrivatePkcs8KeyDer,
+};
 use std::sync::Arc;
 use tokio_rustls::{
     rustls::{
@@ -39,19 +43,23 @@ async fn load_certs(
     TlsCertPath(cp): &TlsCertPath,
 ) -> std::io::Result<Vec<CertificateDer<'static>>> {
     let pem = tokio::fs::read(cp).await?;
-    rustls_pemfile::certs(&mut pem.as_slice()).collect()
+    CertificateDer::pem_slice_iter(pem.as_slice())
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(pem_error_into_io_error)
 }
 
 async fn load_private_key(TlsKeyPath(kp): &TlsKeyPath) -> std::io::Result<PrivateKeyDer<'static>> {
     let pem = tokio::fs::read(kp).await?;
 
-    let mut keys = rustls_pemfile::pkcs8_private_keys(&mut pem.as_slice())
+    let mut keys = PrivatePkcs8KeyDer::pem_slice_iter(pem.as_slice())
         .map(|res| res.map(PrivateKeyDer::from))
-        .collect::<Result<Vec<_>, _>>()?;
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(pem_error_into_io_error)?;
     if keys.is_empty() {
-        keys = rustls_pemfile::rsa_private_keys(&mut pem.as_slice())
+        keys = PrivatePkcs1KeyDer::pem_slice_iter(pem.as_slice())
             .map(|res| res.map(PrivateKeyDer::from))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(pem_error_into_io_error)?;
     }
 
     let key = keys
@@ -61,4 +69,35 @@ async fn load_private_key(TlsKeyPath(kp): &TlsKeyPath) -> std::io::Result<Privat
         return Err(std::io::Error::other("too many private keys"));
     }
     Ok(key)
+}
+
+/// Converts a [`rustls_pki_types::pem::Error`] into a [`std::io::Error`].
+///
+/// This function exists to preserve identical error semantics and error formatting with the
+/// behavior previously exhibited by `rustls_pemfile`. This presents errors due to missing section
+/// end markers, illegal section starts, and decoding errors as [`std::io::ErrorKind::InvalidData`]
+/// errors. Other pemfile errors are reported as "other" i/o errors.
+fn pem_error_into_io_error(error: PemError) -> std::io::Error {
+    use std::io::{self, ErrorKind};
+
+    match error {
+        PemError::MissingSectionEnd { end_marker } => io::Error::new(
+            ErrorKind::InvalidData,
+            format!(
+                "section end {:?} missing",
+                String::from_utf8_lossy(&end_marker)
+            ),
+        ),
+
+        PemError::IllegalSectionStart { line } => io::Error::new(
+            ErrorKind::InvalidData,
+            format!(
+                "illegal section start: {:?}",
+                String::from_utf8_lossy(&line)
+            ),
+        ),
+
+        PemError::Base64Decode(err) => io::Error::new(ErrorKind::InvalidData, err),
+        error => io::Error::other(error),
+    }
 }
