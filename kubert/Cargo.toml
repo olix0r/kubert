@@ -136,7 +136,6 @@ server = [
     "hyper/server",
     "hyper-util/server",
     "hyper-util/server-auto",
-    "hyper-util/server-graceful",
     "hyper-util/service",
     "tokio/fs",
     "tokio/macros",

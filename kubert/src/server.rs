@@ -324,27 +324,26 @@ where
         .http1()
         .header_read_timeout(std::time::Duration::from_secs(2))
         .timer(hyper_util::rt::TokioTimer::default());
-    let graceful = hyper_util::server::graceful::GracefulShutdown::new();
-    let conn = graceful.watch(
-        builder
-            .serve_connection(
-                hyper_util::rt::TokioIo::new(socket),
-                hyper_util::service::TowerToHyperService::new(service),
-            )
-            .into_owned(),
-    );
-    tokio::spawn(
-        async move {
-            match conn.await {
-                Ok(()) => debug!("Connection closed"),
-                Err(error) => info!(%error, "Connection lost"),
-            }
+    let conn = builder
+        .serve_connection(
+            hyper_util::rt::TokioIo::new(socket),
+            hyper_util::service::TowerToHyperService::new(service),
+        )
+        .into_owned();
+    tokio::pin!(conn);
+    let res = tokio::select! {
+        biased; // Always check if the connection is closed first. No need for graceful shutdown in
+                // that case
+        res = &mut conn => res,
+        release = drain.signaled() => {
+            conn.as_mut().graceful_shutdown();
+            release.release_after(conn).await
         }
-        .in_current_span(),
-    );
-
-    let latch = drain.signaled().await;
-    latch.release_after(graceful.shutdown()).await;
+    };
+    match res {
+        Ok(()) => debug!("Connection closed"),
+        Err(error) => info!(%error, "Connection lost"),
+    }
 }
 
 // === impl TlsCertPath ===
